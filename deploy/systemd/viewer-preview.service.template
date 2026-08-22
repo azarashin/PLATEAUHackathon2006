@@ -1,0 +1,15 @@
+[Unit]
+Description=Environmental Cost Route Viewer preview server
+After=network.target
+
+[Service]
+Type=simple
+User=${VIEWER_SERVICE_USER}
+WorkingDirectory=${VIEWER_REPOSITORY_ROOT}/viewer
+EnvironmentFile=${VIEWER_ENV_FILE}
+ExecStart=/usr/bin/npm run preview -- --host ${VIEWER_BIND_HOST} --port ${VIEWER_PORT} --strictPort
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

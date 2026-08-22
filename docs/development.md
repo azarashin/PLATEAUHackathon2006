@@ -8,6 +8,7 @@
 | npm | 11.5.2 |
 | Vite | 8.2.2 |
 | TypeScript | 7.0.2 |
+| MapLibre GL JS | 6.5.0 |
 | Unity | 6000.5.9f1（Unity 6.5） |
 | PLATEAU SDK for Unity | 4.3.0（Issue #4 で導入） |
 
@@ -30,6 +31,9 @@ Node.js の版が異なる場合は、利用しているバージョンマネー
 cd viewer
 npm run dev
 ```
+
+Viewer のURLはViteが起動時に表示します。特定のポートを使う場合は、ローカル環境で
+`npm run dev -- --port <viewer-port> --strictPort` のように指定してください。
 
 ### 型チェックとビルド
 
