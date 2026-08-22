@@ -212,7 +212,7 @@ cd <repository-root>
 git pull --ff-only
 cd viewer
 npm ci
-npm run build
+VIEWER_BASE_PATH='<public-base-path>' npm run build
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -244,16 +244,79 @@ curl --fail --show-error --head https://<public-hostname><public-base-path>envir
 - 日陰／内水モードを切り替えられる
 - 実ホスト名や証明書秘密鍵がGit差分へ含まれていない
 
-## サブパスで画面が空になる場合
+## systemdが `Missing script: "start"` で終了する場合
 
-HTMLは取得できても、Viteクライアント、`src/main.ts`、fixtureがサイトのルートを参照すると、
-JavaScriptが実行されず空画面になります。ブラウザの開発者ツールまたは次のコマンドで確認します。
+このViewerの `package.json` には `start` スクリプトがありません。systemdユニットが
+`npm start` を実行していると、起動直後に終了し、`Restart=on-failure` によって再起動を繰り返します。
+
+まず実際に読み込まれているユニットとログを確認します。
 
 ```bash
-curl --fail --show-error --head https://<public-hostname><public-base-path>@vite/client
-curl --fail --show-error --head https://<public-hostname><public-base-path>src/main.ts
-curl --fail --show-error --head https://<public-hostname><public-base-path>environment-costs-phase-a.geojson
+sudo systemctl cat <service-name>
+sudo journalctl -u <service-name> -n 100 --no-pager
 ```
 
-期待するContent-Typeは、順にJavaScript、JavaScript、GeoJSONです。すべて同じHTMLが返る場合は、
-`VIEWER_BASE_PATH` とNginxのlocation／`proxy_pass`が一致しているか確認し、Viteを再起動します。
+`WorkingDirectory` が `<repository-root>/viewer` を指していること、`ExecStart` が次の形式であることを
+確認します。
+
+```ini
+WorkingDirectory=<repository-root>/viewer
+EnvironmentFile=/etc/environmental-cost-viewer.env
+ExecStart=/usr/bin/npm run preview -- --host ${VIEWER_BIND_HOST} --port ${VIEWER_PORT} --strictPort
+```
+
+変更後はビルドとsystemd設定の再読込を行います。
+
+```bash
+cd <repository-root>/viewer
+npm ci
+VIEWER_BASE_PATH='<public-base-path>' npm run build
+sudo systemctl daemon-reload
+sudo systemctl restart <service-name>
+sudo systemctl status <service-name>
+```
+
+## サブパスで画面が空になる場合
+
+`VIEWER_BASE_PATH` にはサーバー上の配置先ではなく、ブラウザから見える公開URLのパスを指定します。
+例えば `https://example.com/environment-cost-route-finder/` で公開する場合は次の値です。
+
+```dotenv
+VIEWER_BASE_PATH=/environment-cost-route-finder/
+```
+
+`/home/user/repository/viewer/` のようなファイルシステム上のパスを設定すると、Viteはその文字列を
+公開URLとして扱い、別のURLへアクセスするよう案内します。
+
+`VIEWER_BASE_PATH` はビルド成果物にも埋め込まれるため、環境ファイルを直しただけでは反映されません。
+正しい値を指定して再ビルドし、サービスを再起動します。
+
+```bash
+cd <repository-root>/viewer
+VIEWER_BASE_PATH='<public-base-path>' npm run build
+sudo systemctl restart <service-name>
+```
+
+HTMLは取得できても、JavaScript、CSS、fixtureの参照先がサイトのルートになっていると空画面になります。
+公開HTMLに埋め込まれた参照先とfixtureの応答を確認します。
+
+```bash
+curl --silent --show-error https://<public-hostname><public-base-path> \
+  | grep -Eo '(src|href)="[^"]+"'
+curl --include https://<public-hostname><public-base-path>environment-costs-phase-a.geojson
+```
+
+JavaScriptとCSSのURLには `<public-base-path>` が含まれ、fixtureはHTTP 200でJSONまたはGeoJSONを
+返す必要があります。fixtureの要求にHTMLが返る場合は、Nginxのフォールバックが誤って適用されています。
+
+Vite previewを使う場合は、リバースプロキシを経由せずサーバー内部からも確認します。
+
+```bash
+curl --include http://<bind-address>:<viewer-port><public-base-path>
+curl --include http://<bind-address>:<viewer-port><public-base-path>environment-costs-phase-a.geojson
+```
+
+内部URLが成功し、公開URLだけが失敗する場合はNginx設定を確認します。サブパスを維持する構成では、
+`proxy_pass http://<bind-address>:<viewer-port>;` の末尾に `/` を付けません。ブラウザの開発者ツールでは
+ConsoleとNetworkを確認し、アセットの404や `Unexpected token '<'` がないか調べます。後者は、
+JavaScriptやGeoJSONの代わりにHTMLが返された場合によく発生します。
