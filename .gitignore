@@ -15,6 +15,15 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
+# Unity project lives under simulator/
+/simulator/[Ll]ibrary/
+/simulator/[Tt]emp/
+/simulator/[Oo]bj/
+/simulator/[Bb]uild/
+/simulator/[Bb]uilds/
+/simulator/[Ll]ogs/
+/simulator/[Uu]ser[Ss]ettings/
+
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
 *.blend1.meta
@@ -104,3 +113,21 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Viewer dependencies, build artifacts, and local settings
+/viewer/node_modules/
+/viewer/dist/
+/viewer/.vite/
+*.local
+.env
+.env.*
+!.env.example
+
+# Large or generated datasets stay reproducible outside normal Git history
+/data/raw/*
+!/data/raw/README.md
+/data/generated/*
+!/data/generated/README.md
+
+# Local mirror of the GitHub Wiki planning page
+/Documents/planning.md
