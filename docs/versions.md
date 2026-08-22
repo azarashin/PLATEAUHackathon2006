@@ -6,6 +6,7 @@
 - npm: 11.5.2
 - Vite: 8.2.2
 - TypeScript: 7.0.2
+- MapLibre GL JS: 6.5.0
 
 Node.js はローカル環境で利用可能な22系LTSへ固定しています。Vite 8 が要求する Node.js 22.12 以上を満たします。依存パッケージは `viewer/package-lock.json` で固定し、更新は意図した変更としてレビューします。
 
