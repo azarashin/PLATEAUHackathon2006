@@ -1,0 +1,92 @@
+{
+  "type": "FeatureCollection",
+  "name": "Demo area candidates",
+  "project": {
+    "updatedAt": "2026-08-23",
+    "coordinateReferenceSystem": "OGC:CRS84",
+    "coordinateOrder": "longitude, latitude",
+    "simulationAreaCount": 5,
+    "defaultCoverageRadiusMeters": 4000,
+    "approximateCoverageAreaSquareKilometers": 50.265,
+    "currentLocationMode": {
+      "id": "current-location",
+      "usesDeviceGeolocation": true,
+      "mvpSimulationRequired": false,
+      "mvpBehavior": "center-map-and-use-precomputed-data-if-covered",
+      "productionBehavior": "refresh-cost-window-and-reroute",
+      "productionCoverageRadiusMeters": 4000
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "kyoto",
+      "properties": {
+        "name": "京都市",
+        "municipalityCode": "26100",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "pending-challenge-review"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "id": "maizuru",
+      "properties": {
+        "name": "舞鶴市",
+        "municipalityCode": "26202",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "pending-challenge-review"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "id": "fujisawa",
+      "properties": {
+        "name": "藤沢市",
+        "municipalityCode": "14205",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "pending-challenge-review"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "id": "saitama",
+      "properties": {
+        "name": "さいたま市",
+        "municipalityCode": "11100",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "pending-challenge-review"
+      },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "id": "ichigaya-venue",
+      "properties": {
+        "name": "市ヶ谷周辺（ハッカソン開催地）",
+        "municipalityCode": "13101",
+        "role": "venue-simulation-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "venue": "五番町グランドビル",
+        "address": "東京都千代田区五番町3-1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.736043, 35.69047]
+      }
+    }
+  ]
+}
