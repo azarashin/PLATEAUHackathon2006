@@ -55,6 +55,9 @@ PLATEAU SDK for Unity は v4.3.0 を採用予定ですが、導入と動作確�
 
 データの取得元、版、ライセンス、座標系、再生成手順は、データを追加する Issue で文書化します。秘密情報や端末固有値はコミットせず、必要になった時点で `.env.example` のみ追加します。
 
+MVPの対象地区、入力データ、座標・日時条件は
+[対象地区と入力データ](docs/target-area-and-input-data.md) に記録しています。
+
 詳細は [開発ガイド](docs/development.md) と [バージョン方針](docs/versions.md) を参照してください。
 
 ## ライセンス
