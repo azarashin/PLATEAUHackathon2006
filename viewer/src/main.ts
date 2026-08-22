@@ -49,7 +49,7 @@ interface EnvironmentCostsFixture {
   features: RoadFeature[]
 }
 
-const fixtureUrl = '/environment-costs-phase-a.geojson'
+const fixtureUrl = `${import.meta.env.BASE_URL}environment-costs-phase-a.geojson`
 const baseStyle: StyleSpecification = {
   version: 8,
   sources: {
