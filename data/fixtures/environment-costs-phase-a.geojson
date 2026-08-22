@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "fixture": {
+    "isDummy": true,
+    "label": "デモ用ダミーデータ",
+    "notice": "表示確認用に作成した架空の値です。実際の環境評価や避難判断には使用できません。"
+  },
+  "name": "環境コスト Viewer フェーズA fixture",
+  "bbox": [139.7646, 35.6812, 139.7708, 35.6858],
+  "costModes": [
+    {
+      "id": "shade",
+      "displayName": "日陰",
+      "description": "歩行時に日陰を通れる割合のデモ値です。値が高い道路ほど快適な区間として表示します。",
+      "unit": "%",
+      "range": { "min": 0, "max": 100 },
+      "valueDirection": "higher-is-better",
+      "valueDirectionLabel": "高いほど快適",
+      "colors": [
+        { "value": 0, "color": "#f59e0b", "label": "日向が多い" },
+        { "value": 50, "color": "#84cc16", "label": "中程度" },
+        { "value": 100, "color": "#047857", "label": "日陰が多い" }
+      ],
+      "sampleKpi": { "label": "エリア平均日陰率", "value": 62, "unit": "%" }
+    },
+    {
+      "id": "inland-flood",
+      "displayName": "内水",
+      "description": "大雨時の想定浸水深を模したデモ値です。値が高い道路ほど注意が必要な区間として表示します。",
+      "unit": "m",
+      "range": { "min": 0, "max": 0.6 },
+      "valueDirection": "higher-is-worse",
+      "valueDirectionLabel": "高いほどリスク大",
+      "colors": [
+        { "value": 0, "color": "#dbeafe", "label": "リスク低" },
+        { "value": 0.3, "color": "#3b82f6", "label": "注意" },
+        { "value": 0.6, "color": "#1e3a8a", "label": "リスク高" }
+      ],
+      "sampleKpi": { "label": "エリア最大想定浸水深", "value": 0.48, "unit": "m" }
+    }
+  ],
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "road-001", "name": "中央通り（デモ）", "costs": { "shade": 82, "inland-flood": 0.08 } },
+      "geometry": { "type": "LineString", "coordinates": [[139.7648, 35.6820], [139.7664, 35.6828], [139.7680, 35.6835], [139.7704, 35.6841]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "road-002", "name": "公園東通り（デモ）", "costs": { "shade": 65, "inland-flood": 0.22 } },
+      "geometry": { "type": "LineString", "coordinates": [[139.7652, 35.6852], [139.7660, 35.6840], [139.7664, 35.6828], [139.7668, 35.6815]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "road-003", "name": "水辺通り（デモ）", "costs": { "shade": 28, "inland-flood": 0.48 } },
+      "geometry": { "type": "LineString", "coordinates": [[139.7649, 35.6846], [139.7660, 35.6840], [139.7683, 35.6830], [139.7706, 35.6818]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "road-004", "name": "駅前南通り（デモ）", "costs": { "shade": 46, "inland-flood": 0.34 } },
+      "geometry": { "type": "LineString", "coordinates": [[139.7680, 35.6855], [139.7681, 35.6842], [139.7683, 35.6830], [139.7688, 35.6814]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "road-005", "name": "緑道（デモ）", "costs": { "shade": 91, "inland-flood": 0.13 } },
+      "geometry": { "type": "LineString", "coordinates": [[139.7652, 35.6852], [139.7667, 35.6850], [139.7680, 35.6855], [139.7703, 35.6850]] }
+    }
+  ]
+}
