@@ -1,0 +1,125 @@
+{
+  "type": "FeatureCollection",
+  "name": "Demo area candidates",
+  "project": {
+    "updatedAt": "2026-08-23",
+    "coordinateReferenceSystem": "OGC:CRS84",
+    "coordinateOrder": "longitude, latitude",
+    "simulationAreaCount": 5,
+    "defaultCoverageRadiusMeters": 4000,
+    "approximateCoverageAreaSquareKilometers": 50.265,
+    "demoRouteDistanceMeters": {
+      "minimum": 3000,
+      "maximum": 5000
+    },
+    "demoEndpointSelection": "interactive-map-ui",
+    "mvpPilotAnalysis": {
+      "areaId": "ichigaya-venue",
+      "required": true,
+      "meshPartitioningIssue": 26
+    },
+    "currentLocationMode": {
+      "id": "current-location",
+      "usesDeviceGeolocation": true,
+      "mvpSimulationRequired": false,
+      "mvpBehavior": "center-map-and-use-precomputed-data-if-covered",
+      "productionBehavior": "refresh-cost-window-and-reroute",
+      "productionCoverageRadiusMeters": 4000
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "kyoto",
+      "properties": {
+        "name": "京都市",
+        "municipalityCode": "26100",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "centerName": "京都駅",
+        "demoRouteDistanceMeters": { "minimum": 3000, "maximum": 5000 }
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [135.75877, 34.98535]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "maizuru",
+      "properties": {
+        "name": "舞鶴市",
+        "municipalityCode": "26202",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "centerName": "東舞鶴駅",
+        "demoRouteDistanceMeters": { "minimum": 3000, "maximum": 5000 }
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [135.3946946, 35.4685404]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fujisawa",
+      "properties": {
+        "name": "藤沢市",
+        "municipalityCode": "14205",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "centerName": "藤沢駅",
+        "demoRouteDistanceMeters": { "minimum": 3000, "maximum": 5000 }
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.487293, 35.338882]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "saitama",
+      "properties": {
+        "name": "さいたま市",
+        "municipalityCode": "11100",
+        "role": "challenge-study-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "centerName": "大宮区天沼町二丁目（町丁境界の図形中心点）",
+        "address": "埼玉県さいたま市大宮区天沼町二丁目",
+        "hazardFocus": "内水氾濫・道路冠水",
+        "demoRouteDistanceMeters": { "minimum": 3000, "maximum": 5000 }
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.640025, 35.900757]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ichigaya-venue",
+      "properties": {
+        "name": "市ヶ谷周辺（ハッカソン開催地）",
+        "municipalityCode": "13101",
+        "role": "venue-simulation-area",
+        "simulationRequired": true,
+        "coverageRadiusMeters": 4000,
+        "boundaryStatus": "center-and-radius-defined",
+        "venue": "五番町グランドビル",
+        "address": "東京都千代田区五番町3-1",
+        "demoRouteDistanceMeters": { "minimum": 3000, "maximum": 5000 }
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.736043, 35.69047]
+      }
+    }
+  ]
+}
