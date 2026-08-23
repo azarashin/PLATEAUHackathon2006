@@ -27,3 +27,9 @@ Viewer はこのファイルを直接読み込んで表示を切り替えます�
 `invalid/environment-cost-road-network-v1-cases.json` は正常fixtureへ意図的な変更を適用する異常系テストです。
 検証コマンドと詳細規則は
 [`docs/environment-cost-data-contract-v1.md`](../../docs/environment-cost-data-contract-v1.md) を参照してください。
+
+`environment-cost-road-network-integration-v1.json`はIssue #9の結合ツールで生成するViewer統合fixtureです。3ノード、3有向辺、2時刻、8,854 bytesで、物理重複辺の有効サンプル加重集約、両方向辺、道路グラフ境界の明示的欠測を含みます。次のコマンドで決定的に再生成できます。
+
+```bash
+node tools/environment-cost-network/generate-viewer-fixture.mjs
+```

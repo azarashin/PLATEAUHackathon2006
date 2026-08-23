@@ -106,3 +106,5 @@ npm run build
 `validate:contract` は JSON Schema と参照・一意性・値域・時刻・欠測の意味制約を検証します。
 `test:contract` は正常fixtureと、ID重複、参照切れ、範囲外、不正な日時形式、未登録時刻、欠測の0埋めを含む
 異常fixture群が期待どおり拒否されることを確認します。
+
+Unity解析結果と歩行道路グラフからこの契約を生成する方法、重複元辺の集約、座標変換、実データの監査値は[環境コスト道路ネットワークの生成](environment-cost-road-network-generation.md)を参照してください。

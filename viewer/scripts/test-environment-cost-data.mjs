@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { validateDocument } from './validate-environment-cost-data.mjs'
 
 const validPath = fileURLToPath(new URL('../../data/fixtures/environment-cost-road-network-v1.json', import.meta.url))
+const integrationPath = fileURLToPath(new URL('../../data/fixtures/environment-cost-road-network-integration-v1.json', import.meta.url))
 const casesPath = fileURLToPath(new URL('../../data/fixtures/invalid/environment-cost-road-network-v1-cases.json', import.meta.url))
 const validDocument = JSON.parse(await readFile(validPath, 'utf8'))
+const integrationDocument = JSON.parse(await readFile(integrationPath, 'utf8'))
 const invalidCases = JSON.parse(await readFile(casesPath, 'utf8'))
 
 function valueAtPointer(document, pointer) {
@@ -26,6 +28,11 @@ function applyMutation(document, mutation) {
 }
 
 assert.deepEqual(validateDocument(validDocument), [], 'normal fixture must pass the formal contract')
+assert.deepEqual(validateDocument(integrationDocument), [], 'generated integration fixture must pass the formal contract')
+assert.equal(integrationDocument.nodes.length, 3)
+assert.equal(integrationDocument.edges.length, 3)
+assert.equal(integrationDocument.scenario.availableTimestamps.length, 2)
+assert.equal(integrationDocument.extensions.integration.unmatchedPhysicalEdgeCount, 1)
 
 for (const testCase of invalidCases.cases) {
   const document = structuredClone(validDocument)

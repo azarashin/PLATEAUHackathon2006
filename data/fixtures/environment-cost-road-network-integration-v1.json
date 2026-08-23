@@ -1,0 +1,339 @@
+{
+  "schemaVersion": "environment-cost-road-network-1.0",
+  "dataset": {
+    "id": "ichigaya-integration-fixture-environment-cost-road-network-v1",
+    "name": "ichigaya-integration-fixture 時間別環境コスト道路ネットワーク",
+    "provenance": "fixture",
+    "generatedAt": "2026-08-23T06:30:00Z",
+    "notice": "Viewer統合テスト用の小型架空データです。実際の環境評価や避難判断には使用できません。",
+    "contentFingerprintSha256": "45ba8dd1902f00717a06ae1367f7e96de3a6ce0fa0b3fe324a59a29d04900d79"
+  },
+  "area": {
+    "areaId": "ichigaya-integration-fixture",
+    "center": [
+      139.736043,
+      35.69047
+    ],
+    "radiusMeters": 100,
+    "bbox": [
+      139.7357,
+      35.6902,
+      139.7363,
+      35.6906
+    ]
+  },
+  "coordinateReferenceSystem": {
+    "geometryEpsg": 4326,
+    "axisOrder": [
+      "longitude",
+      "latitude"
+    ],
+    "unity": {
+      "projectedEpsg": 6677,
+      "coordinateZoneId": 9,
+      "axisConvention": "EUN",
+      "referencePointGeographic": [
+        139.736043,
+        35.69047
+      ]
+    }
+  },
+  "scenario": {
+    "id": "ichigaya-integration-fixture-2025-08-01-hourly",
+    "referenceDate": "2025-08-01",
+    "timezone": "Asia/Tokyo",
+    "availableTimestamps": [
+      "2025-08-01T08:00:00+09:00",
+      "2025-08-01T09:00:00+09:00"
+    ],
+    "defaultTimestamp": "2025-08-01T08:00:00+09:00",
+    "timeSelectionPolicy": "nearest-on-reference-date-ties-earlier"
+  },
+  "costDefinitions": [
+    {
+      "id": "shadeRatio",
+      "displayName": "日陰",
+      "description": "道路辺の有効サンプルのうち建物によって日陰となった割合です。",
+      "unit": "ratio",
+      "range": {
+        "min": 0,
+        "max": 1
+      },
+      "valueDirection": "higher-is-better",
+      "routeAggregation": "walking-time-weighted-mean",
+      "missingValuePolicy": "preserve-null",
+      "presentation": {
+        "viewerMode": true,
+        "displayUnit": "%",
+        "displayScale": 100,
+        "valueDirectionLabel": "高いほど日陰が多い",
+        "sampleKpiLabel": "道路加重平均日陰率",
+        "colors": [
+          {
+            "value": 0,
+            "color": "#f59e0b",
+            "label": "日向が多い"
+          },
+          {
+            "value": 0.5,
+            "color": "#84cc16",
+            "label": "中程度"
+          },
+          {
+            "value": 1,
+            "color": "#047857",
+            "label": "日陰が多い"
+          }
+        ]
+      }
+    },
+    {
+      "id": "solarExposureSeconds",
+      "displayName": "日射曝露時間",
+      "description": "その道路辺を既定歩行速度で通過するときに日向となる推定時間です。",
+      "unit": "s",
+      "range": {
+        "min": 0,
+        "max": 3600
+      },
+      "valueDirection": "higher-is-worse",
+      "routeAggregation": "sum",
+      "missingValuePolicy": "preserve-null",
+      "presentation": {
+        "viewerMode": false,
+        "displayUnit": "秒",
+        "displayScale": 1,
+        "valueDirectionLabel": "低いほど日射が少ない",
+        "sampleKpiLabel": "道路合計日射曝露時間",
+        "colors": [
+          {
+            "value": 0,
+            "color": "#047857",
+            "label": "曝露なし"
+          },
+          {
+            "value": 1800,
+            "color": "#f59e0b",
+            "label": "中程度"
+          },
+          {
+            "value": 3600,
+            "color": "#b91c1c",
+            "label": "曝露大"
+          }
+        ]
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "osm-node-1001",
+      "sourceNodeId": 1001,
+      "coordinate": [
+        139.7357,
+        35.6902
+      ]
+    },
+    {
+      "id": "osm-node-1002",
+      "sourceNodeId": 1002,
+      "coordinate": [
+        139.736,
+        35.6904
+      ]
+    },
+    {
+      "id": "osm-node-1003",
+      "sourceNodeId": 1003,
+      "coordinate": [
+        139.7363,
+        35.6906
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "osm-way-101-0:backward",
+      "physicalEdgeId": "osm-way-101-0",
+      "sourceEdgeIds": [
+        "osm-way-101-0",
+        "osm-way-102-0"
+      ],
+      "fromNodeId": "osm-node-1002",
+      "toNodeId": "osm-node-1001",
+      "direction": "backward",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.736,
+            35.6904
+          ],
+          [
+            139.7357,
+            35.6902
+          ]
+        ]
+      },
+      "lengthMeters": 140,
+      "walkingSeconds": 100,
+      "timeSlices": [
+        {
+          "timestamp": "2025-08-01T08:00:00+09:00",
+          "status": "partial",
+          "sampleCoverage": {
+            "sampleCount": 3,
+            "validSampleCount": 2,
+            "noGroundSampleCount": 1
+          },
+          "values": {
+            "shadeRatio": 0.25,
+            "solarExposureSeconds": 75
+          }
+        },
+        {
+          "timestamp": "2025-08-01T09:00:00+09:00",
+          "status": "partial",
+          "sampleCoverage": {
+            "sampleCount": 3,
+            "validSampleCount": 2,
+            "noGroundSampleCount": 1
+          },
+          "values": {
+            "shadeRatio": 0.5,
+            "solarExposureSeconds": 50
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm-way-101-0:forward",
+      "physicalEdgeId": "osm-way-101-0",
+      "sourceEdgeIds": [
+        "osm-way-101-0",
+        "osm-way-102-0"
+      ],
+      "fromNodeId": "osm-node-1001",
+      "toNodeId": "osm-node-1002",
+      "direction": "forward",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7357,
+            35.6902
+          ],
+          [
+            139.736,
+            35.6904
+          ]
+        ]
+      },
+      "lengthMeters": 140,
+      "walkingSeconds": 100,
+      "timeSlices": [
+        {
+          "timestamp": "2025-08-01T08:00:00+09:00",
+          "status": "partial",
+          "sampleCoverage": {
+            "sampleCount": 3,
+            "validSampleCount": 2,
+            "noGroundSampleCount": 1
+          },
+          "values": {
+            "shadeRatio": 0.25,
+            "solarExposureSeconds": 75
+          }
+        },
+        {
+          "timestamp": "2025-08-01T09:00:00+09:00",
+          "status": "partial",
+          "sampleCoverage": {
+            "sampleCount": 3,
+            "validSampleCount": 2,
+            "noGroundSampleCount": 1
+          },
+          "values": {
+            "shadeRatio": 0.5,
+            "solarExposureSeconds": 50
+          }
+        }
+      ]
+    },
+    {
+      "id": "osm-way-103-0:forward",
+      "physicalEdgeId": "osm-way-103-0",
+      "sourceEdgeIds": [
+        "osm-way-103-0"
+      ],
+      "fromNodeId": "osm-node-1002",
+      "toNodeId": "osm-node-1003",
+      "direction": "forward",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.736,
+            35.6904
+          ],
+          [
+            139.7363,
+            35.6906
+          ]
+        ]
+      },
+      "lengthMeters": 70,
+      "walkingSeconds": 50,
+      "timeSlices": [
+        {
+          "timestamp": "2025-08-01T08:00:00+09:00",
+          "status": "missing",
+          "sampleCoverage": {
+            "sampleCount": 0,
+            "validSampleCount": 0,
+            "noGroundSampleCount": 0
+          },
+          "values": {
+            "shadeRatio": null,
+            "solarExposureSeconds": null
+          }
+        },
+        {
+          "timestamp": "2025-08-01T09:00:00+09:00",
+          "status": "missing",
+          "sampleCoverage": {
+            "sampleCount": 0,
+            "validSampleCount": 0,
+            "noGroundSampleCount": 0
+          },
+          "values": {
+            "shadeRatio": null,
+            "solarExposureSeconds": null
+          }
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "integration": {
+      "roadGraphSchemaVersion": "pedestrian-road-network-1.0",
+      "roadGraphFingerprintSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "environmentCostSchemaVersion": "environment-cost-analysis-0.2",
+      "environmentCostAnalysisKey": "2222222222222222222222222222222222222222222222222222222222222222",
+      "environmentCostFingerprintSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "sourceEdgeAggregation": "valid-sample-weighted-mean",
+      "unmatchedGraphPolicy": "preserve-as-missing",
+      "matchedPhysicalEdgeCount": 1,
+      "unmatchedPhysicalEdgeCount": 1,
+      "unmatchedPhysicalEdgeIds": [
+        "osm-way-103-0"
+      ],
+      "ignoredEnvironmentSourceEdgeCount": 0,
+      "coordinateRoundTrip": {
+        "testedPointCount": 3,
+        "maximumLongitudeErrorDegrees": 0,
+        "maximumLatitudeErrorDegrees": 1.4210854715202004e-14
+      }
+    }
+  }
+}
