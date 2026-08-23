@@ -124,8 +124,10 @@ curl --fail --show-error --head \
   https://<public-hostname><public-base-path>
 curl --include \
   https://<public-hostname><public-base-path>api/v1/routes
+curl --include \
+  'https://<public-hostname><public-base-path>api/v1/road-edges?areaId=<area-id>&timestamp=<url-encoded-timestamp>&bbox=<min-lng>,<min-lat>,<max-lng>,<max-lat>&solarAvoidanceFactor=2'
 ```
 
-経路APIへのGETはJSON形式のHTTP 405が正常である。HTTP 200かつ`text/html`はViewerへ誤転送、
+経路API`routes`へのGETはJSON形式のHTTP 405、必要パラメーターを指定した`road-edges`へのGETはHTTP 200が正常である。HTTP 200かつ`text/html`はViewerへ誤転送、
 HTTP 502は経路サーバーが起動していないかNginxの転送先ポートが一致していない状態を示す。
-ブラウザではキャッシュを無効化して再読込し、起終点を指定して3経路の描画とKPI更新まで確認する。
+ブラウザではキャッシュを無効化して再読込し、起終点を指定して3経路の描画とKPI更新まで確認する。地図をズーム14.5以上へ拡大し、実日陰道路、欠測の破線、道路辺詳細も確認する。

@@ -50,6 +50,24 @@ test('route endpoint returns only snapped points, routes, and diagnostics', asyn
   assert.equal('costSlices' in document, false)
 })
 
+test('road edge endpoint returns only the requested map extent and cost evidence', async () => {
+  const url = new URL(`${baseUrl}/api/v1/road-edges`)
+  url.searchParams.set('areaId', 'route-server-fixture')
+  url.searchParams.set('timestamp', fixture.timestamp)
+  url.searchParams.set('bbox', '139.7349,35.6897,139.7361,35.6908')
+  url.searchParams.set('solarAvoidanceFactor', '2')
+  const response = await fetch(url)
+  assert.equal(response.status, 200)
+  const document = await response.json()
+  assert.equal(document.schemaVersion, 'road-edge-response-1.0')
+  assert.equal(document.type, 'FeatureCollection')
+  assert.equal(document.features.length, 6)
+  assert.equal(document.features.every((feature) => feature.geometry.type === 'LineString'), true)
+  assert.equal(document.features.every((feature) => feature.properties.solarAvoidanceFactor === 2), true)
+  assert.equal('topology' in document, false)
+  assert.equal('costSlices' in document, false)
+})
+
 test('invalid JSON, method, path, and oversized requests are distinguishable', async () => {
   const invalidJson = await fetch(`${baseUrl}/api/v1/routes`, { method: 'POST', body: '{' })
   assert.equal(invalidJson.status, 400)
@@ -58,6 +76,10 @@ test('invalid JSON, method, path, and oversized requests are distinguishable', a
   const wrongMethod = await fetch(`${baseUrl}/api/v1/routes`)
   assert.equal(wrongMethod.status, 405)
   assert.equal((await wrongMethod.json()).error.code, 'METHOD_NOT_ALLOWED')
+
+  const incompleteRoadEdges = await fetch(`${baseUrl}/api/v1/road-edges?areaId=route-server-fixture`)
+  assert.equal(incompleteRoadEdges.status, 400)
+  assert.equal((await incompleteRoadEdges.json()).error.code, 'INVALID_REQUEST')
 
   const missing = await fetch(`${baseUrl}/missing`)
   assert.equal(missing.status, 404)

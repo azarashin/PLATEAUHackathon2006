@@ -1,11 +1,36 @@
 # Viewer・経路サーバー環境構築
 
+- [1. 前提](#1-前提)
+- [2. サービス化せず一時的に試す](#2-サービス化せず一時的に試す)
+  - [2.1. Viewer 実装ブランチを取得](#21-viewer-実装ブランチを取得)
+  - [2.2. Node.js依存パッケージを導入](#22-nodejs依存パッケージを導入)
+  - [2.3. 現在のシェルだけに環境変数を設定](#23-現在のシェルだけに環境変数を設定)
+  - [2.4. 開発サーバーを起動](#24-開発サーバーを起動)
+  - [2.5. `maplibre-gl` のimportエラーが出る場合](#25-maplibre-gl-のimportエラーが出る場合)
+- [3. 推奨構成：静的ファイルをNginxから配信](#3-推奨構成静的ファイルをnginxから配信)
+  - [3.1. インストールとビルド](#31-インストールとビルド)
+  - [3.2. Nginx設定を生成](#32-nginx設定を生成)
+- [4. 暫定構成：Vite previewを使用](#4-暫定構成vite-previewを使用)
+  - [4.1. 許可ホストをサーバー側へ設定](#41-許可ホストをサーバー側へ設定)
+  - [4.2. systemdユニットを生成](#42-systemdユニットを生成)
+- [5. 更新手順](#5-更新手順)
+- [6. 動作確認](#6-動作確認)
+- [7. systemdが `Missing script: "start"` で終了する場合](#7-systemdが-missing-script-start-で終了する場合)
+- [8. サブパスで画面が空になる場合](#8-サブパスで画面が空になる場合)
+- [9. 経路APIを同一サブパスで公開する](#9-経路apiを同一サブパスで公開する)
+  - [9.1. Viewerと経路サーバーの環境変数を分離する](#91-viewerと経路サーバーの環境変数を分離する)
+  - [9.2. ローカルから経路バンドルを1コマンドで配置する](#92-ローカルから経路バンドルを1コマンドで配置する)
+    - [9.2.1. SSH接続と公開鍵認証](#921-ssh接続と公開鍵認証)
+  - [9.3. 経路サーバーのsystemdユニット](#93-経路サーバーのsystemdユニット)
+  - [9.4. Nginxから経路サーバーへ転送する](#94-nginxから経路サーバーへ転送する)
+
+
 この文書では、Viewerと経路サーバーを外部公開するための初回構築と障害対応を説明します。
 構築済みサーバーへコード・設定・経路バンドルを反映する日常手順は
 [Viewer・経路サーバー更新ランブック](server-operation-runbook.md)を参照してください。
 実際のホスト名、配置パス、OSユーザー名はリポジトリへコミットせず、サーバー上で設定してください。
 
-## 前提
+## 1. 前提
 
 - Node.js 22.18.0
 - npm 11.5.2
@@ -13,9 +38,9 @@
 - Viewer の公開URLは HTTPS 化することを推奨
 - リポジトリのチェックアウト先を `<repository-root>` と表記
 
-## サービス化せず一時的に試す
+## 2. サービス化せず一時的に試す
 
-### 1. Viewer 実装ブランチを取得
+### 2.1. Viewer 実装ブランチを取得
 
 Issue #10 が main へマージされる前に試す場合は、Viewer 実装ブランチを明示的に取得します。
 
@@ -28,7 +53,7 @@ git pull --ff-only
 
 main へマージされた後は、運用対象の main またはリリースブランチを使用してください。
 
-### 2. Node.js依存パッケージを導入
+### 2.2. Node.js依存パッケージを導入
 
 開発サーバーを停止してから、lockfileどおりに依存パッケージを導入します。
 
@@ -43,7 +68,7 @@ npm ls maplibre-gl
 `npm ls` で `maplibre-gl` とバージョンが表示されることを確認します。
 ソースコードだけを更新して `npm ci` を実行していない場合、Vite は `maplibre-gl` を解決できません。
 
-### 3. 現在のシェルだけに環境変数を設定
+### 2.3. 現在のシェルだけに環境変数を設定
 
 次の値は例示用プレースホルダーです。実際の値はサーバー上で入力し、リポジトリへ記録しません。
 
@@ -60,7 +85,7 @@ export VIEWER_BASE_PATH='<public-base-path>'
 同じサーバー上のリバースプロキシから接続する場合、`<bind-address>` にはループバックアドレスを指定します。
 Viteへ外部端末から直接接続する構成では、ファイアウォールとアクセス制限を確認してください。
 
-### 4. 開発サーバーを起動
+### 2.4. 開発サーバーを起動
 
 ```bash
 npm run dev -- \
@@ -79,7 +104,7 @@ unset VIEWER_PORT
 unset VIEWER_BASE_PATH
 ```
 
-### `maplibre-gl` のimportエラーが出る場合
+### 2.5. `maplibre-gl` のimportエラーが出る場合
 
 次のエラーは、サーバー側の依存パッケージが未導入か、Viewer実装を含まないブランチを使用している場合に発生します。
 
@@ -103,12 +128,12 @@ npm ls maplibre-gl
 `package.json` に依存定義がない場合は、Viewer実装を含むブランチへ切り替えてください。
 依存定義があるのに `npm ls` が失敗する場合は、`npm ci` のエラー出力を確認します。
 
-## 推奨構成：静的ファイルをNginxから配信
+## 3. 推奨構成：静的ファイルをNginxから配信
 
 本番・デモ公開では、Vite サーバーを外部公開せず、ビルド結果をNginxから直接配信します。
 この構成では Vite の `allowedHosts` は関係しません。
 
-### 1. インストールとビルド
+### 3.1. インストールとビルド
 
 ```bash
 cd <repository-root>/viewer
@@ -118,7 +143,7 @@ npm run build
 
 成果物は `<repository-root>/viewer/dist` に生成されます。
 
-### 2. Nginx設定を生成
+### 3.2. Nginx設定を生成
 
 `deploy/nginx/viewer-static.conf.template` には実際のサーバー名を含めていません。
 次の値をサーバー上で設定し、テンプレートを展開します。
@@ -142,12 +167,12 @@ sudo systemctl reload nginx
 
 TLS証明書とHTTPSリダイレクトは、サーバーの証明書管理方針に従って追加してください。
 
-## 暫定構成：Vite previewを使用
+## 4. 暫定構成：Vite previewを使用
 
 短期デモ等でVite previewをリバースプロキシ配下に置く場合だけ使用します。
 待受アドレスとポートはサーバー側の環境ファイルで設定し、外部からpreviewへ直接接続させないでください。
 
-### 1. 許可ホストをサーバー側へ設定
+### 4.1. 許可ホストをサーバー側へ設定
 
 `deploy/viewer.env.example` をGit管理外の場所へコピーし、値を設定します。
 値にはプロトコルやパスを含めず、ホスト名だけを指定してください。
@@ -169,7 +194,7 @@ VIEWER_BASE_PATH=<public-base-path>
 
 すべてのホストを許可する設定は、DNSリバインディング対策を無効化するため使用しません。
 
-### 2. systemdユニットを生成
+### 4.2. systemdユニットを生成
 
 `deploy/systemd/viewer-preview.service.template` の変数をサーバー上で展開します。
 
@@ -205,7 +230,7 @@ location <public-base-path> {
 
 `proxy_pass` の転送先末尾に `/` を付けると公開パスが削除されるため、この構成では付けません。
 
-## 更新手順
+## 5. 更新手順
 
 通常のコード更新では、Viewerは再ビルドが必要、経路サーバーは再ビルド不要です。
 両サービスの再起動、片方だけを変更した場合、systemd・Nginx・経路バンドル変更時の条件分岐は
@@ -221,7 +246,7 @@ sudo systemctl restart environment-cost-route-server.service
 sudo systemctl restart environment-cost-route-finder.service
 ```
 
-## 動作確認
+## 6. 動作確認
 
 ```bash
 curl --fail --show-error --head https://<public-hostname>/
@@ -242,7 +267,7 @@ curl --fail --show-error --head https://<public-hostname><public-base-path>envir
 - 日陰／内水モードを切り替えられる
 - 実ホスト名や証明書秘密鍵がGit差分へ含まれていない
 
-## systemdが `Missing script: "start"` で終了する場合
+## 7. systemdが `Missing script: "start"` で終了する場合
 
 このViewerの `package.json` には `start` スクリプトがありません。systemdユニットが
 `npm start` を実行していると、起動直後に終了し、`Restart=on-failure` によって再起動を繰り返します。
@@ -274,7 +299,7 @@ sudo systemctl restart <service-name>
 sudo systemctl status <service-name>
 ```
 
-## サブパスで画面が空になる場合
+## 8. サブパスで画面が空になる場合
 
 `VIEWER_BASE_PATH` にはサーバー上の配置先ではなく、ブラウザから見える公開URLのパスを指定します。
 例えば `https://example.com/environment-cost-route-finder/` で公開する場合は次の値です。
@@ -344,11 +369,11 @@ curl --fail --show-error --head \
 
 ## 9. 経路APIを同一サブパスで公開する
 
-Viewerの既定API URLは`<public-base-path>api/v1/routes`です。Viewerを転送する汎用`location`より前に、
-経路API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
+Viewerの既定API URLは`<public-base-path>api/v1/routes`と`<public-base-path>api/v1/road-edges`です。Viewerを転送する汎用`location`より前に、
+両API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
 経路サーバーが`127.0.0.1:3000`の場合です。
 
-### Viewerと経路サーバーの環境変数を分離する
+### 9.1. Viewerと経路サーバーの環境変数を分離する
 
 Viewerと経路サーバーは別プロセスなので、環境変数ファイルも分離します。Viewerの`VIEWER_PORT`と
 経路サーバーの`PORT`は別の待受ポートです。1つのファイルへ両方を記載することもできますが、
@@ -378,6 +403,7 @@ PORT=3000
 ROUTE_BUNDLE_MANIFESTS=<repository-root>/data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json
 ROUTE_TIMESTAMPS=2025-08-01T12:00:00+09:00
 ROUTE_MAXIMUM_SNAP_DISTANCE_METERS=250
+ROUTE_MAXIMUM_ROAD_EDGE_FEATURES=10000
 ROUTE_MAXIMUM_BODY_BYTES=16384
 ROUTE_REQUEST_TIMEOUT_MILLISECONDS=10000
 ```
@@ -385,7 +411,7 @@ ROUTE_REQUEST_TIMEOUT_MILLISECONDS=10000
 manifestには絶対パスを使用します。複数地域をロードする場合は`ROUTE_BUNDLE_MANIFESTS`をカンマ区切りに
 します。`ROUTE_TIMESTAMPS`を省略するとmanifestに含まれる全時刻をロードします。
 
-### ローカルから経路バンドルを1コマンドで配置する
+### 9.2. ローカルから経路バンドルを1コマンドで配置する
 
 `data/generated/`はGit管理外なので、`git pull`では市ヶ谷の実データはサーバーへ届きません。ローカルで
 生成・検証済みのバンドルをSSHで転送するため、設定例をコピーします。
@@ -520,7 +546,7 @@ ssh -p $env:ROUTE_DEPLOY_SSH_PORT `
 転送だけを行い、サービスは自動再起動しません。完了後にサーバーで経路サービスを再起動し、
 `/healthz`を確認します。実行内容だけを事前確認する場合は末尾へ`-WhatIf`を付けます。
 
-### 経路サーバーのsystemdユニット
+### 9.3. 経路サーバーのsystemdユニット
 
 Viewerとは別のサービスとして起動します。
 
@@ -568,11 +594,20 @@ curl --include http://127.0.0.1:3000/healthz
 `/healthz`がHTTP 200と`{"status":"ok"}`を返さない場合は、Nginxではなく経路サーバーの起動・
 manifestパス・ログを先に修正します。
 
-### Nginxから経路サーバーへ転送する
+### 9.4. Nginxから経路サーバーへ転送する
 
 ```nginx
 location = /environment-cost-route-finder/api/v1/routes {
     proxy_pass http://127.0.0.1:3000/api/v1/routes;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 15s;
+}
+
+location = /environment-cost-route-finder/api/v1/road-edges {
+    proxy_pass http://127.0.0.1:3000/api/v1/road-edges;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -588,9 +623,10 @@ ViewerのHTMLへ誤転送されています。
 sudo nginx -t
 sudo systemctl reload nginx
 curl --include https://<public-hostname><public-base-path>api/v1/routes
+curl --include 'https://<public-hostname><public-base-path>api/v1/road-edges?areaId=<area-id>&timestamp=<url-encoded-timestamp>&bbox=<min-lng>,<min-lat>,<max-lng>,<max-lat>&solarAvoidanceFactor=2'
 ```
 
-公開URLへのGETがJSON形式のHTTP 405になれば、経路サーバーまで到達しています。HTTP 404はAPI用
+`routes`へのGETがJSON形式のHTTP 405になり、必要パラメーター付きの`road-edges`がHTTP 200になれば、経路サーバーまで到達しています。HTTP 404はAPI用
 `location`が未反映、HTTP 200かつ`Content-Type: text/html`はViewerのフォールバックへ誤転送、
 HTTP 502は経路サーバーが指定ポートで待受していない状態です。
 
