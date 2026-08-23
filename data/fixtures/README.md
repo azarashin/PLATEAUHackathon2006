@@ -27,3 +27,20 @@ Viewer はこのファイルを直接読み込んで表示を切り替えます�
 `invalid/environment-cost-road-network-v1-cases.json` は正常fixtureへ意図的な変更を適用する異常系テストです。
 検証コマンドと詳細規則は
 [`docs/environment-cost-data-contract-v1.md`](../../docs/environment-cost-data-contract-v1.md) を参照してください。
+
+`environment-cost-road-network-integration-v1.json`はIssue #9の結合ツールで生成するViewer統合fixtureです。3ノード、3有向辺、2時刻、8,854 bytesで、物理重複辺の有効サンプル加重集約、両方向辺、道路グラフ境界の明示的欠測を含みます。次のコマンドで決定的に再生成できます。
+
+```bash
+node tools/environment-cost-network/generate-viewer-fixture.mjs
+```
+
+## 経路サーバー用分割バンドル v1
+
+`environment-cost-server-bundle-v1/`はIssue #9のサーバー用fixtureです。3ノード、2物理辺、3有向辺、2時刻を、manifest、topology、時刻別コスト2ファイルの合計4,742 bytesへ分割しています。
+
+物理重複辺の有効サンプル加重集約、方向間でのコスト共有、明示的欠測、ファイル改変検知を確認できます。
+
+```bash
+node tools/environment-cost-network/generate-server-bundle-fixture.mjs
+npm --prefix viewer run validate:server-bundle
+```

@@ -206,3 +206,5 @@ Get-Content 'data/raw/ichigaya-venue-analysis-summary.json' -Raw -Encoding UTF8 
 - `data/generated/ichigaya-venue-environment-cost.json`
 
 道路グラフ辺の`sourceEdgeIds`と、環境コスト辺の`id`を対応させます。物理重複を統合した道路辺は複数の`sourceEdgeIds`を持つため、#9で時刻別コストの統合規則を明記します。欠測値`shadeRatio=null`は0として扱わず、正式データ契約の欠測状態として保持します。
+
+実装済みの結合コマンド、物理重複辺の加重集約、円境界112辺の扱い、正式契約の検証結果は[環境コスト道路ネットワークの生成](environment-cost-road-network-generation.md)を参照してください。
