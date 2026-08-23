@@ -1,11 +1,14 @@
 import {
   AttributionControl,
+  type GeoJSONSource,
   Map as MapLibreMap,
+  Marker,
   NavigationControl,
   type StyleSpecification,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './style.css'
+import { demoAreas, findCoveredArea, geolocationErrorMessage, type Coordinate, type DemoArea } from './location-domain.ts'
 
 type ValueDirection = 'higher-is-better' | 'higher-is-worse'
 
@@ -53,6 +56,17 @@ interface EnvironmentCostsFixture {
   features: RoadFeature[]
 }
 
+type EndpointKind = 'start' | 'end'
+type DataState = 'available' | 'not-precomputed' | 'outside-coverage' | 'load-error'
+
+interface AccuracyPolygon {
+  type: 'Feature'
+  properties: Record<string, never>
+  geometry: { type: 'Polygon'; coordinates: Coordinate[][] }
+}
+
+const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? '/api/v1/routes'
+
 const fixtureUrl = `${import.meta.env.BASE_URL}environment-cost-road-network-v1.json`
 const baseStyle: StyleSpecification = {
   version: 8,
@@ -88,6 +102,14 @@ let fixture: EnvironmentCostsFixture | null = null
 let selectedModeId = ''
 let map: MapLibreMap | null = null
 let basemapWarningShown = false
+let selectedArea = demoAreas.at(-1) as DemoArea
+let selectedEndpoint: EndpointKind = 'start'
+let startCoordinate: Coordinate | null = null
+let endCoordinate: Coordinate | null = null
+let startMarker: Marker | null = null
+let endMarker: Marker | null = null
+let locationMarker: Marker | null = null
+let routeRequestSequence = 0
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (character) => ({
@@ -292,6 +314,17 @@ function renderShell(): void {
         </div>
       </section>
 
+      <section class="location-panel" aria-label="地域と現在位置">
+        <label>シミュレーション地域
+          <select id="area-select">
+            ${demoAreas.map((area) => `<option value="${area.id}"${area.id === selectedArea.id ? ' selected' : ''}>${escapeHtml(area.name)}（${escapeHtml(area.centerName)}）</option>`).join('')}
+          </select>
+        </label>
+        <button id="current-location-button" class="secondary-button" type="button">現在位置へ移動</button>
+        <p id="coverage-status" class="coverage-status" data-state="available" role="status">市ヶ谷周辺の計算済みデータを利用できます。</p>
+        <p class="privacy-note">現在位置はこの端末での地図表示だけに使い、保存・サーバー送信しません。</p>
+      </section>
+
       <section class="workspace">
         <div class="map-column">
           <div class="map-card">
@@ -312,6 +345,7 @@ function renderShell(): void {
                 <small>しばらくお待ちください</small>
               </div>
               <div class="basemap-warning" id="basemap-warning" hidden>背景地図を取得できません。道路データは引き続き操作できます。</div>
+              <div class="map-instruction">地図をクリックして<span id="click-target-label">出発地</span>を指定</div>
             </div>
           </div>
 
@@ -338,15 +372,28 @@ function renderShell(): void {
                 <p class="eyebrow">Search conditions</p>
                 <h2 id="conditions-title">経路条件</h2>
               </div>
-              <span class="preview-label">UIのみ</span>
+              <span class="preview-label preview-label--active">操作可能</span>
             </div>
-            <label>出発地<input value="東京駅 丸の内南口（例）" disabled></label>
-            <label>目的地<input value="日比谷公園（例）" disabled></label>
+            <div class="endpoint-controls" role="group" aria-label="地図クリックの設定先">
+              <button id="select-start-button" class="endpoint-button is-active" type="button">出発地を指定</button>
+              <button id="select-end-button" class="endpoint-button" type="button">目的地を指定</button>
+            </div>
+            <label>出発地
+              <span class="coordinate-field"><output id="start-coordinate">未指定</output><button id="clear-start-button" type="button">解除</button></span>
+            </label>
+            <label>目的地
+              <span class="coordinate-field"><output id="end-coordinate">未指定</output><button id="clear-end-button" type="button">解除</button></span>
+            </label>
+            <div class="endpoint-actions">
+              <button id="swap-endpoints-button" type="button">起終点を入れ替え</button>
+              <button id="reset-conditions-button" type="button">全リセット</button>
+            </div>
             <div class="condition-row">
-              <label>日付<input type="date" value="2026-08-22" disabled></label>
-              <label>時刻<select disabled><option>12:00</option></select></label>
+              <label>計算済み日時<select id="timestamp-select"></select></label>
             </div>
-            <button class="search-button" type="button" disabled>経路を比較（未実装）</button>
+            <p class="condition-help">選択肢は事前計算済みの日時だけです。リアルタイム解析ではありません。</p>
+            <button class="search-button" id="search-button" type="button" disabled>出発地と目的地を指定してください</button>
+            <p id="route-status" class="route-status" role="status">経路条件を指定してください。</p>
           </section>
 
           <section class="details-card" aria-live="polite">
@@ -430,6 +477,10 @@ function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
   if (!fixture) return
   const overlay = document.querySelector<SVGSVGElement>('#road-overlay')
   if (!overlay) return
+  if (selectedArea.id !== 'ichigaya-venue') {
+    overlay.innerHTML = ''
+    return
+  }
   const container = mapInstance.getContainer()
   overlay.setAttribute('viewBox', `0 0 ${container.clientWidth} ${container.clientHeight}`)
   const roadPaths = fixture.features.map((feature) => {
@@ -446,19 +497,246 @@ function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
   overlay.innerHTML = `<g>${casingPaths}</g><g>${roadPaths}</g>`
 }
 
+function formatCoordinate(coordinate: Coordinate | null): string {
+  return coordinate ? `${coordinate[1].toFixed(6)}, ${coordinate[0].toFixed(6)}` : '未指定'
+}
+
+function setCoverageState(state: DataState, message: string): void {
+  const status = document.querySelector<HTMLElement>('#coverage-status')
+  if (!status) return
+  status.dataset.state = state
+  status.textContent = message
+}
+
+function invalidateRoute(message = '条件が変更されました。新しい経路を計算します。'): void {
+  routeRequestSequence += 1
+  const status = document.querySelector<HTMLElement>('#route-status')
+  if (status) status.textContent = message
+}
+
+function markerElement(kind: 'start' | 'end' | 'location'): HTMLDivElement {
+  const element = document.createElement('div')
+  element.className = `map-marker map-marker--${kind}`
+  element.textContent = kind === 'start' ? '出' : kind === 'end' ? '着' : '●'
+  element.setAttribute('aria-label', kind === 'start' ? '出発地' : kind === 'end' ? '目的地' : '現在位置')
+  return element
+}
+
+function replaceMarker(marker: Marker | null, coordinate: Coordinate | null, kind: 'start' | 'end'): Marker | null {
+  marker?.remove()
+  if (!map || !coordinate) return null
+  return new Marker({ element: markerElement(kind), anchor: 'bottom' }).setLngLat(coordinate).addTo(map)
+}
+
+function updateEndpointUi(): void {
+  const startOutput = document.querySelector<HTMLOutputElement>('#start-coordinate')
+  const endOutput = document.querySelector<HTMLOutputElement>('#end-coordinate')
+  if (startOutput) startOutput.value = formatCoordinate(startCoordinate)
+  if (endOutput) endOutput.value = formatCoordinate(endCoordinate)
+  startMarker = replaceMarker(startMarker, startCoordinate, 'start')
+  endMarker = replaceMarker(endMarker, endCoordinate, 'end')
+  const canSearch = startCoordinate !== null && endCoordinate !== null && selectedArea.availableTimestamps.length > 0
+  const searchButton = document.querySelector<HTMLButtonElement>('#search-button')
+  if (searchButton) {
+    searchButton.disabled = !canSearch
+    searchButton.textContent = canSearch ? '3経路を再計算' : selectedArea.availableTimestamps.length === 0 ? 'この地域は結果未生成です' : '出発地と目的地を指定してください'
+  }
+}
+
+function chooseEndpoint(kind: EndpointKind): void {
+  selectedEndpoint = kind
+  document.querySelector('#select-start-button')?.classList.toggle('is-active', kind === 'start')
+  document.querySelector('#select-end-button')?.classList.toggle('is-active', kind === 'end')
+  const label = document.querySelector<HTMLElement>('#click-target-label')
+  if (label) label.textContent = kind === 'start' ? '出発地' : '目的地'
+}
+
+function setEndpoint(kind: EndpointKind, coordinate: Coordinate | null): void {
+  if (kind === 'start') startCoordinate = coordinate
+  else endCoordinate = coordinate
+  invalidateRoute(coordinate ? `${kind === 'start' ? '出発地' : '目的地'}を指定しました。` : `${kind === 'start' ? '出発地' : '目的地'}を解除しました。`)
+  updateEndpointUi()
+  if (coordinate) chooseEndpoint(kind === 'start' ? 'end' : 'start')
+  void requestRoutes()
+}
+
+function updateTimestampOptions(): void {
+  const select = document.querySelector<HTMLSelectElement>('#timestamp-select')
+  if (!select) return
+  select.disabled = selectedArea.availableTimestamps.length === 0
+  select.innerHTML = selectedArea.availableTimestamps.length > 0
+    ? selectedArea.availableTimestamps.map((timestamp) => `<option value="${escapeHtml(timestamp)}">${escapeHtml(new Date(timestamp).toLocaleString('ja-JP'))}</option>`).join('')
+    : '<option value="">計算済みデータなし</option>'
+}
+
+function selectArea(areaId: string, moveMap = true): void {
+  const area = demoAreas.find((candidate) => candidate.id === areaId)
+  if (!area) return
+  selectedArea = area
+  const select = document.querySelector<HTMLSelectElement>('#area-select')
+  if (select) select.value = area.id
+  invalidateRoute('地域を変更したため、以前の経路とKPIを消去しました。')
+  startCoordinate = null
+  endCoordinate = null
+  updateTimestampOptions()
+  updateEndpointUi()
+  chooseEndpoint('start')
+  if (area.availableTimestamps.length > 0) setCoverageState('available', `${area.name}の計算済みデータを利用できます。`)
+  else setCoverageState('not-precomputed', `${area.name}は固定シミュレーション地域ですが、計算結果はまだ生成されていません。`)
+  if (moveMap) map?.flyTo({ center: area.center, zoom: 12.5, essential: true })
+  if (map && fixture) renderRoadOverlay(map, activeMode())
+}
+
+function accuracyPolygon(center: Coordinate, radiusMeters: number): AccuracyPolygon {
+  const coordinates: Coordinate[] = []
+  const latitudeScale = 111320
+  const longitudeScale = latitudeScale * Math.cos(center[1] * Math.PI / 180)
+  for (let index = 0; index <= 64; index += 1) {
+    const angle = index / 64 * Math.PI * 2
+    coordinates.push([center[0] + Math.cos(angle) * radiusMeters / longitudeScale, center[1] + Math.sin(angle) * radiusMeters / latitudeScale])
+  }
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [coordinates] } }
+}
+
+function showCurrentLocation(coordinate: Coordinate, accuracyMeters: number): void {
+  if (!map) return
+  locationMarker?.remove()
+  locationMarker = new Marker({ element: markerElement('location') }).setLngLat(coordinate).addTo(map)
+  const accuracy = accuracyPolygon(coordinate, accuracyMeters)
+  const source = map.getSource('current-location-accuracy') as GeoJSONSource | undefined
+  if (source) source.setData(accuracy)
+  else {
+    map.addSource('current-location-accuracy', { type: 'geojson', data: accuracy })
+    map.addLayer({ id: 'current-location-accuracy-fill', type: 'fill', source: 'current-location-accuracy', paint: { 'fill-color': '#1677ff', 'fill-opacity': 0.13 } })
+    map.addLayer({ id: 'current-location-accuracy-line', type: 'line', source: 'current-location-accuracy', paint: { 'line-color': '#1677ff', 'line-width': 2 } })
+  }
+  map.flyTo({ center: coordinate, zoom: 15, essential: true })
+}
+
+function requestCurrentLocation(): void {
+  const button = document.querySelector<HTMLButtonElement>('#current-location-button')
+  if (!window.isSecureContext) {
+    setCoverageState('load-error', '現在位置はHTTPSまたはlocalhostでのみ取得できます。')
+    return
+  }
+  if (!navigator.geolocation) {
+    setCoverageState('load-error', 'このブラウザでは現在位置を取得できません。')
+    return
+  }
+  if (button) button.disabled = true
+  setCoverageState('available', '現在位置を取得しています。')
+  navigator.geolocation.getCurrentPosition((position) => {
+    if (button) button.disabled = false
+    const coordinate: Coordinate = [position.coords.longitude, position.coords.latitude]
+    showCurrentLocation(coordinate, position.coords.accuracy)
+    const coveredArea = findCoveredArea(coordinate)
+    if (!coveredArea) {
+      setCoverageState('outside-coverage', `現在位置（精度±${Math.round(position.coords.accuracy)} m）は固定5地域の範囲外です。地図表示は継続できます。`)
+      return
+    }
+    selectArea(coveredArea.id, false)
+    map?.flyTo({ center: coordinate, zoom: 15, essential: true })
+    setCoverageState(coveredArea.availableTimestamps.length > 0 ? 'available' : 'not-precomputed', `${coveredArea.name}の範囲内です（測位精度±${Math.round(position.coords.accuracy)} m）。${coveredArea.availableTimestamps.length > 0 ? '計算済み結果を利用できます。' : '計算結果はまだ生成されていません。'}`)
+  }, (error) => {
+    if (button) button.disabled = false
+    setCoverageState('load-error', geolocationErrorMessage(error.code))
+  }, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 })
+}
+
+async function requestRoutes(): Promise<void> {
+  if (!startCoordinate || !endCoordinate || selectedArea.availableTimestamps.length === 0) return
+  const timestamp = document.querySelector<HTMLSelectElement>('#timestamp-select')?.value
+  if (!timestamp) return
+  const sequence = ++routeRequestSequence
+  const status = document.querySelector<HTMLElement>('#route-status')
+  if (status) status.textContent = '道路へのスナップと3経路の計算を実行しています。'
+  setCoverageState('available', `${selectedArea.name}の計算済みデータを利用しています。`)
+  try {
+    let response: Response
+    try {
+      response = await fetch(routeApiUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ areaId: selectedArea.id, timestamp, start: startCoordinate, end: endCoordinate }),
+      })
+    } catch {
+      throw new Error('経路データを取得できませんでした。時間をおいて再度お試しください。')
+    }
+    let document: Record<string, unknown>
+    try {
+      document = await response.json() as Record<string, unknown>
+    } catch {
+      throw new Error('経路サーバーの応答形式が不正です。')
+    }
+    if (sequence !== routeRequestSequence) return
+    if (!response.ok) {
+      const error = isRecord(document.error) ? document.error : {}
+      const code = typeof error.code === 'string' ? error.code : 'LOAD_ERROR'
+      if (code === 'SNAP_NOT_FOUND') throw new Error('許容距離内に歩行可能な道路がないため、経路を検索できません。')
+      if (code === 'OUTSIDE_COVERAGE') throw new Error('選択地点が計算済み範囲外のため、経路を検索できません。')
+      throw new Error('経路データを取得できませんでした。時間をおいて再度お試しください。')
+    }
+    if (!isRecord(document.snapped) || !isRecord(document.snapped.start) || !isRecord(document.snapped.end)) throw new Error('経路サーバーの応答形式が不正です。')
+    const snappedStart = document.snapped.start.snappedCoordinate
+    const snappedEnd = document.snapped.end.snappedCoordinate
+    if (!Array.isArray(snappedStart) || !snappedStart.every(isFiniteNumber) || !Array.isArray(snappedEnd) || !snappedEnd.every(isFiniteNumber)) throw new Error('スナップ結果が不正です。')
+    startCoordinate = [snappedStart[0] as number, snappedStart[1] as number]
+    endCoordinate = [snappedEnd[0] as number, snappedEnd[1] as number]
+    updateEndpointUi()
+    const routeCount = Array.isArray(document.routes) ? document.routes.length : 0
+    if (status) status.textContent = `起終点を道路へスナップし、${routeCount}経路を計算しました。経路描画とKPI比較は#13で接続します。`
+  } catch (error) {
+    if (sequence !== routeRequestSequence) return
+    const message = error instanceof Error ? error.message : '経路を検索できませんでした。'
+    if (status) status.textContent = message
+    if (message.includes('取得できません') || message.includes('応答形式が不正')) {
+      setCoverageState('load-error', `${selectedArea.name}の計算結果を取得できませんでした。`)
+    }
+  }
+}
+
+function bindLocationControls(mapInstance: MapLibreMap): void {
+  document.querySelector<HTMLSelectElement>('#area-select')?.addEventListener('change', (event) => selectArea((event.currentTarget as HTMLSelectElement).value))
+  document.querySelector('#current-location-button')?.addEventListener('click', requestCurrentLocation)
+  document.querySelector('#select-start-button')?.addEventListener('click', () => chooseEndpoint('start'))
+  document.querySelector('#select-end-button')?.addEventListener('click', () => chooseEndpoint('end'))
+  document.querySelector('#clear-start-button')?.addEventListener('click', () => setEndpoint('start', null))
+  document.querySelector('#clear-end-button')?.addEventListener('click', () => setEndpoint('end', null))
+  document.querySelector('#swap-endpoints-button')?.addEventListener('click', () => {
+    ;[startCoordinate, endCoordinate] = [endCoordinate, startCoordinate]
+    invalidateRoute('起終点を入れ替えました。')
+    updateEndpointUi()
+    void requestRoutes()
+  })
+  document.querySelector('#reset-conditions-button')?.addEventListener('click', () => {
+    startCoordinate = null
+    endCoordinate = null
+    invalidateRoute('起終点と検索結果をリセットしました。')
+    updateEndpointUi()
+    chooseEndpoint('start')
+  })
+  document.querySelector('#timestamp-select')?.addEventListener('change', () => {
+    invalidateRoute('計算済み日時を変更しました。')
+    void requestRoutes()
+  })
+  document.querySelector('#search-button')?.addEventListener('click', () => void requestRoutes())
+  mapInstance.on('click', (event) => setEndpoint(selectedEndpoint, [event.lngLat.lng, event.lngLat.lat]))
+  updateTimestampOptions()
+  updateEndpointUi()
+}
+
 function initializeMap(): void {
   if (!fixture) return
   const mode = activeMode()
-  const [minLng, minLat, maxLng, maxLat] = fixture.bbox
-
   const mapInstance = new MapLibreMap({
     container: 'map',
     style: baseStyle,
-    center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
-    zoom: 15,
+    center: selectedArea.center,
+    zoom: 12.5,
     attributionControl: false,
   })
   map = mapInstance
+  bindLocationControls(mapInstance)
   mapInstance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
   mapInstance.addControl(new AttributionControl({ compact: true }), 'bottom-right')
 
@@ -472,7 +750,6 @@ function initializeMap(): void {
 
   mapInstance.on('load', () => {
     if (!fixture) return
-    mapInstance.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 48, duration: 0 })
     renderRoadOverlay(mapInstance, mode)
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
     const label = document.querySelector<HTMLElement>('#map-data-label')
