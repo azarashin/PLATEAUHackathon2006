@@ -418,12 +418,14 @@ h2 {
 .legend li strong { color: #263b33; }
 .legend-swatch { width: 13px; height: 13px; border-radius: 4px; background: var(--swatch); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%); }
 .legend-swatch--missing { background: repeating-linear-gradient(135deg, var(--swatch) 0 3px, transparent 3px 6px); }
+.legend-swatch--route { background: #7048c8; box-shadow: 0 0 0 2px #c4b5fd; }
 
 .road-evidence-help { margin: 13px 0 12px; color: #54675f; font-size: 0.7rem; line-height: 1.6; }
 .road-edge-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 0; padding: 0; list-style: none; }
 .road-edge-legend li { display: grid; grid-template-columns: 18px 1fr; gap: 1px 7px; align-items: center; padding: 7px; border: 1px solid #e1e8e4; border-radius: 8px; color: #40564d; background: #f8faf9; font-size: 0.65rem; }
 .road-edge-legend li > span { grid-row: 1 / 3; width: 18px; height: 6px; border-radius: 999px; background: var(--edge-color); }
 .road-edge-legend li > span.is-missing { background: repeating-linear-gradient(90deg, var(--edge-color) 0 4px, transparent 4px 7px); }
+.road-edge-legend li > span.is-route { height: 7px; background: #7048c8; box-shadow: 0 0 0 2px #c4b5fd; }
 .road-edge-legend small { color: #78877f; font-size: 0.56rem; }
 .road-edge-status { margin: 12px 0 0; padding: 9px; border-radius: 8px; color: #53675e; background: #edf3f0; font-size: 0.65rem; line-height: 1.5; }
 .road-edge-detail { margin-top: 10px; padding: 12px; border: 1px solid #cddbd4; border-radius: 10px; color: #31483e; background: #fff; font-size: 0.68rem; }

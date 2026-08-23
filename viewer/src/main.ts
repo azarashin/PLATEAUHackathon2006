@@ -150,10 +150,11 @@ let selectedRoadEdgeId: string | null = null
 const visibleRouteProfiles = new Set<RouteProfileId>(['shortest', 'balanced', 'shade'])
 
 const routePresentations: Record<RouteProfileId, { label: string; color: string; description: string }> = {
-  shortest: { label: '最短経路', color: '#e4543f', description: '歩行時間を最小化' },
-  balanced: { label: 'バランス', color: '#7257bd', description: '距離と日向回避を両立' },
-  shade: { label: '日陰優先', color: '#16805a', description: '日向時間を強く回避' },
+  shortest: { label: '最短経路', color: '#d9485f', description: '歩行時間を最小化' },
+  balanced: { label: 'バランス', color: '#7048c8', description: '距離と日向回避を両立' },
+  shade: { label: '日陰優先', color: '#2474d2', description: '日向時間を強く回避' },
 }
+const selectedRouteCasingColor = '#c4b5fd'
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (character) => ({
@@ -468,12 +469,13 @@ function renderShell(): void {
               </div>
               <span class="preview-label" id="road-edge-count">未取得</span>
             </div>
-            <p class="road-evidence-help">道路の色は解析値（日陰率）を示します。道路を選択したときの探索コストは、歩行時間と日射回避係数から別に計算します。</p>
+            <p class="road-evidence-help">道路の緑・黄・橙・灰は解析値（日陰率）、明るい紫の縁を持つ線は選択中の移動経路を示します。道路を選択したときの探索コストは、歩行時間と日射回避係数から別に計算します。</p>
             <ul class="road-edge-legend" aria-label="日陰解析道路の凡例">
               <li><span style="--edge-color:#16805a"></span><strong>日陰</strong><small>日陰率75%以上</small></li>
               <li><span style="--edge-color:#e9c46a"></span><strong>混在</strong><small>日陰率25〜75%</small></li>
               <li><span style="--edge-color:#e76f51"></span><strong>日向</strong><small>日陰率25%未満</small></li>
               <li><span class="is-missing" style="--edge-color:#64748b"></span><strong>欠測</strong><small>道路面未照合／未計算</small></li>
+              <li><span class="is-route"></span><strong>選択経路</strong><small>経路色＋明るい紫の縁</small></li>
             </ul>
             <p class="road-edge-status" id="road-edge-status" role="status">地図を拡大すると、表示範囲の実解析道路を取得します。</p>
             <div class="road-edge-detail is-empty" id="road-edge-detail">
@@ -505,6 +507,7 @@ function updateModeUi(): void {
   const kpiLabel = document.querySelector<HTMLElement>('#kpi-label')
   const kpiValue = document.querySelector<HTMLElement>('#kpi-value')
   const legendRange = document.querySelector<HTMLElement>('#legend-range')
+  const legendTitle = document.querySelector<HTMLElement>('.legend-title span')
   const legendList = document.querySelector<HTMLUListElement>('#legend-list')
   const sampleKpi = document.querySelector<HTMLElement>('#mode-sample-kpi')
   const fixtureNotice = document.querySelector<HTMLElement>('#fixture-notice')
@@ -543,12 +546,14 @@ function updateModeUi(): void {
   if (kpiLabel) kpiLabel.textContent = mode.sampleKpi.label
   if (kpiValue) kpiValue.textContent = formatValue(mode.sampleKpi.value, mode.sampleKpi.unit, mode.displayScale)
   if (legendRange) legendRange.textContent = actualShadeMode ? '解析値 0–100%' : `${formatValue(mode.range.min, mode.unit, mode.displayScale)}–${formatValue(mode.range.max, mode.unit, mode.displayScale)}`
+  if (legendTitle) legendTitle.textContent = actualShadeMode ? '地図の凡例' : '道路の凡例'
   if (legendList) {
     legendList.innerHTML = actualShadeMode ? `
       <li><span class="legend-swatch" style="--swatch:#16805a"></span><span>日陰</span><strong>75%以上</strong></li>
       <li><span class="legend-swatch" style="--swatch:#e9c46a"></span><span>日陰・日向が混在</span><strong>25〜75%</strong></li>
       <li><span class="legend-swatch" style="--swatch:#e76f51"></span><span>日向</span><strong>25%未満</strong></li>
       <li><span class="legend-swatch legend-swatch--missing" style="--swatch:#64748b"></span><span>欠測</span><strong>未照合／未計算</strong></li>
+      <li><span class="legend-swatch legend-swatch--route"></span><span>選択中の移動経路</span><strong>経路色＋明紫縁</strong></li>
     ` : mode.colors.map((stop) => `
       <li><span class="legend-swatch" style="--swatch: ${stop.color}"></span><span>${escapeHtml(stop.label)}</span><strong>${formatValue(stop.value, mode.unit, mode.displayScale)}</strong></li>
     `).join('')
@@ -685,10 +690,7 @@ function ensureRoadEdgeLayers(): void {
     source: 'analyzed-road-edges',
     filter: ['!=', ['get', 'status'], 'missing'],
     paint: {
-      'line-color': [
-        'interpolate', ['linear'], ['get', 'shadeRatio'],
-        0, '#e76f51', 0.25, '#f4a261', 0.5, '#e9c46a', 0.75, '#84b86b', 1, '#16805a',
-      ],
+      'line-color': ['step', ['get', 'shadeRatio'], '#e76f51', 0.25, '#e9c46a', 0.75, '#16805a'],
       'line-width': 4,
       'line-opacity': 0.9,
     },
@@ -707,7 +709,7 @@ function ensureRoadEdgeLayers(): void {
     type: 'line',
     source: 'analyzed-road-edges',
     filter: ['==', ['get', 'selectedRoute'], true],
-    paint: { 'line-color': routePresentations[selectedRouteProfile].color, 'line-width': 8, 'line-opacity': 0.92 },
+    paint: { 'line-color': routePresentations[selectedRouteProfile].color, 'line-width': 6, 'line-opacity': 0.96 },
     layout: { 'line-cap': 'round', 'line-join': 'round' },
   })
   map.addLayer({
@@ -894,14 +896,14 @@ function updateRouteMap(fitToRoutes = false): void {
       id: 'calculated-routes-casing',
       type: 'line',
       source: 'calculated-routes',
-      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+      paint: { 'line-color': selectedRouteCasingColor, 'line-width': 8, 'line-opacity': 0.72 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
       id: 'calculated-routes-lines',
       type: 'line',
       source: 'calculated-routes',
-      paint: { 'line-color': colorExpression, 'line-width': 5, 'line-opacity': 0.76 },
+      paint: { 'line-color': colorExpression, 'line-width': 4, 'line-opacity': 0.82 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
@@ -909,7 +911,7 @@ function updateRouteMap(fitToRoutes = false): void {
       type: 'line',
       source: 'calculated-routes',
       filter: ['==', ['get', 'selected'], true],
-      paint: { 'line-color': '#17211d', 'line-width': 12, 'line-opacity': 0.34 },
+      paint: { 'line-color': selectedRouteCasingColor, 'line-width': 10, 'line-opacity': 0.9 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
@@ -917,7 +919,7 @@ function updateRouteMap(fitToRoutes = false): void {
       type: 'line',
       source: 'calculated-routes',
       filter: ['==', ['get', 'selected'], true],
-      paint: { 'line-color': colorExpression, 'line-width': 8, 'line-opacity': 1 },
+      paint: { 'line-color': colorExpression, 'line-width': 6, 'line-opacity': 1 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
   }
