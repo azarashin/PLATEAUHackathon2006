@@ -131,3 +131,17 @@ curl --include \
 経路API`routes`へのGETはJSON形式のHTTP 405、必要パラメーターを指定した`road-edges`へのGETはHTTP 200が正常である。HTTP 200かつ`text/html`はViewerへ誤転送、
 HTTP 502は経路サーバーが起動していないかNginxの転送先ポートが一致していない状態を示す。
 ブラウザではキャッシュを無効化して再読込し、起終点を指定して3経路の描画とKPI更新まで確認する。地図をズーム14.5以上へ拡大し、実日陰道路、欠測の破線、道路辺詳細も確認する。
+
+道路色だけが読み込めない場合は、同じ`road-edges`クエリをまず`http://127.0.0.1:<route-port>`へ、
+次に公開URLへ送る。内部がJSON、公開側がHTMLならデータを再転送せず、Nginx設定を確認する。
+
+```bash
+sudo nginx -T 2>/dev/null | \
+  grep -A12 -B2 'environment-cost-route-finder/api/v1/road-edges'
+```
+
+出力がなければ編集した設定は読み込まれていない。出力がある場合は`proxy_pass`のポートを
+`/etc/environment-cost-route-server.env`の`PORT`と一致させる。HTML本文に`<div id="app"></div>`や
+`assets/index-*.js`が含まれる場合はViewer用の汎用`location`へ誤転送されているため、
+`road-edges`用の完全一致`location`を同じHTTPS `server`ブロックへ追加する。詳細は
+[経路APIを同一サブパスで公開する](server-deployment.md#9-経路apiを同一サブパスで公開する)を参照する。
