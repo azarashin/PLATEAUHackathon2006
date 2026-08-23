@@ -372,8 +372,13 @@ ROUTE_DEPLOY_HOST=<server-ip-or-hostname>
 ROUTE_DEPLOY_USER=azarashin
 ROUTE_DEPLOY_SSH_PORT=22
 ROUTE_DEPLOY_ROOT=/home/azarashin/8002_EnvironmentCostRouteFinder/PLATEAUHackathon2006
-ROUTE_DEPLOY_BUNDLE_NAME=ichigaya-environment-cost-server-bundle-v1
+ROUTE_DEPLOY_BUNDLE_NAME=<remote-bundle-directory-name>
+ROUTE_DEPLOY_LOCAL_BUNDLE=data/generated/<local-bundle-directory-name>
 ```
+
+`ROUTE_DEPLOY_BUNDLE_NAME`はリモートの`data/generated/`直下に作る配置名、
+`ROUTE_DEPLOY_LOCAL_BUNDLE`は転送元の生成済みバンドルです。ツール側には市ヶ谷などの地域固有名を
+埋め込んでいません。地域ごとに設定ファイルの値だけを変更して同じコマンドを利用できます。
 
 設定後の転送は1コマンドです。Windows標準のOpenSSH `ssh`と`scp`、ローカルとサーバー双方のNode.jsを
 使用します。公開鍵認証を設定しておけば、途中のパスワード入力も不要です。
