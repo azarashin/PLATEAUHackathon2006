@@ -1,6 +1,8 @@
-# Viewer サーバー環境構築
+# Viewer・経路サーバー環境構築
 
-この文書では、Viewer を外部公開するための基本構成を説明します。
+この文書では、Viewerと経路サーバーを外部公開するための初回構築と障害対応を説明します。
+構築済みサーバーへコード・設定・経路バンドルを反映する日常手順は
+[Viewer・経路サーバー更新ランブック](server-operation-runbook.md)を参照してください。
 実際のホスト名、配置パス、OSユーザー名はリポジトリへコミットせず、サーバー上で設定してください。
 
 ## 前提
@@ -205,22 +207,18 @@ location <public-base-path> {
 
 ## 更新手順
 
-静的配信の場合：
+通常のコード更新では、Viewerは再ビルドが必要、経路サーバーは再ビルド不要です。
+両サービスの再起動、片方だけを変更した場合、systemd・Nginx・経路バンドル変更時の条件分岐は
+[Viewer・経路サーバー更新ランブック](server-operation-runbook.md)に集約しています。
+
+初回構築の直後に両方を反映する最小例は次のとおりです。
 
 ```bash
 cd <repository-root>
-git pull --ff-only
-cd viewer
-npm ci
-VIEWER_BASE_PATH='<public-base-path>' npm run build
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-Vite previewの場合は、ビルド後にサービスも再起動します。
-
-```bash
-sudo systemctl restart environmental-cost-viewer
+npm --prefix viewer ci
+VIEWER_BASE_PATH='<public-base-path>' npm --prefix viewer run build
+sudo systemctl restart environment-cost-route-server.service
+sudo systemctl restart environment-cost-route-finder.service
 ```
 
 ## 動作確認
@@ -551,13 +549,14 @@ WantedBy=multi-user.target
 例えば`/etc/systemd/system/environment-cost-route-server.service`へ保存し、次の順で反映します。
 
 ```bash
-cd <repository-root>/server
-npm ci
 sudo systemctl daemon-reload
 sudo systemctl enable --now environment-cost-route-server
 sudo systemctl status environment-cost-route-server
 sudo journalctl -u environment-cost-route-server -n 100 --no-pager
 ```
+
+経路サーバーは現在外部依存を持たず、`.mjs`をNode.jsで直接実行するため、ビルドと`npm ci`は不要です。
+依存パッケージを追加した場合はlockfileもGit管理し、その時点で配備手順へ`npm ci`を追加します。
 
 Nginx設定前に、環境ファイルの`PORT`で待受していることをサーバー内部から確認します。
 

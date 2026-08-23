@@ -34,7 +34,9 @@ npm run dev
 Viewer のURLはViteが起動時に表示します。特定のポートを使う場合は、リポジトリへ固定値を
 記載せず、起動時の引数またはサーバー側の環境変数で指定してください。
 
-外部サーバーへの配置は [Viewer サーバー環境構築](docs/server-deployment.md) を参照してください。
+外部サーバーの初回構築は [Viewer・経路サーバー環境構築](docs/server-deployment.md)、
+コード・設定・データ更新時の再ビルドと再起動は
+[Viewer・経路サーバー更新ランブック](docs/server-operation-runbook.md)を参照してください。
 経路APIの契約と起動方法は [経路サーバーAPI](docs/route-server.md) を参照してください。
 [地域・現在位置・起終点・日時指定UI](docs/viewer-location-and-route-controls.md) に操作仕様、データ状態、GPSの取扱いを記録しています。
 実際のホスト名はリポジトリへ記載せず、サーバー上の環境変数またはNginx設定へ反映します。
