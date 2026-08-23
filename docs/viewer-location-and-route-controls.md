@@ -34,7 +34,7 @@ Content-Type: application/json
 
 クリック座標は経路サーバーの同一規則で道路ノードへスナップされ、応答後のマーカーをスナップ座標へ更新します。`SNAP_NOT_FOUND`と`OUTSIDE_COVERAGE`は検索せず日本語で理由を表示します。処理中に条件が変わった場合はリクエスト番号で古い応答を無視します。
 
-APIを別オリジンで稼働する場合は、ビルド時に`VITE_ROUTE_API_URL`を指定します。同一オリジン構成では`/api/v1/routes`が既定値です。
+APIを別オリジンで稼働する場合は、ビルド時に`VITE_ROUTE_API_URL`を指定します。同一オリジン構成では`<VIEWER_BASE_PATH>api/v1/routes`が既定値です。例えば公開URLが`/environment-cost-route-finder/`なら、API URLは`/environment-cost-route-finder/api/v1/routes`になります。
 
 経路線とKPIカードの実応答描画は#13の範囲です。#12では経路APIの呼出し、道路スナップ、古い結果の無効化までを接続しています。
 

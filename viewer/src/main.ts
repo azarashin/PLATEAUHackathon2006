@@ -66,7 +66,7 @@ interface AccuracyPolygon {
   geometry: { type: 'Polygon'; coordinates: Coordinate[][] }
 }
 
-const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? '/api/v1/routes'
+const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? `${import.meta.env.BASE_URL}api/v1/routes`
 
 const fixtureUrl = `${import.meta.env.BASE_URL}environment-cost-road-network-v1.json`
 const baseStyle: StyleSpecification = {

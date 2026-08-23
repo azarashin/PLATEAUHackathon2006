@@ -285,6 +285,9 @@ sudo systemctl status <service-name>
 VIEWER_BASE_PATH=/environment-cost-route-finder/
 ```
 
+このリポジトリでは、`npm run build`時に`VIEWER_BASE_PATH`を省略した場合の本番既定値も
+`/environment-cost-route-finder/`です。別パスへ配置する場合は従来どおり明示指定してください。
+
 `/home/user/repository/viewer/` のようなファイルシステム上のパスを設定すると、Viteはその文字列を
 公開URLとして扱い、別のURLへアクセスするよう案内します。
 
@@ -308,6 +311,35 @@ curl --include https://<public-hostname><public-base-path>environment-cost-road-
 
 JavaScriptとCSSのURLには `<public-base-path>` が含まれ、fixtureはHTTP 200でJSONまたはGeoJSONを
 返す必要があります。fixtureの要求にHTMLが返る場合は、Nginxのフォールバックが誤って適用されています。
+
+## 経路APIを同一サブパスで公開する
+
+Viewerの既定API URLは`<public-base-path>api/v1/routes`です。Viewerを転送する汎用`location`より前に、
+経路API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
+経路サーバーが`127.0.0.1:3000`の場合です。
+
+```nginx
+location = /environment-cost-route-finder/api/v1/routes {
+    proxy_pass http://127.0.0.1:3000/api/v1/routes;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 15s;
+}
+```
+
+設定反映前後に構文と応答を確認します。GETは経路API側で`405`になることが正常であり、`200 text/html`は
+ViewerのHTMLへ誤転送されています。
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+curl --include https://<public-hostname><public-base-path>api/v1/routes
+```
+
+実リクエストは`POST application/json`です。サーバーの起動・環境変数・リクエスト例は
+[経路サーバーAPI](route-server.md)を参照してください。
 
 Vite previewを使う場合は、リバースプロキシを経由せずサーバー内部からも確認します。
 
