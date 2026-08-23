@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { demoAreas, findCoveredArea, geolocationErrorMessage, haversineMeters } from '../src/location-domain.ts'
+import { demoAreas, findCoveredArea, geolocationErrorMessage, haversineMeters, shouldDisplayDataset } from '../src/location-domain.ts'
 
 test('5地域を半径4kmとして定義する', () => {
   assert.deepEqual(demoAreas.map((area) => area.id), ['kyoto', 'maizuru', 'fujisawa', 'saitama', 'ichigaya-venue'])
@@ -18,4 +18,9 @@ test('GPSエラーを許可拒否・取得不可・タイムアウトで区別�
   assert.match(geolocationErrorMessage(1), /許可されません/)
   assert.match(geolocationErrorMessage(2), /取得できません/)
   assert.match(geolocationErrorMessage(3), /タイムアウト/)
+})
+
+test('選択地域と異なるfixture道路を表示しない', () => {
+  assert.equal(shouldDisplayDataset('ichigaya-venue', 'tokyo-demo'), false)
+  assert.equal(shouldDisplayDataset('ichigaya-venue', 'ichigaya-venue'), true)
 })

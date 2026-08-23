@@ -30,6 +30,10 @@ export function findCoveredArea(coordinate: Coordinate, areas = demoAreas): Demo
   return areas.find((area) => haversineMeters(coordinate, area.center) <= area.radiusMeters)
 }
 
+export function shouldDisplayDataset(selectedAreaId: string, datasetAreaId: string): boolean {
+  return selectedAreaId === datasetAreaId
+}
+
 export function geolocationErrorMessage(code: number): string {
   const messages: Record<number, string> = {
     1: '現在位置の利用が許可されませんでした。ブラウザの権限設定を確認してください。',

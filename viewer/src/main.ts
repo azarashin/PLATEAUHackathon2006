@@ -8,7 +8,7 @@ import {
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './style.css'
-import { demoAreas, findCoveredArea, geolocationErrorMessage, type Coordinate, type DemoArea } from './location-domain.ts'
+import { demoAreas, findCoveredArea, geolocationErrorMessage, shouldDisplayDataset, type Coordinate, type DemoArea } from './location-domain.ts'
 
 type ValueDirection = 'higher-is-better' | 'higher-is-worse'
 
@@ -48,6 +48,7 @@ interface RoadFeature {
 
 interface EnvironmentCostsFixture {
   type: 'FeatureCollection'
+  areaId: string
   fixture: { isDummy: boolean; label: string; notice: string }
   name: string
   bbox: [number, number, number, number]
@@ -138,7 +139,7 @@ function parseFixture(value: unknown): EnvironmentCostsFixture {
   if (value.dataset.provenance !== 'fixture' && value.dataset.provenance !== 'analysis') {
     throw new Error('データ由来が不正です。')
   }
-  if (!isRecord(value.area) || !Array.isArray(value.area.bbox) || value.area.bbox.length !== 4 || !value.area.bbox.every(isFiniteNumber)) {
+  if (!isRecord(value.area) || typeof value.area.areaId !== 'string' || !Array.isArray(value.area.bbox) || value.area.bbox.length !== 4 || !value.area.bbox.every(isFiniteNumber)) {
     throw new Error('表示範囲 bbox が不正です。')
   }
   const [minLng, minLat, maxLng, maxLat] = value.area.bbox
@@ -245,6 +246,7 @@ function parseFixture(value: unknown): EnvironmentCostsFixture {
 
   return {
     type: 'FeatureCollection',
+    areaId: value.area.areaId,
     fixture: {
       isDummy: value.dataset.provenance === 'fixture',
       label: value.dataset.provenance === 'fixture' ? '正式契約ダミーデータ' : '実解析データ',
@@ -477,7 +479,7 @@ function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
   if (!fixture) return
   const overlay = document.querySelector<SVGSVGElement>('#road-overlay')
   if (!overlay) return
-  if (selectedArea.id !== 'ichigaya-venue') {
+  if (!shouldDisplayDataset(selectedArea.id, fixture.areaId)) {
     overlay.innerHTML = ''
     return
   }
@@ -495,6 +497,19 @@ function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
   }).join('')
   const casingPaths = roadPaths.replaceAll('road-overlay-line', 'road-overlay-casing').replaceAll(/stroke="[^"]+"/g, 'stroke="#ffffff"')
   overlay.innerHTML = `<g>${casingPaths}</g><g>${roadPaths}</g>`
+}
+
+function updateRoadLayerLabel(): void {
+  if (!fixture) return
+  const label = document.querySelector<HTMLElement>('#map-data-label')
+  if (!label) return
+  if (shouldDisplayDataset(selectedArea.id, fixture.areaId)) {
+    label.textContent = `${fixture.features.length}本の道路データを表示中`
+    return
+  }
+  label.textContent = selectedArea.availableTimestamps.length > 0
+    ? '実道路・経路レイヤーは#13で接続します'
+    : 'この地域の計算結果は未生成です（#36）'
 }
 
 function formatCoordinate(coordinate: Coordinate | null): string {
@@ -585,6 +600,7 @@ function selectArea(areaId: string, moveMap = true): void {
   else setCoverageState('not-precomputed', `${area.name}は固定シミュレーション地域ですが、計算結果はまだ生成されていません。`)
   if (moveMap) map?.flyTo({ center: area.center, zoom: 12.5, essential: true })
   if (map && fixture) renderRoadOverlay(map, activeMode())
+  updateRoadLayerLabel()
 }
 
 function accuracyPolygon(center: Coordinate, radiusMeters: number): AccuracyPolygon {
@@ -752,8 +768,7 @@ function initializeMap(): void {
     if (!fixture) return
     renderRoadOverlay(mapInstance, mode)
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
-    const label = document.querySelector<HTMLElement>('#map-data-label')
-    if (label) label.textContent = `${fixture.features.length}本の正式契約道路を表示中`
+    updateRoadLayerLabel()
   })
   mapInstance.on('render', () => renderRoadOverlay(mapInstance, activeMode()))
 }
