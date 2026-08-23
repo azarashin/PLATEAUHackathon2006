@@ -285,6 +285,9 @@ sudo systemctl status <service-name>
 VIEWER_BASE_PATH=/environment-cost-route-finder/
 ```
 
+このリポジトリでは、`npm run build`時に`VIEWER_BASE_PATH`を省略した場合の本番既定値も
+`/environment-cost-route-finder/`です。別パスへ配置する場合は従来どおり明示指定してください。
+
 `/home/user/repository/viewer/` のようなファイルシステム上のパスを設定すると、Viteはその文字列を
 公開URLとして扱い、別のURLへアクセスするよう案内します。
 
@@ -308,6 +311,171 @@ curl --include https://<public-hostname><public-base-path>environment-cost-road-
 
 JavaScriptとCSSのURLには `<public-base-path>` が含まれ、fixtureはHTTP 200でJSONまたはGeoJSONを
 返す必要があります。fixtureの要求にHTMLが返る場合は、Nginxのフォールバックが誤って適用されています。
+
+## 経路APIを同一サブパスで公開する
+
+Viewerの既定API URLは`<public-base-path>api/v1/routes`です。Viewerを転送する汎用`location`より前に、
+経路API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
+経路サーバーが`127.0.0.1:3000`の場合です。
+
+### Viewerと経路サーバーの環境変数を分離する
+
+Viewerと経路サーバーは別プロセスなので、環境変数ファイルも分離します。Viewerの`VIEWER_PORT`と
+経路サーバーの`PORT`は別の待受ポートです。1つのファイルへ両方を記載することもできますが、
+systemdユニット間の設定混同を防ぐため推奨しません。
+
+現在の公開構成に対応するViewer用ファイルの例です。
+
+```dotenv
+# /etc/environmental-cost-viewer.env
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=www.pit-creation.com
+VIEWER_BIND_HOST=127.0.0.1
+VIEWER_PORT=8002
+VIEWER_HTTP_PORT=80
+VIEWER_BASE_PATH=/environment-cost-route-finder/
+```
+
+`__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`には、`http://`、`https://`、パスを含めず、ホスト名だけを
+指定します。`VIEWER_HTTP_PORT`は外部公開側の設定値であり、経路APIの待受ポートではありません。
+
+経路サーバー用ファイルは別途作成します。`3000`は既定値であり固定ではありません。別の未使用ポートを
+選ぶ場合は、後述するNginxの`proxy_pass`も同じ番号へ変更します。
+
+```dotenv
+# /etc/environment-cost-route-server.env
+HOST=127.0.0.1
+PORT=3000
+ROUTE_BUNDLE_MANIFESTS=<repository-root>/data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json
+ROUTE_TIMESTAMPS=2025-08-01T12:00:00+09:00
+ROUTE_MAXIMUM_SNAP_DISTANCE_METERS=250
+ROUTE_MAXIMUM_BODY_BYTES=16384
+ROUTE_REQUEST_TIMEOUT_MILLISECONDS=10000
+```
+
+manifestには絶対パスを使用します。複数地域をロードする場合は`ROUTE_BUNDLE_MANIFESTS`をカンマ区切りに
+します。`ROUTE_TIMESTAMPS`を省略するとmanifestに含まれる全時刻をロードします。
+
+### ローカルから経路バンドルを1コマンドで配置する
+
+`data/generated/`はGit管理外なので、`git pull`では市ヶ谷の実データはサーバーへ届きません。ローカルで
+生成・検証済みのバンドルをSSHで転送するため、設定例をコピーします。
+
+```powershell
+Copy-Item deploy/route-bundle-upload.env.example deploy/route-bundle-upload.env
+```
+
+`deploy/route-bundle-upload.env`はGit管理外です。サーバーIPまたはホスト名、SSHユーザー、ポート、
+リポジトリ配置先を実環境へ合わせます。ホストには`http://`や`https://`を付けません。
+
+```dotenv
+ROUTE_DEPLOY_HOST=<server-ip-or-hostname>
+ROUTE_DEPLOY_USER=<ssh-user>
+ROUTE_DEPLOY_SSH_PORT=22
+ROUTE_DEPLOY_ROOT=/home/<ssh-user>/<repository-directory>
+ROUTE_DEPLOY_BUNDLE_NAME=<remote-bundle-directory-name>
+ROUTE_DEPLOY_LOCAL_BUNDLE=data/generated/<local-bundle-directory-name>
+```
+
+`ROUTE_DEPLOY_BUNDLE_NAME`はリモートの`data/generated/`直下に作る配置名、
+`ROUTE_DEPLOY_LOCAL_BUNDLE`は転送元の生成済みバンドルです。ツール側には市ヶ谷などの地域固有名を
+埋め込んでいません。地域ごとに設定ファイルの値だけを変更して同じコマンドを利用できます。
+
+設定後の転送は1コマンドです。Windows標準のOpenSSH `ssh`と`scp`、ローカルとサーバー双方のNode.jsを
+使用します。公開鍵認証を設定しておけば、途中のパスワード入力も不要です。
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File tools/deployment/publish-route-bundle.ps1
+```
+
+スクリプトは次を順に実施します。
+
+1. ローカルの`manifest.json`、`topology.json`、コストファイルを検証する。
+2. サーバーの`data/generated/`内に一時ディレクトリを作り、全ファイルを転送する。
+3. サーバー上でもSHA-256、参照、値域を検証する。
+4. 検証成功後だけ既存ディレクトリをバックアップ名へ移動し、新バンドルへ切り替える。
+
+接続先を一時的に上書きする場合は、環境変数が設定ファイルより優先されます。
+
+```powershell
+$env:ROUTE_DEPLOY_HOST = '<temporary-server-ip>'
+powershell.exe -ExecutionPolicy Bypass -File tools/deployment/publish-route-bundle.ps1
+Remove-Item Env:ROUTE_DEPLOY_HOST
+```
+
+転送だけを行い、サービスは自動再起動しません。完了後にサーバーで経路サービスを再起動し、
+`/healthz`を確認します。実行内容だけを事前確認する場合は末尾へ`-WhatIf`を付けます。
+
+### 経路サーバーのsystemdユニット
+
+Viewerとは別のサービスとして起動します。
+
+```ini
+[Unit]
+Description=Environment Cost Route Server
+After=network.target
+
+[Service]
+Type=simple
+User=<service-user>
+WorkingDirectory=<repository-root>/server
+EnvironmentFile=/etc/environment-cost-route-server.env
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+例えば`/etc/systemd/system/environment-cost-route-server.service`へ保存し、次の順で反映します。
+
+```bash
+cd <repository-root>/server
+npm ci
+sudo systemctl daemon-reload
+sudo systemctl enable --now environment-cost-route-server
+sudo systemctl status environment-cost-route-server
+sudo journalctl -u environment-cost-route-server -n 100 --no-pager
+```
+
+Nginx設定前に、環境ファイルの`PORT`で待受していることをサーバー内部から確認します。
+
+```bash
+sudo ss -ltnp | grep ':3000'
+curl --include http://127.0.0.1:3000/healthz
+```
+
+`/healthz`がHTTP 200と`{"status":"ok"}`を返さない場合は、Nginxではなく経路サーバーの起動・
+manifestパス・ログを先に修正します。
+
+### Nginxから経路サーバーへ転送する
+
+```nginx
+location = /environment-cost-route-finder/api/v1/routes {
+    proxy_pass http://127.0.0.1:3000/api/v1/routes;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 15s;
+}
+```
+
+設定反映前後に構文と応答を確認します。GETは経路API側で`405`になることが正常であり、`200 text/html`は
+ViewerのHTMLへ誤転送されています。
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+curl --include https://<public-hostname><public-base-path>api/v1/routes
+```
+
+公開URLへのGETがJSON形式のHTTP 405になれば、経路サーバーまで到達しています。HTTP 404はAPI用
+`location`が未反映、HTTP 200かつ`Content-Type: text/html`はViewerのフォールバックへ誤転送、
+HTTP 502は経路サーバーが指定ポートで待受していない状態です。
+
+実リクエストは`POST application/json`です。サーバーの起動・環境変数・リクエスト例は
+[経路サーバーAPI](route-server.md)を参照してください。
 
 Vite previewを使う場合は、リバースプロキシを経由せずサーバー内部からも確認します。
 
