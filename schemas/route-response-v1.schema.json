@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/route-response-v1.schema.json",
+  "title": "Route response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requestId", "schemaVersion", "areaId", "timestamp", "missingCostPolicy", "snapped", "routes", "diagnostics"],
+  "properties": {
+    "requestId": { "type": "string", "format": "uuid" },
+    "schemaVersion": { "const": "route-response-1.0" },
+    "areaId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "missingCostPolicy": { "const": "assume-fully-sun-and-report-unknown-coverage" },
+    "snapped": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/snappedPoint" },
+        "end": { "$ref": "#/$defs/snappedPoint" }
+      }
+    },
+    "routes": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/route" } },
+    "diagnostics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["snapMilliseconds", "bundleFingerprintSha256"],
+      "properties": {
+        "snapMilliseconds": { "type": "number", "minimum": 0 },
+        "bundleFingerprintSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableRatio": { "anyOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "type": "null" }] },
+    "coordinate": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 }
+      ],
+      "items": false
+    },
+    "snappedPoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodeIndex", "nodeId", "inputCoordinate", "snappedCoordinate", "distanceMeters"],
+      "properties": {
+        "nodeIndex": { "type": "integer", "minimum": 0 },
+        "nodeId": { "type": "string", "minLength": 1 },
+        "inputCoordinate": { "$ref": "#/$defs/coordinate" },
+        "snappedCoordinate": { "$ref": "#/$defs/coordinate" },
+        "distanceMeters": { "type": "number", "minimum": 0 }
+      }
+    },
+    "route": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "edgeIds", "geometry", "kpis", "diagnostics"],
+      "properties": {
+        "profile": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "solarAvoidanceFactor"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+            "solarAvoidanceFactor": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "edgeIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "geometry": {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "LineString" },
+            "coordinates": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/coordinate" } }
+          }
+        },
+        "kpis": {
+          "type": "object", "additionalProperties": false,
+          "required": ["distanceMeters", "walkingSeconds", "solarExposureSeconds", "observedSolarExposureSeconds", "unknownWalkingSeconds", "shadeRatio", "observedShadeRatio", "routeCostSeconds", "edgeCount", "missingEdgeCount", "partialEdgeCount", "coverageStatus"],
+          "properties": {
+            "distanceMeters": { "type": "number", "minimum": 0 },
+            "walkingSeconds": { "type": "number", "minimum": 0 },
+            "solarExposureSeconds": { "type": "number", "minimum": 0 },
+            "observedSolarExposureSeconds": { "type": "number", "minimum": 0 },
+            "unknownWalkingSeconds": { "type": "number", "minimum": 0 },
+            "shadeRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+            "observedShadeRatio": { "$ref": "#/$defs/nullableRatio" },
+            "routeCostSeconds": { "type": "number", "minimum": 0 },
+            "edgeCount": { "type": "integer", "minimum": 0 },
+            "missingEdgeCount": { "type": "integer", "minimum": 0 },
+            "partialEdgeCount": { "type": "integer", "minimum": 0 },
+            "coverageStatus": { "enum": ["available", "partial", "missing"] }
+          }
+        },
+        "diagnostics": {
+          "type": "object", "additionalProperties": false,
+          "required": ["visitedNodeCount", "searchMilliseconds"],
+          "properties": {
+            "visitedNodeCount": { "type": "integer", "minimum": 1 },
+            "searchMilliseconds": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}
