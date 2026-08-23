@@ -81,4 +81,12 @@ test('snapping and route failures return stable error codes', () => {
     () => service.compare(request({ profiles: [{ id: 'bad', solarAvoidanceFactor: -1 }] })),
     (error) => error instanceof RouteError && error.code === 'INVALID_PROFILE',
   )
+  assert.throws(
+    () => service.compare(request({ unexpected: true })),
+    (error) => error instanceof RouteError && error.code === 'INVALID_REQUEST',
+  )
+  assert.throws(
+    () => service.compare(request({ profiles: [{ id: 'bad', solarAvoidanceFactor: 1, unexpected: true }] })),
+    (error) => error instanceof RouteError && error.code === 'INVALID_PROFILE',
+  )
 })

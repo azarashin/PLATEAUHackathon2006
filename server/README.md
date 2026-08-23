@@ -29,4 +29,14 @@ npm test
 npm run generate:fixture
 ```
 
+## 市ヶ谷実データの確認
+
+```powershell
+npm run verify:ichigaya -- `
+  --manifest ../data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json `
+  --report ../data/raw/ichigaya-route-server-verification.json
+```
+
+市ヶ谷中心付近から新宿駅付近までの約3〜5 km条件で、3経路、決定性、HTTPレスポンス量、読込・探索時間、RSS・V8メモリを記録します。
+
 API契約、係数、欠測方針、エラーは[`docs/route-server.md`](../docs/route-server.md)を参照してください。

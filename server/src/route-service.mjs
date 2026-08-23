@@ -3,12 +3,18 @@ import { DEFAULT_PROFILES, RouteEngine } from './route-engine.mjs'
 import { RouteError, invariantRoute } from './route-error.mjs'
 
 const PROFILE_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/
+const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
+
+function hasOnlyKeys(value, allowed) {
+  return Object.keys(value).every((key) => allowed.has(key))
+}
 
 function validateProfiles(profiles) {
   invariantRoute(Array.isArray(profiles) && profiles.length > 0 && profiles.length <= 5, 'INVALID_PROFILE', 'profiles must contain between 1 and 5 entries.', 400)
   const ids = new Set()
   return profiles.map((profile) => {
     invariantRoute(profile && typeof profile === 'object' && PROFILE_ID_PATTERN.test(profile.id ?? ''), 'INVALID_PROFILE', 'Each profile requires a safe id.', 400)
+    invariantRoute(hasOnlyKeys(profile, new Set(['id', 'solarAvoidanceFactor'])), 'INVALID_PROFILE', 'A profile contains an unsupported field.', 400)
     invariantRoute(!ids.has(profile.id), 'INVALID_PROFILE', 'Profile ids must be unique.', 400)
     ids.add(profile.id)
     invariantRoute(Number.isFinite(profile.solarAvoidanceFactor) && profile.solarAvoidanceFactor >= 0 && profile.solarAvoidanceFactor <= 100, 'INVALID_PROFILE', 'solarAvoidanceFactor must be between 0 and 100.', 400)
@@ -18,8 +24,9 @@ function validateProfiles(profiles) {
 
 function validateRequest(request) {
   invariantRoute(request && typeof request === 'object' && !Array.isArray(request), 'INVALID_REQUEST', 'The request body must be an object.', 400)
-  invariantRoute(typeof request.areaId === 'string' && request.areaId.length > 0, 'INVALID_REQUEST', 'areaId is required.', 400)
-  invariantRoute(typeof request.timestamp === 'string' && request.timestamp.length > 0, 'INVALID_REQUEST', 'timestamp is required.', 400)
+  invariantRoute(hasOnlyKeys(request, new Set(['areaId', 'timestamp', 'start', 'end', 'profiles'])), 'INVALID_REQUEST', 'The request contains an unsupported field.', 400)
+  invariantRoute(typeof request.areaId === 'string' && request.areaId.length > 0 && request.areaId.length <= 128, 'INVALID_REQUEST', 'areaId is required and must not exceed 128 characters.', 400)
+  invariantRoute(typeof request.timestamp === 'string' && DATE_TIME_PATTERN.test(request.timestamp) && Number.isFinite(Date.parse(request.timestamp)), 'INVALID_REQUEST', 'timestamp must be an ISO 8601 date-time.', 400)
   return {
     areaId: request.areaId,
     timestamp: request.timestamp,

@@ -101,3 +101,30 @@ routeCostSeconds = walkingSeconds
 - #13: 返却された3経路とKPIの描画
 
 GPSはMVPでは表示位置合わせだけに使用し、利用者が地図上で明示指定した起終点だけをAPIへ送る。
+
+## 市ヶ谷実データ検証
+
+次のコマンドは市ヶ谷の12:00コストだけを読み込み、市ヶ谷中心付近から新宿駅付近までの3経路を複数回計算する。最短経路が3〜5 kmであること、係数0、日射曝露の単調性、エッジ列の決定性、HTTPレスポンスが全バンドルを含まないことを検証する。
+
+```powershell
+npm --prefix server run verify:ichigaya -- `
+  --manifest data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json `
+  --report data/raw/ichigaya-route-server-verification.json
+```
+
+追跡対象の代表値は`data/ichigaya-route-server-verification.json`へ記録する。実行ごとの詳細レポートと大規模バンドルはGit管理しない。
+
+2026-08-23の代表実行結果は次のとおり。
+
+| 指標 | 結果 |
+|---|---:|
+| 1時刻の起動読込 | 764.29 ms |
+| 3経路比較 p50 / p95（7回） | 98.69 / 116.21 ms |
+| HTTP往復 | 137.32 ms |
+| HTTPレスポンス | 34,743 bytes |
+| 起動読込後RSS増加 | 127,635,456 bytes |
+| 最短経路 | 3,631 m、2,594秒、日射曝露1,726秒 |
+| バランス経路 | 3,777 m、2,698秒、日射曝露780秒 |
+| 日陰優先経路 | 3,791 m、2,708秒、日射曝露772秒 |
+
+3経路とも一部に欠測辺がある。探索では欠測区間を全日向として扱い、`unknownWalkingSeconds`を最短87.8秒、バランス37.9秒、日陰優先36.6秒として返した。UIは日陰率だけでなく、この未知区間を必ず併記する必要がある。
