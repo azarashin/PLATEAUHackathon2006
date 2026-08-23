@@ -1,14 +1,31 @@
 import {
   AttributionControl,
+  type ExpressionSpecification,
   type GeoJSONSource,
+  LngLatBounds,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  setWorkerUrl,
   type StyleSpecification,
 } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './style.css'
 import { demoAreas, findCoveredArea, geolocationErrorMessage, shouldDisplayDataset, type Coordinate, type DemoArea } from './location-domain.ts'
+import {
+  comparisonSummary,
+  DEFAULT_SHADE_FACTOR,
+  formatDistance,
+  formatDuration,
+  formatShadeRatio,
+  identicalRouteGroups,
+  parseRouteResponse,
+  profilesForShadeFactor,
+  routesInDisplayOrder,
+  type CalculatedRoute,
+  type RouteProfileId,
+  type RouteResponse,
+} from './route-domain.ts'
 
 type ValueDirection = 'higher-is-better' | 'higher-is-worse'
 
@@ -67,6 +84,9 @@ interface AccuracyPolygon {
 }
 
 const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? `${import.meta.env.BASE_URL}api/v1/routes`
+setWorkerUrl(import.meta.env.DEV
+  ? '/node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'
+  : `${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`)
 
 const fixtureUrl = `${import.meta.env.BASE_URL}environment-cost-road-network-v1.json`
 const baseStyle: StyleSpecification = {
@@ -102,6 +122,7 @@ const app: HTMLDivElement = appElement
 let fixture: EnvironmentCostsFixture | null = null
 let selectedModeId = ''
 let map: MapLibreMap | null = null
+let mapStyleReady = false
 let basemapWarningShown = false
 let selectedArea = demoAreas.at(-1) as DemoArea
 let selectedEndpoint: EndpointKind = 'start'
@@ -111,6 +132,16 @@ let startMarker: Marker | null = null
 let endMarker: Marker | null = null
 let locationMarker: Marker | null = null
 let routeRequestSequence = 0
+let routeResponse: RouteResponse | null = null
+let selectedRouteProfile: RouteProfileId = 'balanced'
+let shadeFactor = DEFAULT_SHADE_FACTOR
+const visibleRouteProfiles = new Set<RouteProfileId>(['shortest', 'balanced', 'shade'])
+
+const routePresentations: Record<RouteProfileId, { label: string; color: string; description: string }> = {
+  shortest: { label: '最短経路', color: '#e4543f', description: '歩行時間を最小化' },
+  balanced: { label: 'バランス', color: '#7257bd', description: '距離と日向回避を両立' },
+  shade: { label: '日陰優先', color: '#16805a', description: '日向時間を強く回避' },
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (character) => ({
@@ -357,13 +388,11 @@ function renderShell(): void {
                 <p class="eyebrow">Route comparison</p>
                 <h2 id="route-preview-title">経路比較</h2>
               </div>
-              <span class="preview-label">外観プレビュー</span>
+              <span class="preview-label" id="route-result-label">経路未計算</span>
             </div>
-            <div class="route-cards">
-              <article><span class="route-dot route-dot--short"></span><strong>最短経路</strong><small>実計算は未接続</small></article>
-              <article><span class="route-dot route-dot--shade"></span><strong>日陰優先</strong><small>実計算は未接続</small></article>
-              <article><span class="route-dot route-dot--balance"></span><strong>バランス</strong><small>実計算は未接続</small></article>
-            </div>
+            <p class="route-summary" id="route-summary">起終点を指定すると、実計算した3経路を比較できます。</p>
+            <div class="route-cards" id="route-cards"></div>
+            <p class="identical-route-note" id="identical-route-note" hidden></p>
           </section>
         </div>
 
@@ -393,6 +422,10 @@ function renderShell(): void {
             <div class="condition-row">
               <label>計算済み日時<select id="timestamp-select"></select></label>
             </div>
+            <label class="factor-control">日陰優先度
+              <span><input id="shade-factor" type="range" min="0" max="4" step="0.25" value="${DEFAULT_SHADE_FACTOR}"><output id="shade-factor-value">${DEFAULT_SHADE_FACTOR.toFixed(2)}</output></span>
+            </label>
+            <p class="condition-help">0は距離のみ、値を上げるほど日向時間を強く回避します。バランス経路には表示値の1/4を適用します。</p>
             <p class="condition-help">選択肢は事前計算済みの日時だけです。リアルタイム解析ではありません。</p>
             <button class="search-button" id="search-button" type="button" disabled>出発地と目的地を指定してください</button>
             <p id="route-status" class="route-status" role="status">経路条件を指定してください。</p>
@@ -402,7 +435,7 @@ function renderShell(): void {
             <p class="eyebrow">Mode detail</p>
             <h2 id="mode-title">データ読込中</h2>
             <p class="description" id="mode-description">fixture を確認しています。</p>
-            <div class="kpi">
+            <div class="kpi" id="mode-sample-kpi">
               <span id="kpi-label">サンプル KPI</span>
               <strong id="kpi-value">–</strong>
               <small>表示確認用の架空値</small>
@@ -471,8 +504,11 @@ function updateModeUi(): void {
 function selectMode(modeId: string): void {
   if (!fixture || !fixture.costModes.some((mode) => mode.id === modeId)) return
   selectedModeId = modeId
+  if (modeId !== 'shadeRatio') invalidateRoute('内水モードの実経路計算は対象外です。日陰モードへ切り替えてください。')
   updateModeUi()
+  updateEndpointUi()
   if (map) renderRoadOverlay(map, activeMode())
+  if (modeId === 'shadeRatio') void requestRoutes()
 }
 
 function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
@@ -503,12 +539,16 @@ function updateRoadLayerLabel(): void {
   if (!fixture) return
   const label = document.querySelector<HTMLElement>('#map-data-label')
   if (!label) return
+  if (routeResponse) {
+    label.textContent = `${routeResponse.routes.length}本の実計算経路を表示中`
+    return
+  }
   if (shouldDisplayDataset(selectedArea.id, fixture.areaId)) {
     label.textContent = `${fixture.features.length}本の道路データを表示中`
     return
   }
   label.textContent = selectedArea.availableTimestamps.length > 0
-    ? '実道路・経路レイヤーは#13で接続します'
+    ? '起終点を指定すると実道路の経路を表示します'
     : 'この地域の計算結果は未生成です（#36）'
 }
 
@@ -523,8 +563,154 @@ function setCoverageState(state: DataState, message: string): void {
   status.textContent = message
 }
 
+function routeGeoJson(response: RouteResponse) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: response.routes.filter((route) => visibleRouteProfiles.has(route.profile.id)).map((route) => ({
+      type: 'Feature' as const,
+      properties: {
+        profileId: route.profile.id,
+        selected: route.profile.id === selectedRouteProfile,
+      },
+      geometry: route.geometry,
+    })),
+  }
+}
+
+function updateRouteMap(fitToRoutes = false): void {
+  if (!map || !routeResponse || !mapStyleReady) return
+  const data = routeGeoJson(routeResponse)
+  const source = map.getSource('calculated-routes') as GeoJSONSource | undefined
+  if (source) source.setData(data)
+  else {
+    map.addSource('calculated-routes', { type: 'geojson', data })
+    const colorExpression: ExpressionSpecification = [
+      'match', ['get', 'profileId'],
+      'shortest', routePresentations.shortest.color,
+      'balanced', routePresentations.balanced.color,
+      'shade', routePresentations.shade.color,
+      '#64748b',
+    ]
+    map.addLayer({
+      id: 'calculated-routes-casing',
+      type: 'line',
+      source: 'calculated-routes',
+      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    })
+    map.addLayer({
+      id: 'calculated-routes-lines',
+      type: 'line',
+      source: 'calculated-routes',
+      paint: { 'line-color': colorExpression, 'line-width': 5, 'line-opacity': 0.76 },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    })
+    map.addLayer({
+      id: 'calculated-route-selected-casing',
+      type: 'line',
+      source: 'calculated-routes',
+      filter: ['==', ['get', 'selected'], true],
+      paint: { 'line-color': '#17211d', 'line-width': 12, 'line-opacity': 0.34 },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    })
+    map.addLayer({
+      id: 'calculated-route-selected',
+      type: 'line',
+      source: 'calculated-routes',
+      filter: ['==', ['get', 'selected'], true],
+      paint: { 'line-color': colorExpression, 'line-width': 8, 'line-opacity': 1 },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    })
+  }
+  if (fitToRoutes) {
+    const bounds = new LngLatBounds()
+    for (const route of routeResponse.routes) for (const point of route.geometry.coordinates) bounds.extend(point)
+    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 48, maxZoom: 16, duration: 500 })
+  }
+}
+
+function routeCard(route: CalculatedRoute, shortest: CalculatedRoute, unknownLabel: string): string {
+  const presentation = routePresentations[route.profile.id]
+  const selected = route.profile.id === selectedRouteProfile
+  const visible = visibleRouteProfiles.has(route.profile.id)
+  const difference = Math.max(0, route.kpis.walkingSeconds - shortest.kpis.walkingSeconds)
+  const coverageLabel = route.kpis.coverageStatus === 'available' ? '解析値あり' : route.kpis.coverageStatus === 'partial' ? '一部欠測' : '欠測あり'
+  return `
+    <article class="route-card${selected ? ' is-selected' : ''}" style="--route-color: ${presentation.color}">
+      <button class="route-select" type="button" data-select-route="${route.profile.id}" aria-pressed="${selected}">
+        <span class="route-dot"></span>
+        <span><strong>${presentation.label}</strong><small>${presentation.description}・係数${route.profile.solarAvoidanceFactor.toFixed(2)}</small></span>
+      </button>
+      <dl class="route-kpis">
+        <div><dt>距離</dt><dd>${formatDistance(route.kpis.distanceMeters)}</dd></div>
+        <div><dt>推定所要時間</dt><dd>${formatDuration(route.kpis.walkingSeconds)}</dd></div>
+        <div><dt>日陰率</dt><dd>${formatShadeRatio(route.kpis.observedShadeRatio)}</dd></div>
+        <div><dt>日向時間</dt><dd>${formatDuration(route.kpis.solarExposureSeconds)}</dd></div>
+        <div><dt>最短との差</dt><dd>+${formatDuration(difference)}</dd></div>
+        <div><dt>${escapeHtml(unknownLabel)}</dt><dd>${formatDuration(route.kpis.unknownWalkingSeconds)}</dd></div>
+      </dl>
+      <div class="route-card-footer">
+        <span class="coverage-chip" data-coverage="${route.kpis.coverageStatus}">${coverageLabel}</span>
+        <label><input type="checkbox" data-toggle-route="${route.profile.id}"${visible ? ' checked' : ''}>地図に表示</label>
+      </div>
+    </article>
+  `
+}
+
+function renderRouteComparison(fitToRoutes = false): void {
+  const cards = document.querySelector<HTMLElement>('#route-cards')
+  const summary = document.querySelector<HTMLElement>('#route-summary')
+  const note = document.querySelector<HTMLElement>('#identical-route-note')
+  const resultLabel = document.querySelector<HTMLElement>('#route-result-label')
+  if (!routeResponse) {
+    if (cards) cards.innerHTML = ''
+    if (summary) summary.textContent = '起終点を指定すると、実計算した3経路を比較できます。'
+    if (note) note.hidden = true
+    if (resultLabel) resultLabel.textContent = '経路未計算'
+    return
+  }
+  const routes = routesInDisplayOrder(routeResponse.routes)
+  const shortest = routes.find((route) => route.profile.id === 'shortest')
+  const selected = routes.find((route) => route.profile.id === selectedRouteProfile)
+  if (!shortest || !selected) return
+  const unknownLabel = routeResponse.presentation.kpiLabels.unknownWalkingSeconds
+  if (cards) {
+    cards.innerHTML = routes.map((route) => routeCard(route, shortest, unknownLabel)).join('')
+    cards.querySelectorAll<HTMLButtonElement>('[data-select-route]').forEach((button) => button.addEventListener('click', () => {
+      selectedRouteProfile = button.dataset.selectRoute as RouteProfileId
+      visibleRouteProfiles.add(selectedRouteProfile)
+      renderRouteComparison()
+    }))
+    cards.querySelectorAll<HTMLInputElement>('[data-toggle-route]').forEach((checkbox) => checkbox.addEventListener('change', () => {
+      const profileId = checkbox.dataset.toggleRoute as RouteProfileId
+      if (checkbox.checked) visibleRouteProfiles.add(profileId)
+      else visibleRouteProfiles.delete(profileId)
+      updateRouteMap()
+    }))
+  }
+  if (summary) summary.textContent = `${routePresentations[selected.profile.id].label}: ${comparisonSummary(selected, shortest)}`
+  if (resultLabel) {
+    resultLabel.textContent = '実計算結果'
+    resultLabel.classList.add('preview-label--active')
+  }
+  const duplicateGroups = identicalRouteGroups(routes)
+  if (note) {
+    note.hidden = duplicateGroups.length === 0
+    note.textContent = duplicateGroups.map((group) => `${group.map((id) => routePresentations[id].label).join('・')}は同一路線です。係数が異なっても、この条件では最適な道路列が一致しました。`).join(' ')
+  }
+  updateRouteMap(fitToRoutes)
+}
+
+function clearCalculatedRoutes(): void {
+  routeResponse = null
+  const source = map?.getSource('calculated-routes') as GeoJSONSource | undefined
+  source?.setData({ type: 'FeatureCollection', features: [] })
+  renderRouteComparison()
+}
+
 function invalidateRoute(message = '条件が変更されました。新しい経路を計算します。'): void {
   routeRequestSequence += 1
+  clearCalculatedRoutes()
   const status = document.querySelector<HTMLElement>('#route-status')
   if (status) status.textContent = message
 }
@@ -550,11 +736,11 @@ function updateEndpointUi(): void {
   if (endOutput) endOutput.value = formatCoordinate(endCoordinate)
   startMarker = replaceMarker(startMarker, startCoordinate, 'start')
   endMarker = replaceMarker(endMarker, endCoordinate, 'end')
-  const canSearch = startCoordinate !== null && endCoordinate !== null && selectedArea.availableTimestamps.length > 0
+  const canSearch = startCoordinate !== null && endCoordinate !== null && selectedArea.availableTimestamps.length > 0 && selectedModeId === 'shadeRatio'
   const searchButton = document.querySelector<HTMLButtonElement>('#search-button')
   if (searchButton) {
     searchButton.disabled = !canSearch
-    searchButton.textContent = canSearch ? '3経路を再計算' : selectedArea.availableTimestamps.length === 0 ? 'この地域は結果未生成です' : '出発地と目的地を指定してください'
+    searchButton.textContent = canSearch ? '3経路を再計算' : selectedArea.availableTimestamps.length === 0 ? 'この地域は結果未生成です' : selectedModeId !== 'shadeRatio' ? '日陰モードで利用できます' : '出発地と目的地を指定してください'
   }
 }
 
@@ -660,7 +846,7 @@ function requestCurrentLocation(): void {
 }
 
 async function requestRoutes(): Promise<void> {
-  if (!startCoordinate || !endCoordinate || selectedArea.availableTimestamps.length === 0) return
+  if (!startCoordinate || !endCoordinate || selectedArea.availableTimestamps.length === 0 || selectedModeId !== 'shadeRatio') return
   const timestamp = document.querySelector<HTMLSelectElement>('#timestamp-select')?.value
   if (!timestamp) return
   const sequence = ++routeRequestSequence
@@ -673,34 +859,46 @@ async function requestRoutes(): Promise<void> {
       response = await fetch(routeApiUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ areaId: selectedArea.id, timestamp, start: startCoordinate, end: endCoordinate }),
+        body: JSON.stringify({
+          areaId: selectedArea.id,
+          timestamp,
+          start: startCoordinate,
+          end: endCoordinate,
+          profiles: profilesForShadeFactor(shadeFactor),
+        }),
       })
     } catch {
       throw new Error('経路データを取得できませんでした。時間をおいて再度お試しください。')
     }
-    let document: Record<string, unknown>
+    let responseDocument: Record<string, unknown>
     try {
-      document = await response.json() as Record<string, unknown>
+      responseDocument = await response.json() as Record<string, unknown>
     } catch {
       throw new Error('経路サーバーの応答形式が不正です。')
     }
     if (sequence !== routeRequestSequence) return
     if (!response.ok) {
-      const error = isRecord(document.error) ? document.error : {}
+      const error = isRecord(responseDocument.error) ? responseDocument.error : {}
       const code = typeof error.code === 'string' ? error.code : 'LOAD_ERROR'
       if (code === 'SNAP_NOT_FOUND') throw new Error('許容距離内に歩行可能な道路がないため、経路を検索できません。')
       if (code === 'OUTSIDE_COVERAGE') throw new Error('選択地点が計算済み範囲外のため、経路を検索できません。')
       throw new Error('経路データを取得できませんでした。時間をおいて再度お試しください。')
     }
-    if (!isRecord(document.snapped) || !isRecord(document.snapped.start) || !isRecord(document.snapped.end)) throw new Error('経路サーバーの応答形式が不正です。')
-    const snappedStart = document.snapped.start.snappedCoordinate
-    const snappedEnd = document.snapped.end.snappedCoordinate
-    if (!Array.isArray(snappedStart) || !snappedStart.every(isFiniteNumber) || !Array.isArray(snappedEnd) || !snappedEnd.every(isFiniteNumber)) throw new Error('スナップ結果が不正です。')
-    startCoordinate = [snappedStart[0] as number, snappedStart[1] as number]
-    endCoordinate = [snappedEnd[0] as number, snappedEnd[1] as number]
+    routeResponse = parseRouteResponse(responseDocument)
+    startCoordinate = routeResponse.snapped.start.snappedCoordinate
+    endCoordinate = routeResponse.snapped.end.snappedCoordinate
     updateEndpointUi()
-    const routeCount = Array.isArray(document.routes) ? document.routes.length : 0
-    if (status) status.textContent = `起終点を道路へスナップし、${routeCount}経路を計算しました。経路描画とKPI比較は#13で接続します。`
+    renderRouteComparison(true)
+    updateRoadLayerLabel()
+    const badge = document.querySelector<HTMLElement>('#dummy-badge')
+    const datasetNotice = document.querySelector<HTMLElement>('#dataset-notice')
+    const sampleKpi = document.querySelector<HTMLElement>('#mode-sample-kpi')
+    const fixtureNotice = document.querySelector<HTMLElement>('#fixture-notice')
+    if (badge) badge.textContent = '実計算経路'
+    if (datasetNotice) datasetNotice.innerHTML = '<strong>市ヶ谷 実計算</strong><span>経路とKPIは実道路グラフとUnity日陰解析結果からサーバーで計算しています。</span>'
+    if (sampleKpi) sampleKpi.hidden = true
+    if (fixtureNotice) fixtureNotice.hidden = true
+    if (status) status.textContent = `起終点を道路へスナップし、${routeResponse.routes.length}経路を計算・描画しました。`
   } catch (error) {
     if (sequence !== routeRequestSequence) return
     const message = error instanceof Error ? error.message : '経路を検索できませんでした。'
@@ -736,6 +934,17 @@ function bindLocationControls(mapInstance: MapLibreMap): void {
     void requestRoutes()
   })
   document.querySelector('#search-button')?.addEventListener('click', () => void requestRoutes())
+  const factorInput = document.querySelector<HTMLInputElement>('#shade-factor')
+  const factorOutput = document.querySelector<HTMLOutputElement>('#shade-factor-value')
+  factorInput?.addEventListener('input', () => {
+    const value = Number(factorInput.value)
+    if (factorOutput) factorOutput.value = value.toFixed(2)
+  })
+  factorInput?.addEventListener('change', () => {
+    shadeFactor = Number(factorInput.value)
+    invalidateRoute('日陰優先度を変更したため、3経路を再計算します。')
+    void requestRoutes()
+  })
   mapInstance.on('click', (event) => setEndpoint(selectedEndpoint, [event.lngLat.lng, event.lngLat.lat]))
   updateTimestampOptions()
   updateEndpointUi()
@@ -752,6 +961,7 @@ function initializeMap(): void {
     attributionControl: false,
   })
   map = mapInstance
+  mapStyleReady = false
   bindLocationControls(mapInstance)
   mapInstance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
   mapInstance.addControl(new AttributionControl({ compact: true }), 'bottom-right')
@@ -766,9 +976,11 @@ function initializeMap(): void {
 
   mapInstance.on('load', () => {
     if (!fixture) return
+    mapStyleReady = true
     renderRoadOverlay(mapInstance, mode)
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
     updateRoadLayerLabel()
+    updateRouteMap(routeResponse !== null)
   })
   mapInstance.on('render', () => renderRoadOverlay(mapInstance, activeMode()))
 }
