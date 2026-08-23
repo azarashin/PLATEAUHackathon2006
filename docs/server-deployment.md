@@ -318,6 +318,88 @@ Viewerの既定API URLは`<public-base-path>api/v1/routes`です。Viewerを転�
 経路API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
 経路サーバーが`127.0.0.1:3000`の場合です。
 
+### Viewerと経路サーバーの環境変数を分離する
+
+Viewerと経路サーバーは別プロセスなので、環境変数ファイルも分離します。Viewerの`VIEWER_PORT`と
+経路サーバーの`PORT`は別の待受ポートです。1つのファイルへ両方を記載することもできますが、
+systemdユニット間の設定混同を防ぐため推奨しません。
+
+現在の公開構成に対応するViewer用ファイルの例です。
+
+```dotenv
+# /etc/environmental-cost-viewer.env
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=www.pit-creation.com
+VIEWER_BIND_HOST=127.0.0.1
+VIEWER_PORT=8002
+VIEWER_HTTP_PORT=80
+VIEWER_BASE_PATH=/environment-cost-route-finder/
+```
+
+`__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`には、`http://`、`https://`、パスを含めず、ホスト名だけを
+指定します。`VIEWER_HTTP_PORT`は外部公開側の設定値であり、経路APIの待受ポートではありません。
+
+経路サーバー用ファイルは別途作成します。`3000`は既定値であり固定ではありません。別の未使用ポートを
+選ぶ場合は、後述するNginxの`proxy_pass`も同じ番号へ変更します。
+
+```dotenv
+# /etc/environment-cost-route-server.env
+HOST=127.0.0.1
+PORT=3000
+ROUTE_BUNDLE_MANIFESTS=<repository-root>/data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json
+ROUTE_TIMESTAMPS=2025-08-01T12:00:00+09:00
+ROUTE_MAXIMUM_SNAP_DISTANCE_METERS=250
+ROUTE_MAXIMUM_BODY_BYTES=16384
+ROUTE_REQUEST_TIMEOUT_MILLISECONDS=10000
+```
+
+manifestには絶対パスを使用します。複数地域をロードする場合は`ROUTE_BUNDLE_MANIFESTS`をカンマ区切りに
+します。`ROUTE_TIMESTAMPS`を省略するとmanifestに含まれる全時刻をロードします。
+
+### 経路サーバーのsystemdユニット
+
+Viewerとは別のサービスとして起動します。
+
+```ini
+[Unit]
+Description=Environment Cost Route Server
+After=network.target
+
+[Service]
+Type=simple
+User=<service-user>
+WorkingDirectory=<repository-root>/server
+EnvironmentFile=/etc/environment-cost-route-server.env
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+例えば`/etc/systemd/system/environment-cost-route-server.service`へ保存し、次の順で反映します。
+
+```bash
+cd <repository-root>/server
+npm ci
+sudo systemctl daemon-reload
+sudo systemctl enable --now environment-cost-route-server
+sudo systemctl status environment-cost-route-server
+sudo journalctl -u environment-cost-route-server -n 100 --no-pager
+```
+
+Nginx設定前に、環境ファイルの`PORT`で待受していることをサーバー内部から確認します。
+
+```bash
+sudo ss -ltnp | grep ':3000'
+curl --include http://127.0.0.1:3000/healthz
+```
+
+`/healthz`がHTTP 200と`{"status":"ok"}`を返さない場合は、Nginxではなく経路サーバーの起動・
+manifestパス・ログを先に修正します。
+
+### Nginxから経路サーバーへ転送する
+
 ```nginx
 location = /environment-cost-route-finder/api/v1/routes {
     proxy_pass http://127.0.0.1:3000/api/v1/routes;
@@ -337,6 +419,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 curl --include https://<public-hostname><public-base-path>api/v1/routes
 ```
+
+公開URLへのGETがJSON形式のHTTP 405になれば、経路サーバーまで到達しています。HTTP 404はAPI用
+`location`が未反映、HTTP 200かつ`Content-Type: text/html`はViewerのフォールバックへ誤転送、
+HTTP 502は経路サーバーが指定ポートで待受していない状態です。
 
 実リクエストは`POST application/json`です。サーバーの起動・環境変数・リクエスト例は
 [経路サーバーAPI](route-server.md)を参照してください。

@@ -83,6 +83,10 @@ routeCostSeconds = walkingSeconds
 
 `ROUTE_TIMESTAMPS`を指定すると必要時刻だけ、未指定なら全時刻を型付き配列へ読み込む。複数地域はmanifestパスをカンマ区切りで指定する。同じ`areaId`の重複は起動失敗とする。
 
+本番ではViewerと別のsystemdサービス・環境変数ファイルで起動する。`PORT`は既定値3000から変更でき、
+Nginxの`proxy_pass`と一致させる。環境ファイル、systemdユニット、同一サブパスでの公開例は
+[Viewer サーバー環境構築](server-deployment.md#経路apiを同一サブパスで公開する)を参照する。
+
 ## Fixture
 
 `data/fixtures/route-server-bundle-v1/`は3つの候補経路と到達不能な孤立ノードを持つ。
