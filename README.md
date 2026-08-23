@@ -72,3 +72,5 @@ PLATEAU CityGMLを道路ごとの環境コストへ変換するUnityバッチツ
 ## 解析記録
 
 - [市ヶ谷1地域分の実解析結果](docs/ichigaya-pilot-analysis.md)
+- [市ヶ谷周辺の歩行道路グラフ生成・品質確認](docs/ichigaya-pedestrian-road-network.md)
+- [ノードID付きOSMによるUnity再解析手順](docs/reanalyze-unity-with-node-id-osm.md)

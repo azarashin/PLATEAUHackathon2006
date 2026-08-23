@@ -20,7 +20,7 @@
     "13106": "data/raw/plateau/13106-2025",
     "13113": "data/raw/plateau/13113-2025"
   },
-  "osmInputPath": "data/raw/ichigaya-osm-highways.json",
+  "osmInputPath": "data/raw/ichigaya-osm-highways-with-nodes.json",
   "coverageOutputPath": "data/raw/ichigaya-venue-mesh-coverage.json",
   "environmentCostOutputPath": "data/generated/ichigaya-venue-environment-cost.json",
   "summaryOutputPath": "data/raw/ichigaya-venue-analysis-summary.json"
