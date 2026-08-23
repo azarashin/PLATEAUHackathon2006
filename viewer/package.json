@@ -11,9 +11,13 @@
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:contract": "node scripts/validate-environment-cost-data.mjs ../data/fixtures/environment-cost-road-network-v1.json",
+    "test:contract": "node scripts/test-environment-cost-data.mjs"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "typescript": "7.0.2",
     "vite": "8.2.2"
   },

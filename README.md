@@ -4,7 +4,7 @@ PLATEAU の3D都市モデルから都市環境を計算する Unity シミュレ
 
 ## 現在の状態
 
-Issue #10 のダミー版 Viewer を実装しています。MapLibre の地図上で日陰・内水コストを切り替え、道路色、凡例、説明、サンプル KPI の連動を確認できます。Unity 側はプロジェクト骨格のみで、PLATEAU SDK の導入と都市モデル読込は Issue #4 の対象です。
+Viewer は正式データ契約 v1 の小型 fixture を直接読み込みます。MapLibre の地図上で日陰・内水コストを切り替え、道路色、凡例、説明、サンプル KPI の連動と欠測表示を確認できます。実解析結果との結合は後続 Issue の対象です。
 
 ## ディレクトリ構成
 
@@ -17,6 +17,8 @@ Issue #10 のダミー版 Viewer を実装しています。MapLibre の地図�
 ```
 
 Unity と Viewer をつなぐ主要インターフェースは、JSON / GeoJSON の環境コストデータです。Viewer は CityGML や Unity アセットを直接読み込みません。
+正式な v1 契約、時刻・欠測・単位・拡張規則は
+[環境コスト道路ネットワークデータ契約 v1](docs/environment-cost-data-contract-v1.md) を参照してください。
 
 ## Viewer の起動
 

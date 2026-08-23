@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "environment-cost-road-network-1.0",
+  "dataset": {
+    "id": "tokyo-demo-formal-v1",
+    "name": "環境コスト正式契約v1デモ",
+    "provenance": "fixture",
+    "generatedAt": "2026-08-23T03:30:00Z",
+    "notice": "正式契約の表示・検証用に作成した架空値です。実際の環境評価や避難判断には使用できません。"
+  },
+  "area": {
+    "areaId": "tokyo-demo",
+    "center": [139.7677, 35.6835],
+    "radiusMeters": 500,
+    "bbox": [139.7646, 35.6812, 139.7708, 35.6858]
+  },
+  "coordinateReferenceSystem": {
+    "geometryEpsg": 4326,
+    "axisOrder": ["longitude", "latitude"],
+    "unity": {
+      "projectedEpsg": 6677,
+      "coordinateZoneId": 9,
+      "axisConvention": "EUN",
+      "referencePointGeographic": [139.7677, 35.6835]
+    }
+  },
+  "scenario": {
+    "id": "summer-clear-demo",
+    "referenceDate": "2025-08-01",
+    "timezone": "Asia/Tokyo",
+    "availableTimestamps": ["2025-08-01T12:00:00+09:00", "2025-08-01T13:00:00+09:00"],
+    "defaultTimestamp": "2025-08-01T12:00:00+09:00",
+    "timeSelectionPolicy": "nearest-on-reference-date-ties-earlier"
+  },
+  "costDefinitions": [
+    {
+      "id": "shadeRatio",
+      "displayName": "日陰",
+      "description": "道路辺の有効サンプルのうち建物によって日陰となった割合です。",
+      "unit": "ratio",
+      "range": { "min": 0, "max": 1 },
+      "valueDirection": "higher-is-better",
+      "routeAggregation": "walking-time-weighted-mean",
+      "missingValuePolicy": "preserve-null",
+      "presentation": {
+        "viewerMode": true,
+        "displayUnit": "%",
+        "displayScale": 100,
+        "valueDirectionLabel": "高いほど日陰が多い",
+        "sampleKpiLabel": "道路加重平均日陰率",
+        "colors": [
+          { "value": 0, "color": "#f59e0b", "label": "日向が多い" },
+          { "value": 0.5, "color": "#84cc16", "label": "中程度" },
+          { "value": 1, "color": "#047857", "label": "日陰が多い" }
+        ]
+      }
+    },
+    {
+      "id": "solarExposureSeconds",
+      "displayName": "日射曝露時間",
+      "description": "その道路辺を既定歩行速度で通過するときに日向となる推定時間です。",
+      "unit": "s",
+      "range": { "min": 0, "max": 3600 },
+      "valueDirection": "higher-is-worse",
+      "routeAggregation": "sum",
+      "missingValuePolicy": "preserve-null",
+      "presentation": {
+        "viewerMode": false,
+        "displayUnit": "秒",
+        "displayScale": 1,
+        "valueDirectionLabel": "低いほど日射が少ない",
+        "sampleKpiLabel": "道路合計日射曝露時間",
+        "colors": [
+          { "value": 0, "color": "#047857", "label": "曝露なし" },
+          { "value": 1800, "color": "#f59e0b", "label": "中程度" },
+          { "value": 3600, "color": "#b91c1c", "label": "曝露大" }
+        ]
+      }
+    },
+    {
+      "id": "inlandFloodDepthMeters",
+      "displayName": "内水",
+      "description": "大雨時の想定浸水深を模した拡張コストのデモ値です。",
+      "unit": "m",
+      "range": { "min": 0, "max": 0.6 },
+      "valueDirection": "higher-is-worse",
+      "routeAggregation": "maximum",
+      "missingValuePolicy": "preserve-null",
+      "presentation": {
+        "viewerMode": true,
+        "displayUnit": "m",
+        "displayScale": 1,
+        "valueDirectionLabel": "高いほどリスク大",
+        "sampleKpiLabel": "道路最大想定浸水深",
+        "colors": [
+          { "value": 0, "color": "#dbeafe", "label": "リスク低" },
+          { "value": 0.3, "color": "#3b82f6", "label": "注意" },
+          { "value": 0.6, "color": "#1e3a8a", "label": "リスク高" }
+        ]
+      }
+    }
+  ],
+  "nodes": [
+    { "id": "node-001", "sourceNodeId": 1001, "coordinate": [139.7648, 35.6820] },
+    { "id": "node-002", "sourceNodeId": 1002, "coordinate": [139.7664, 35.6828] },
+    { "id": "node-003", "sourceNodeId": 1003, "coordinate": [139.7683, 35.6830] },
+    { "id": "node-004", "sourceNodeId": 1004, "coordinate": [139.7704, 35.6841] }
+  ],
+  "edges": [
+    {
+      "id": "edge-001-forward",
+      "physicalEdgeId": "edge-001",
+      "sourceEdgeIds": ["osm-way-101-0"],
+      "fromNodeId": "node-001",
+      "toNodeId": "node-002",
+      "direction": "forward",
+      "geometry": { "type": "LineString", "coordinates": [[139.7648, 35.6820], [139.7664, 35.6828]] },
+      "lengthMeters": 170,
+      "walkingSeconds": 121.428571,
+      "timeSlices": [
+        { "timestamp": "2025-08-01T12:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.8, "solarExposureSeconds": 24.2857142, "inlandFloodDepthMeters": 0.08 } },
+        { "timestamp": "2025-08-01T13:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.65, "solarExposureSeconds": 42.5, "inlandFloodDepthMeters": 0.08 } }
+      ]
+    },
+    {
+      "id": "edge-001-backward",
+      "physicalEdgeId": "edge-001",
+      "sourceEdgeIds": ["osm-way-101-0"],
+      "fromNodeId": "node-002",
+      "toNodeId": "node-001",
+      "direction": "backward",
+      "geometry": { "type": "LineString", "coordinates": [[139.7664, 35.6828], [139.7648, 35.6820]] },
+      "lengthMeters": 170,
+      "walkingSeconds": 121.428571,
+      "timeSlices": [
+        { "timestamp": "2025-08-01T12:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.8, "solarExposureSeconds": 24.2857142, "inlandFloodDepthMeters": 0.08 } },
+        { "timestamp": "2025-08-01T13:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.65, "solarExposureSeconds": 42.5, "inlandFloodDepthMeters": 0.08 } }
+      ]
+    },
+    {
+      "id": "edge-002-forward",
+      "physicalEdgeId": "edge-002",
+      "sourceEdgeIds": ["osm-way-102-0"],
+      "fromNodeId": "node-002",
+      "toNodeId": "node-003",
+      "direction": "forward",
+      "geometry": { "type": "LineString", "coordinates": [[139.7664, 35.6828], [139.7683, 35.6830]] },
+      "lengthMeters": 220,
+      "walkingSeconds": 157.142857,
+      "timeSlices": [
+        { "timestamp": "2025-08-01T12:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 5, "validSampleCount": 5, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.25, "solarExposureSeconds": 117.85714275, "inlandFloodDepthMeters": 0.48 } },
+        { "timestamp": "2025-08-01T13:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 5, "validSampleCount": 5, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.4, "solarExposureSeconds": 94.2857142, "inlandFloodDepthMeters": 0.48 } }
+      ]
+    },
+    {
+      "id": "edge-003-forward",
+      "physicalEdgeId": "edge-003",
+      "sourceEdgeIds": ["osm-way-103-0"],
+      "fromNodeId": "node-003",
+      "toNodeId": "node-004",
+      "direction": "forward",
+      "geometry": { "type": "LineString", "coordinates": [[139.7683, 35.6830], [139.7704, 35.6841]] },
+      "lengthMeters": 200,
+      "walkingSeconds": 142.857143,
+      "timeSlices": [
+        { "timestamp": "2025-08-01T12:00:00+09:00", "status": "partial", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 3, "noGroundSampleCount": 1 }, "values": { "shadeRatio": 0.5, "solarExposureSeconds": 71.4285715, "inlandFloodDepthMeters": 0.34 } },
+        { "timestamp": "2025-08-01T13:00:00+09:00", "status": "missing", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 0, "noGroundSampleCount": 4 }, "values": { "shadeRatio": null, "solarExposureSeconds": null, "inlandFloodDepthMeters": null } }
+      ]
+    },
+    {
+      "id": "edge-004-forward",
+      "physicalEdgeId": "edge-004",
+      "sourceEdgeIds": ["osm-way-104-0"],
+      "fromNodeId": "node-004",
+      "toNodeId": "node-002",
+      "direction": "forward",
+      "geometry": { "type": "LineString", "coordinates": [[139.7704, 35.6841], [139.7664, 35.6828]] },
+      "lengthMeters": 154,
+      "walkingSeconds": 110,
+      "timeSlices": [
+        { "timestamp": "2025-08-01T12:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.9, "solarExposureSeconds": 11, "inlandFloodDepthMeters": 0.13 } },
+        { "timestamp": "2025-08-01T13:00:00+09:00", "status": "available", "sampleCoverage": { "sampleCount": 4, "validSampleCount": 4, "noGroundSampleCount": 0 }, "values": { "shadeRatio": 0.75, "solarExposureSeconds": 27.5, "inlandFloodDepthMeters": 0.13 } }
+      ]
+    }
+  ],
+  "extensions": {
+    "fixture": true
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "environment-cost-road-network-invalid-cases-1.0",
+  "baseFixture": "../environment-cost-road-network-v1.json",
+  "cases": [
+    {
+      "id": "duplicate-edge-id",
+      "description": "辺IDが一意ではない",
+      "mutation": { "operation": "copy", "from": "/edges/0/id", "path": "/edges/1/id" },
+      "expectedError": "duplicate edge id"
+    },
+    {
+      "id": "missing-node-reference",
+      "description": "辺が存在しないノードを参照する",
+      "mutation": { "operation": "replace", "path": "/edges/0/toNodeId", "value": "node-missing" },
+      "expectedError": "missing node reference"
+    },
+    {
+      "id": "shade-ratio-out-of-range",
+      "description": "日陰率が定義値域を超える",
+      "mutation": { "operation": "replace", "path": "/edges/0/timeSlices/0/values/shadeRatio", "value": 1.2 },
+      "expectedError": "value out of range"
+    },
+    {
+      "id": "invalid-timestamp",
+      "description": "時刻がscenarioに登録されていない",
+      "mutation": { "operation": "replace", "path": "/edges/0/timeSlices/0/timestamp", "value": "2025-08-01T14:00:00+09:00" },
+      "expectedError": "unregistered timestamp"
+    },
+    {
+      "id": "malformed-datetime",
+      "description": "既定時刻がISO 8601 date-time形式ではない",
+      "mutation": { "operation": "replace", "path": "/scenario/defaultTimestamp", "value": "2025/08/01 12:00" },
+      "expectedError": "must match format \"date-time\""
+    },
+    {
+      "id": "missing-is-zero",
+      "description": "欠測状態をゼロ値として格納する",
+      "mutation": { "operation": "replace", "path": "/edges/3/timeSlices/1/values/shadeRatio", "value": 0 },
+      "expectedError": "missing values must be null"
+    }
+  ]
+}

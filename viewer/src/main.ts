@@ -23,6 +23,8 @@ interface CostMode {
   range: { min: number; max: number }
   valueDirection: ValueDirection
   valueDirectionLabel: string
+  displayScale: number
+  routeAggregation: 'sum' | 'maximum' | 'walking-time-weighted-mean'
   colors: ColorStop[]
   sampleKpi: { label: string; value: number; unit: string }
 }
@@ -32,7 +34,8 @@ interface RoadFeature {
   properties: {
     id: string
     name: string
-    costs: Record<string, number>
+    walkingSeconds: number
+    costs: Record<string, number | null>
   }
   geometry: {
     type: 'LineString'
@@ -42,14 +45,15 @@ interface RoadFeature {
 
 interface EnvironmentCostsFixture {
   type: 'FeatureCollection'
-  fixture: { isDummy: true; label: string; notice: string }
+  fixture: { isDummy: boolean; label: string; notice: string }
   name: string
   bbox: [number, number, number, number]
+  selectedTimestamp: string
   costModes: CostMode[]
   features: RoadFeature[]
 }
 
-const fixtureUrl = `${import.meta.env.BASE_URL}environment-costs-phase-a.geojson`
+const fixtureUrl = `${import.meta.env.BASE_URL}environment-cost-road-network-v1.json`
 const baseStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -103,40 +107,44 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function parseFixture(value: unknown): EnvironmentCostsFixture {
-  if (!isRecord(value) || value.type !== 'FeatureCollection') {
-    throw new Error('GeoJSON FeatureCollection ではありません。')
+  if (!isRecord(value) || value.schemaVersion !== 'environment-cost-road-network-1.0') {
+    throw new Error('正式データ契約 v1 ではありません。')
   }
-  if (!isRecord(value.fixture) || value.fixture.isDummy !== true) {
-    throw new Error('ダミーデータ識別情報がありません。')
+  if (!isRecord(value.dataset) || typeof value.dataset.name !== 'string' || typeof value.dataset.notice !== 'string') {
+    throw new Error('データセット情報が不正です。')
   }
-  if (typeof value.fixture.label !== 'string' || typeof value.fixture.notice !== 'string') {
-    throw new Error('ダミーデータの表示情報が不正です。')
+  if (value.dataset.provenance !== 'fixture' && value.dataset.provenance !== 'analysis') {
+    throw new Error('データ由来が不正です。')
   }
-  if (typeof value.name !== 'string') throw new Error('データ名がありません。')
-  if (!Array.isArray(value.bbox) || value.bbox.length !== 4 || !value.bbox.every(isFiniteNumber)) {
+  if (!isRecord(value.area) || !Array.isArray(value.area.bbox) || value.area.bbox.length !== 4 || !value.area.bbox.every(isFiniteNumber)) {
     throw new Error('表示範囲 bbox が不正です。')
   }
-  const [minLng, minLat, maxLng, maxLat] = value.bbox
+  const [minLng, minLat, maxLng, maxLat] = value.area.bbox
   if (minLng >= maxLng || minLat >= maxLat) throw new Error('表示範囲 bbox の大小関係が不正です。')
-  if (!Array.isArray(value.costModes) || value.costModes.length < 2) {
-    throw new Error('コストモードが不足しています。')
+  if (!isRecord(value.scenario) || typeof value.scenario.defaultTimestamp !== 'string' || !Array.isArray(value.scenario.availableTimestamps)) {
+    throw new Error('シナリオの時刻情報が不正です。')
   }
-  if (!Array.isArray(value.features)) throw new Error('道路データがありません。')
+  if (!value.scenario.availableTimestamps.includes(value.scenario.defaultTimestamp)) throw new Error('既定時刻が利用可能時刻にありません。')
+  const defaultTimestamp = value.scenario.defaultTimestamp
+  if (!Array.isArray(value.costDefinitions)) throw new Error('コスト定義がありません。')
+  if (!Array.isArray(value.edges)) throw new Error('道路データがありません。')
 
-  const modes = value.costModes.map((candidate, index): CostMode => {
+  const modes = value.costDefinitions.filter((candidate) => isRecord(candidate) && isRecord(candidate.presentation) && candidate.presentation.viewerMode === true).map((candidate, index): CostMode => {
     if (!isRecord(candidate)) throw new Error(`コストモード ${index + 1} が不正です。`)
     const range = candidate.range
-    const sampleKpi = candidate.sampleKpi
-    const colors = candidate.colors
+    const presentation = candidate.presentation
+    if (!isRecord(presentation)) throw new Error(`コストモード ${index + 1} の表示情報が不正です。`)
+    const colors = presentation.colors
     if (
       typeof candidate.id !== 'string' ||
       typeof candidate.displayName !== 'string' ||
       typeof candidate.description !== 'string' ||
       typeof candidate.unit !== 'string' ||
-      typeof candidate.valueDirectionLabel !== 'string' ||
       (candidate.valueDirection !== 'higher-is-better' && candidate.valueDirection !== 'higher-is-worse') ||
+      (candidate.routeAggregation !== 'sum' && candidate.routeAggregation !== 'maximum' && candidate.routeAggregation !== 'walking-time-weighted-mean') ||
       !isRecord(range) || !isFiniteNumber(range.min) || !isFiniteNumber(range.max) || range.min >= range.max ||
-      !isRecord(sampleKpi) || typeof sampleKpi.label !== 'string' || !isFiniteNumber(sampleKpi.value) || typeof sampleKpi.unit !== 'string' ||
+      typeof presentation.displayUnit !== 'string' || !isFiniteNumber(presentation.displayScale) || presentation.displayScale <= 0 ||
+      typeof presentation.valueDirectionLabel !== 'string' || typeof presentation.sampleKpiLabel !== 'string' ||
       !Array.isArray(colors) || colors.length < 2
     ) {
       throw new Error(`コストモード ${index + 1} の表示情報が不正です。`)
@@ -152,63 +160,85 @@ function parseFixture(value: unknown): EnvironmentCostsFixture {
       id: candidate.id,
       displayName: candidate.displayName,
       description: candidate.description,
-      unit: candidate.unit,
+      unit: presentation.displayUnit,
       range: { min: range.min, max: range.max },
       valueDirection: candidate.valueDirection,
-      valueDirectionLabel: candidate.valueDirectionLabel,
+      valueDirectionLabel: presentation.valueDirectionLabel,
+      displayScale: presentation.displayScale,
+      routeAggregation: candidate.routeAggregation,
       colors: parsedColors,
-      sampleKpi: { label: sampleKpi.label, value: sampleKpi.value, unit: sampleKpi.unit },
+      sampleKpi: { label: presentation.sampleKpiLabel, value: 0, unit: presentation.displayUnit },
     }
   })
+  if (modes.length === 0) throw new Error('Viewer表示対象のコストモードがありません。')
 
   const modeIds = new Set(modes.map((mode) => mode.id))
   if (modeIds.size !== modes.length) throw new Error('コストモード ID が重複しています。')
 
-  const features = value.features.map((candidate, index): RoadFeature => {
-    if (!isRecord(candidate) || candidate.type !== 'Feature' || !isRecord(candidate.properties) || !isRecord(candidate.geometry)) {
-      throw new Error(`道路 ${index + 1} が GeoJSON Feature ではありません。`)
+  const features = value.edges.map((candidate, index): RoadFeature => {
+    if (!isRecord(candidate) || !isRecord(candidate.geometry) || !Array.isArray(candidate.timeSlices)) {
+      throw new Error(`道路 ${index + 1} が不正です。`)
     }
-    const properties = candidate.properties
     const geometry = candidate.geometry
-    if (typeof properties.id !== 'string' || typeof properties.name !== 'string' || !isRecord(properties.costs)) {
+    if (typeof candidate.id !== 'string' || !isFiniteNumber(candidate.walkingSeconds)) {
       throw new Error(`道路 ${index + 1} の属性が不正です。`)
     }
     if (geometry.type !== 'LineString' || !Array.isArray(geometry.coordinates) || geometry.coordinates.length < 2) {
-      throw new Error(`道路 ${properties.id} の LineString が不正です。`)
+      throw new Error(`道路 ${candidate.id} の LineString が不正です。`)
     }
     const coordinates = geometry.coordinates.map((coordinate) => {
       if (!Array.isArray(coordinate) || coordinate.length < 2 || !isFiniteNumber(coordinate[0]) || !isFiniteNumber(coordinate[1])) {
-        throw new Error(`道路 ${properties.id} の座標が不正です。`)
+        throw new Error(`道路 ${candidate.id} の座標が不正です。`)
       }
       return [coordinate[0], coordinate[1]] as [number, number]
     })
-    const costs: Record<string, number> = {}
+    const selectedSlice = candidate.timeSlices.find((slice) => isRecord(slice) && slice.timestamp === defaultTimestamp)
+    if (!isRecord(selectedSlice) || !isRecord(selectedSlice.values)) throw new Error(`道路 ${candidate.id} に既定時刻の値がありません。`)
+    const costs: Record<string, number | null> = {}
     for (const mode of modes) {
-      const cost = properties.costs[mode.id]
-      if (!isFiniteNumber(cost) || cost < mode.range.min || cost > mode.range.max) {
-        throw new Error(`道路 ${properties.id} の ${mode.displayName} 値が範囲外です。`)
+      const cost = selectedSlice.values[mode.id]
+      if (cost !== null && (!isFiniteNumber(cost) || cost < mode.range.min || cost > mode.range.max)) {
+        throw new Error(`道路 ${candidate.id} の ${mode.displayName} 値が範囲外です。`)
       }
-      costs[mode.id] = cost
+      costs[mode.id] = cost === null ? null : cost
     }
     return {
       type: 'Feature',
-      properties: { id: properties.id, name: properties.name, costs },
+      properties: { id: candidate.id, name: candidate.id, walkingSeconds: candidate.walkingSeconds, costs },
       geometry: { type: 'LineString', coordinates },
     }
   })
 
+  for (const mode of modes) {
+    const availableFeatures = features.filter((feature) => feature.properties.costs[mode.id] !== null)
+    const values = availableFeatures.map((feature) => feature.properties.costs[mode.id] as number)
+    if (values.length === 0) continue
+    if (mode.routeAggregation === 'maximum') mode.sampleKpi.value = Math.max(...values)
+    else if (mode.routeAggregation === 'sum') mode.sampleKpi.value = values.reduce((total, current) => total + current, 0)
+    else {
+      const totalWalkingSeconds = availableFeatures.reduce((total, feature) => total + feature.properties.walkingSeconds, 0)
+      mode.sampleKpi.value = availableFeatures.reduce((total, feature) => total + (feature.properties.costs[mode.id] as number) * feature.properties.walkingSeconds, 0) / totalWalkingSeconds
+    }
+  }
+
   return {
     type: 'FeatureCollection',
-    fixture: { isDummy: true, label: value.fixture.label, notice: value.fixture.notice },
-    name: value.name,
+    fixture: {
+      isDummy: value.dataset.provenance === 'fixture',
+      label: value.dataset.provenance === 'fixture' ? '正式契約ダミーデータ' : '実解析データ',
+      notice: value.dataset.notice,
+    },
+    name: value.dataset.name,
     bbox: [minLng, minLat, maxLng, maxLat],
+    selectedTimestamp: defaultTimestamp,
     costModes: modes,
     features,
   }
 }
 
-function formatValue(value: number, unit: string): string {
-  return `${Number.isInteger(value) ? value : value.toFixed(2)}${unit}`
+function formatValue(value: number, unit: string, displayScale = 1): string {
+  const displayed = value * displayScale
+  return `${Number.isInteger(displayed) ? displayed : displayed.toFixed(2)}${unit}`
 }
 
 function toRgb(hex: string): [number, number, number] {
@@ -250,7 +280,7 @@ function renderShell(): void {
         <span class="dummy-badge" id="dummy-badge">コンセプト表示</span>
       </header>
 
-      <div class="concept-notice" role="note">
+      <div class="concept-notice" id="dataset-notice" role="note">
         <strong>デモ画面</strong>
         <span>環境コストと経路の値はダミーです。避難判断や安全保証には使用できません。</span>
       </div>
@@ -274,11 +304,11 @@ function renderShell(): void {
             </div>
             <div class="map-wrap">
               <div id="map" aria-label="環境コスト道路地図"></div>
-              <svg class="road-overlay" id="road-overlay" aria-label="ダミー道路レイヤー"></svg>
+              <svg class="road-overlay" id="road-overlay" aria-label="環境コスト道路レイヤー"></svg>
               <span class="map-data-label" id="map-data-label">道路レイヤー準備中</span>
               <div class="map-state" id="map-state" role="status">
                 <span class="spinner" aria-hidden="true"></span>
-                <strong>ダミー道路データを読み込んでいます</strong>
+                <strong>正式契約データを読み込んでいます</strong>
                 <small>しばらくお待ちください</small>
               </div>
               <div class="basemap-warning" id="basemap-warning" hidden>背景地図を取得できません。道路データは引き続き操作できます。</div>
@@ -380,11 +410,11 @@ function updateModeUi(): void {
     direction.className = `direction direction--${mode.valueDirection}`
   }
   if (kpiLabel) kpiLabel.textContent = mode.sampleKpi.label
-  if (kpiValue) kpiValue.textContent = formatValue(mode.sampleKpi.value, mode.sampleKpi.unit)
-  if (legendRange) legendRange.textContent = `${mode.range.min}–${mode.range.max}${mode.unit}`
+  if (kpiValue) kpiValue.textContent = formatValue(mode.sampleKpi.value, mode.sampleKpi.unit, mode.displayScale)
+  if (legendRange) legendRange.textContent = `${formatValue(mode.range.min, mode.unit, mode.displayScale)}–${formatValue(mode.range.max, mode.unit, mode.displayScale)}`
   if (legendList) {
     legendList.innerHTML = mode.colors.map((stop) => `
-      <li><span class="legend-swatch" style="--swatch: ${stop.color}"></span><span>${escapeHtml(stop.label)}</span><strong>${formatValue(stop.value, mode.unit)}</strong></li>
+      <li><span class="legend-swatch" style="--swatch: ${stop.color}"></span><span>${escapeHtml(stop.label)}</span><strong>${formatValue(stop.value, mode.unit, mode.displayScale)}</strong></li>
     `).join('')
   }
 }
@@ -408,8 +438,9 @@ function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
       return `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
     }).join(' ')
     const value = feature.properties.costs[mode.id]
-    const label = `${feature.properties.name}: ${formatValue(value, mode.unit)}`
-    return `<path class="road-overlay-line" d="${path}" stroke="${colorForValue(value, mode.colors)}"><title>${escapeHtml(label)}</title></path>`
+    const label = `${feature.properties.name}: ${value === null ? '欠測' : formatValue(value, mode.unit, mode.displayScale)}`
+    const color = value === null ? '#64748b' : colorForValue(value, mode.colors)
+    return `<path class="road-overlay-line" d="${path}" stroke="${color}"><title>${escapeHtml(label)}</title></path>`
   }).join('')
   const casingPaths = roadPaths.replaceAll('road-overlay-line', 'road-overlay-casing').replaceAll(/stroke="[^"]+"/g, 'stroke="#ffffff"')
   overlay.innerHTML = `<g>${casingPaths}</g><g>${roadPaths}</g>`
@@ -445,7 +476,7 @@ function initializeMap(): void {
     renderRoadOverlay(mapInstance, mode)
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
     const label = document.querySelector<HTMLElement>('#map-data-label')
-    if (label) label.textContent = `${fixture.features.length}本のダミー道路を表示中`
+    if (label) label.textContent = `${fixture.features.length}本の正式契約道路を表示中`
   })
   mapInstance.on('render', () => renderRoadOverlay(mapInstance, activeMode()))
 }
@@ -463,8 +494,10 @@ async function start(): Promise<void> {
     selectedModeId = fixture.costModes[0]?.id ?? ''
     const badge = document.querySelector<HTMLElement>('#dummy-badge')
     const notice = document.querySelector<HTMLElement>('#fixture-notice')
+    const datasetNotice = document.querySelector<HTMLElement>('#dataset-notice')
     if (badge) badge.textContent = fixture.fixture.label
     if (notice) notice.textContent = fixture.fixture.notice
+    if (datasetNotice) datasetNotice.innerHTML = `<strong>${escapeHtml(fixture.name)}</strong><span>${escapeHtml(fixture.fixture.notice)}</span>`
     updateModeUi()
     initializeMap()
   } catch (error) {
