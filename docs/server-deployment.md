@@ -369,9 +369,9 @@ Copy-Item deploy/route-bundle-upload.env.example deploy/route-bundle-upload.env
 
 ```dotenv
 ROUTE_DEPLOY_HOST=<server-ip-or-hostname>
-ROUTE_DEPLOY_USER=azarashin
+ROUTE_DEPLOY_USER=<ssh-user>
 ROUTE_DEPLOY_SSH_PORT=22
-ROUTE_DEPLOY_ROOT=/home/azarashin/8002_EnvironmentCostRouteFinder/PLATEAUHackathon2006
+ROUTE_DEPLOY_ROOT=/home/<ssh-user>/<repository-directory>
 ROUTE_DEPLOY_BUNDLE_NAME=<remote-bundle-directory-name>
 ROUTE_DEPLOY_LOCAL_BUNDLE=data/generated/<local-bundle-directory-name>
 ```

@@ -36,17 +36,17 @@ function Get-DeploymentSetting {
 }
 
 $serverHost = Get-DeploymentSetting 'ROUTE_DEPLOY_HOST'
-$serverUser = Get-DeploymentSetting 'ROUTE_DEPLOY_USER' 'azarashin'
+$serverUser = Get-DeploymentSetting 'ROUTE_DEPLOY_USER'
 $sshPortText = Get-DeploymentSetting 'ROUTE_DEPLOY_SSH_PORT' '22'
 $remoteRoot = (Get-DeploymentSetting 'ROUTE_DEPLOY_ROOT').TrimEnd('/')
 $bundleName = Get-DeploymentSetting 'ROUTE_DEPLOY_BUNDLE_NAME'
 $localBundleSetting = Get-DeploymentSetting 'ROUTE_DEPLOY_LOCAL_BUNDLE'
 
 if ($serverHost -notmatch '^[A-Za-z0-9.-]+$') { throw 'ROUTE_DEPLOY_HOST must be an IP address or hostname without a protocol or path.' }
-if ($serverUser -notmatch '^[A-Za-z0-9._-]+$') { throw 'ROUTE_DEPLOY_USER contains unsupported characters.' }
+if ([string]::IsNullOrWhiteSpace($serverUser) -or $serverUser -notmatch '^[A-Za-z0-9._-]+$') { throw 'ROUTE_DEPLOY_USER is required and contains unsupported characters.' }
 $sshPort = 0
 if (-not [int]::TryParse($sshPortText, [ref]$sshPort) -or $sshPort -lt 1 -or $sshPort -gt 65535) { throw 'ROUTE_DEPLOY_SSH_PORT must be between 1 and 65535.' }
-if ($remoteRoot -notmatch '^/[A-Za-z0-9._/-]+$') { throw 'ROUTE_DEPLOY_ROOT must be an absolute Linux path without spaces or shell characters.' }
+if ([string]::IsNullOrWhiteSpace($remoteRoot) -or $remoteRoot -notmatch '^/[A-Za-z0-9._/-]+$') { throw 'ROUTE_DEPLOY_ROOT is required and must be an absolute Linux path without spaces or shell characters.' }
 if ([string]::IsNullOrWhiteSpace($bundleName) -or $bundleName -notmatch '^[A-Za-z0-9._-]+$') { throw 'ROUTE_DEPLOY_BUNDLE_NAME is required and may contain only letters, digits, dot, underscore, and hyphen.' }
 if ([string]::IsNullOrWhiteSpace($localBundleSetting)) { throw 'ROUTE_DEPLOY_LOCAL_BUNDLE is required.' }
 
