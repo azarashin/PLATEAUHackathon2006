@@ -43,6 +43,7 @@ test('route endpoint returns only snapped points, routes, and diagnostics', asyn
   assert.ok(Number(response.headers.get('content-length')) < 8192)
   const document = await response.json()
   assert.match(document.requestId, /^[0-9a-f-]{36}$/)
+  assert.equal(document.presentation.kpiLabels.unknownWalkingSeconds, '不明な歩行時間')
   assert.equal(document.routes.length, 3)
   assert.equal(document.routes.every((route) => route.geometry.type === 'LineString'), true)
   assert.equal('topology' in document, false)

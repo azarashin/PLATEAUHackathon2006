@@ -70,6 +70,10 @@ export class RouteService {
       areaId: validated.areaId,
       timestamp: validated.timestamp,
       missingCostPolicy: 'assume-fully-sun-and-report-unknown-coverage',
+      presentation: {
+        locale: 'ja',
+        kpiLabels: { unknownWalkingSeconds: '不明な歩行時間' },
+      },
       snapped: { start, end },
       routes,
       diagnostics: {

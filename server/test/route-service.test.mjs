@@ -27,6 +27,7 @@ test('three profiles select shortest, balanced, and shaded paths', () => {
   const result = service.compare(request())
   assert.equal(result.schemaVersion, 'route-response-1.0')
   assert.equal(result.missingCostPolicy, 'assume-fully-sun-and-report-unknown-coverage')
+  assert.equal(result.presentation.kpiLabels.unknownWalkingSeconds, '不明な歩行時間')
   assert.equal(result.snapped.start.nodeId, 'osm-node-2001')
   assert.equal(result.snapped.end.nodeId, 'osm-node-2005')
   assert.deepEqual(result.routes.map((route) => route.profile), [

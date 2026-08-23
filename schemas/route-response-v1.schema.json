@@ -4,13 +4,27 @@
   "title": "Route response v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requestId", "schemaVersion", "areaId", "timestamp", "missingCostPolicy", "snapped", "routes", "diagnostics"],
+  "required": ["requestId", "schemaVersion", "areaId", "timestamp", "missingCostPolicy", "presentation", "snapped", "routes", "diagnostics"],
   "properties": {
     "requestId": { "type": "string", "format": "uuid" },
     "schemaVersion": { "const": "route-response-1.0" },
     "areaId": { "type": "string", "minLength": 1 },
     "timestamp": { "type": "string", "format": "date-time" },
     "missingCostPolicy": { "const": "assume-fully-sun-and-report-unknown-coverage" },
+    "presentation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["locale", "kpiLabels"],
+      "properties": {
+        "locale": { "const": "ja" },
+        "kpiLabels": {
+          "type": "object", "additionalProperties": false,
+          "required": ["unknownWalkingSeconds"],
+          "properties": {
+            "unknownWalkingSeconds": { "const": "不明な歩行時間" }
+          }
+        }
+      }
+    },
     "snapped": {
       "type": "object", "additionalProperties": false,
       "required": ["start", "end"],
