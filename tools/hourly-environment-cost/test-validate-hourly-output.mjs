@@ -33,6 +33,24 @@ const summary = validateHourlyOutput(valid);
 assert.equal(summary.edgeCount, 1);
 assert.equal(summary.byHour[8].partial, 1);
 
+const boundaryValues = fixture();
+boundaryValues.edges[0].hourly[0].shadeRatio = 0;
+boundaryValues.edges[0].hourly[0].solarExposureSeconds = 100;
+boundaryValues.edges[0].hourly[1].shadeRatio = 1;
+boundaryValues.edges[0].hourly[1].solarExposureSeconds = 0;
+assert.doesNotThrow(() => validateHourlyOutput(boundaryValues), "shadeRatio boundaries 0 and 1 must be valid");
+
+const zeroValidSamples = fixture();
+zeroValidSamples.edges[0].validSampleCount = 0;
+zeroValidSamples.edges[0].noGroundSampleCount = 2;
+for (const slice of zeroValidSamples.edges[0].hourly) {
+  slice.status = "missing";
+  slice.exclusionReason = "road-surface-not-found";
+  slice.shadeRatio = null;
+  slice.solarExposureSeconds = null;
+}
+assert.equal(validateHourlyOutput(zeroValidSamples).byHour[8].missing, 1);
+
 const incomplete = fixture();
 incomplete.edges[0].hourly.pop();
 assert.throws(() => validateHourlyOutput(incomplete), /hourly slice count mismatch/);

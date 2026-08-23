@@ -18,7 +18,9 @@
     "test:route-server-contract": "node scripts/test-route-server-contract.mjs",
     "test:location-controls": "node --experimental-strip-types --test test/location-domain.test.ts",
     "test:route-display": "node --experimental-strip-types --test test/route-domain.test.ts",
-    "test:road-edge-display": "node --experimental-strip-types --test test/road-edge-domain.test.ts"
+    "test:road-edge-display": "node --experimental-strip-types --test test/road-edge-domain.test.ts",
+    "test": "npm run test:contract && npm run test:route-server-contract && npm run test:location-controls && npm run test:route-display && npm run test:road-edge-display",
+    "verify": "npm run validate:contract && npm run validate:server-bundle && npm test && npm run build"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

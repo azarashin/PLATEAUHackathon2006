@@ -67,6 +67,9 @@ MVPの対象地区、入力データ、座標・日時条件は
 
 詳細は [開発ガイド](docs/development.md) と [バージョン方針](docs/versions.md) を参照してください。
 
+小型fixtureによるデータ・日陰・経路・Viewerの統合検証とGitHub Actionsについては
+[自動テストとCI](docs/continuous-integration.md)を参照してください。
+
 ## ライセンス
 
 [MIT License](LICENSE)
