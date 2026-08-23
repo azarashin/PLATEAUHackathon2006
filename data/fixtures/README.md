@@ -44,3 +44,12 @@ node tools/environment-cost-network/generate-viewer-fixture.mjs
 node tools/environment-cost-network/generate-server-bundle-fixture.mjs
 npm --prefix viewer run validate:server-bundle
 ```
+
+## 経路サーバー用fixture
+
+`route-server-bundle-v1/`はIssue #11のAPI・経路探索テスト用です。最短、バランス、日陰優先で別経路が選択される3経路と、到達不能を確認する孤立ノードを含みます。
+
+```bash
+npm --prefix server run generate:fixture
+npm --prefix server test
+```

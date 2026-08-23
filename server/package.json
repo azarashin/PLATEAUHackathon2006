@@ -1,0 +1,15 @@
+{
+  "name": "environment-cost-route-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "test": "node --test test/*.test.mjs",
+    "generate:fixture": "node scripts/generate-route-fixture.mjs",
+    "verify:ichigaya": "node --expose-gc --max-old-space-size=4096 scripts/verify-ichigaya-route.mjs"
+  }
+}

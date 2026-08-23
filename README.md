@@ -11,6 +11,7 @@ Viewer は正式データ契約 v1 の小型 fixture を直接読み込みます
 ```text
 .
 ├── viewer/       ブラウザ版 Viewer（Vite + Vanilla TypeScript）
+├── server/       道路スナップ・経路探索・KPI API（Node.js）
 ├── simulator/    Unity シミュレーション環境
 ├── data/         fixture、入力データ、生成データの境界
 └── docs/         開発手順と技術判断
@@ -34,6 +35,7 @@ Viewer のURLはViteが起動時に表示します。特定のポートを使う
 記載せず、起動時の引数またはサーバー側の環境変数で指定してください。
 
 外部サーバーへの配置は [Viewer サーバー環境構築](docs/server-deployment.md) を参照してください。
+経路APIの契約と起動方法は [経路サーバーAPI](docs/route-server.md) を参照してください。
 実際のホスト名はリポジトリへ記載せず、サーバー上の環境変数またはNginx設定へ反映します。
 
 開発サーバーが表示する URL をブラウザで開きます。プロダクションビルドは次のコマンドです。
