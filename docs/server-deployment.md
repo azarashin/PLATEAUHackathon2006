@@ -227,14 +227,14 @@ sudo systemctl restart environmental-cost-viewer
 
 ```bash
 curl --fail --show-error --head https://<public-hostname>/
-curl --fail --show-error --head https://<public-hostname>/environment-costs-phase-a.geojson
+curl --fail --show-error --head https://<public-hostname>/environment-cost-road-network-v1.json
 ```
 
 サブパス配信では、各URLの先頭に `<public-base-path>` を付けて確認します。
 
 ```bash
 curl --fail --show-error --head https://<public-hostname><public-base-path>
-curl --fail --show-error --head https://<public-hostname><public-base-path>environment-costs-phase-a.geojson
+curl --fail --show-error --head https://<public-hostname><public-base-path>environment-cost-road-network-v1.json
 ```
 
 確認項目：
@@ -303,7 +303,7 @@ HTMLは取得できても、JavaScript、CSS、fixtureの参照先がサイト�
 ```bash
 curl --silent --show-error https://<public-hostname><public-base-path> \
   | grep -Eo '(src|href)="[^"]+"'
-curl --include https://<public-hostname><public-base-path>environment-costs-phase-a.geojson
+curl --include https://<public-hostname><public-base-path>environment-cost-road-network-v1.json
 ```
 
 JavaScriptとCSSのURLには `<public-base-path>` が含まれ、fixtureはHTTP 200でJSONまたはGeoJSONを
@@ -313,7 +313,7 @@ Vite previewを使う場合は、リバースプロキシを経由せずサー�
 
 ```bash
 curl --include http://<bind-address>:<viewer-port><public-base-path>
-curl --include http://<bind-address>:<viewer-port><public-base-path>environment-costs-phase-a.geojson
+curl --include http://<bind-address>:<viewer-port><public-base-path>environment-cost-road-network-v1.json
 ```
 
 内部URLが成功し、公開URLだけが失敗する場合はNginx設定を確認します。サブパスを維持する構成では、
