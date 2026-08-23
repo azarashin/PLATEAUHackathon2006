@@ -614,7 +614,17 @@ location = /environment-cost-route-finder/api/v1/road-edges {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 15s;
 }
+
+location /environment-cost-route-finder/ {
+    proxy_pass http://127.0.0.1:8002;
+    include /etc/nginx/snippets/proxy-common.conf;
+}
 ```
+
+APIの2つの完全一致`location`とViewer用の汎用`location`を同じHTTPSの`server`ブロックへ置きます。
+上例の経路サーバーポート`3000`は固定値ではありません。`/etc/environment-cost-route-server.env`が
+`PORT=8003`なら、2か所の`proxy_pass`も`127.0.0.1:8003`へ揃えます。Viewer用の`8002`へ
+`road-edges`を転送すると、道路GeoJSONではなくSPAの`index.html`が返ります。
 
 設定反映前後に構文と応答を確認します。GETは経路API側で`405`になることが正常であり、`200 text/html`は
 ViewerのHTMLへ誤転送されています。
@@ -622,15 +632,49 @@ ViewerのHTMLへ誤転送されています。
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
+sudo nginx -T 2>/dev/null | grep -A12 -B2 'environment-cost-route-finder/api/v1/road-edges'
 curl --include https://<public-hostname><public-base-path>api/v1/routes
 curl --include 'https://<public-hostname><public-base-path>api/v1/road-edges?areaId=<area-id>&timestamp=<url-encoded-timestamp>&bbox=<min-lng>,<min-lat>,<max-lng>,<max-lat>&solarAvoidanceFactor=2'
 ```
+
+`nginx -T`の結果に`road-edges`がなければ、編集したファイルが有効な`server`ブロックにないか、
+`sites-enabled`から読み込まれていません。構文検査に成功しただけでは、意図した設定ファイルが
+選択されていることの確認にはなりません。
 
 `routes`へのGETがJSON形式のHTTP 405になり、必要パラメーター付きの`road-edges`がHTTP 200になれば、経路サーバーまで到達しています。HTTP 404はAPI用
 `location`が未反映、HTTP 200かつ`Content-Type: text/html`はViewerのフォールバックへ誤転送、
 HTTP 502は経路サーバーが指定ポートで待受していない状態です。
 
-実リクエストは`POST application/json`です。サーバーの起動・環境変数・リクエスト例は
+### 9.5. 道路色が読み込めない場合の切り分け
+
+最初にリバースプロキシを経由せず、経路サーバーへ直接問い合わせます。
+
+```bash
+curl --include \
+  'http://127.0.0.1:<route-port>/api/v1/road-edges?areaId=ichigaya-venue&timestamp=2025-08-01T12%3A00%3A00%2B09%3A00&bbox=139.7335,35.6880,139.7385,35.6930&solarAvoidanceFactor=2'
+```
+
+ここでHTTP 200、`Content-Type: application/json`、本文の`features`が得られれば、バンドルと経路サーバーは正常です。
+同じクエリの公開URLだけが`200 text/html`になる場合、データ不足ではなくNginxの誤転送です。
+返されたHTMLに`<div id="app"></div>`や`assets/index-*.js`が含まれる場合は、ViewerのSPAフォールバックへ
+到達したことを示します。`road-edges`の完全一致`location`を追加または修正し、`nginx -t`後にreloadします。
+
+直接問い合わせも失敗する場合は、環境ファイルの`ROUTE_BUNDLE_MANIFESTS`が指すディレクトリで、
+少なくとも次を確認します。
+
+```bash
+grep '^ROUTE_BUNDLE_MANIFESTS=' /etc/environment-cost-route-server.env
+ls -lh <bundle-directory>/manifest.json \
+       <bundle-directory>/topology.json \
+       <bundle-directory>/cost-*.json
+sudo journalctl -u environment-cost-route-server.service -n 100 --no-pager
+```
+
+`manifest.json`、`topology.json`、対象時刻の`cost-*.json`がすでに存在し、内部URLがJSONを返す場合、
+道路色データの再生成・再転送は不要です。なおViewerは通信量抑制のため、日陰モード、解析済み地域、
+ズーム14.5以上の条件を満たした場合だけ`road-edges`を要求します。
+
+経路探索`routes`の実リクエストは`POST application/json`、道路表示`road-edges`はクエリ付き`GET`です。サーバーの起動・環境変数・リクエスト例は
 [経路サーバーAPI](route-server.md)を参照してください。
 
 Vite previewを使う場合は、リバースプロキシを経由せずサーバー内部からも確認します。
