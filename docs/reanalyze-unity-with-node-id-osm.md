@@ -16,6 +16,8 @@
 | メッシュ対応表 | `data/raw/ichigaya-venue-mesh-coverage.json` | しない |
 | Unity環境コスト | `data/generated/ichigaya-venue-environment-cost.json` | しない |
 | Unity解析サマリー | `data/raw/ichigaya-venue-analysis-summary.json` | しない |
+| Unity解析状態 | `data/raw/ichigaya-venue-analysis-state.json` | しない |
+| 時刻別キャッシュ | `data/raw/environment-cost-cache/ichigaya-venue/` | しない |
 | Unityログ | `data/raw/ichigaya-venue-environment-cost.log` | しない |
 | 道路グラフ | `data/generated/ichigaya-pedestrian-road-network.json` | しない |
 
@@ -27,7 +29,7 @@
 - Unity 6000.3.18f1と、`tools/plateau-environment-cost-analyzer`の依存パッケージが利用できる。
 - `data/raw/plateau/<自治体ID>-2025/`に対象7区のCityGMLが展開済みである。
 - Unity Editorで分析プロジェクトを開いていない。バッチ実行中も同じプロジェクトを別プロセスで起動しない。
-- 実績ではピークメモリが約10 GiB、処理時間が約6.5分、出力が約170 MiBだった。再実行時は余裕のあるメモリとディスクを確保する。
+- 現行の時間別出力の実績では初回ピークメモリが約12 GiB、処理時間が約10分、結果とキャッシュの合計が約612 MiBだった。再実行時は余裕のあるメモリとディスクを確保する。
 
 ## 1. OSMスナップショットを確認する
 
@@ -139,6 +141,7 @@ $analysisLog = Join-Path $repoRoot 'data\raw\ichigaya-venue-environment-cost.log
   -projectPath $analyzerProject `
   -executeMethod EnvironmentCostAnalyzer.Run `
   -analysisConfig $analysisConfig `
+  -forceRecalculate `
   -logFile $analysisLog
 
 $analysisExitCode = $LASTEXITCODE
@@ -146,7 +149,9 @@ if ($analysisExitCode -ne 0) { throw "Environment-cost analysis failed with exit
 if (-not (Select-String -Path $analysisLog -Pattern 'ENVIRONMENT_COST_ANALYSIS_COMPLETE' -Quiet)) { throw 'Analysis completion marker was not found.' }
 ```
 
-出力先は地域設定から決まり、`data/generated/ichigaya-venue-environment-cost.json`と`data/raw/ichigaya-venue-analysis-summary.json`になります。
+`-forceRecalculate`は既存キャッシュを読まず、全10時刻を再計算する指定です。入力・設定が同じ結果を再構成するだけでよい場合はこの指定を外し、時刻別キャッシュを再利用します。
+
+出力先は地域設定から決まり、`data/generated/ichigaya-venue-environment-cost.json`、`data/raw/ichigaya-venue-analysis-summary.json`、`data/raw/ichigaya-venue-analysis-state.json`になります。
 
 ## 5. Unity出力を検証する
 
@@ -155,9 +160,10 @@ if (-not (Select-String -Path $analysisLog -Pattern 'ENVIRONMENT_COST_ANALYSIS_C
 ```powershell
 $environmentPath = 'data/generated/ichigaya-venue-environment-cost.json'
 $summaryPath = 'data/raw/ichigaya-venue-analysis-summary.json'
+$statePath = 'data/raw/ichigaya-venue-analysis-state.json'
 $analysisLog = 'data/raw/ichigaya-venue-environment-cost.log'
 
-foreach ($path in @($environmentPath, $summaryPath, $analysisLog)) {
+foreach ($path in @($environmentPath, $summaryPath, $statePath, $analysisLog)) {
   if (-not (Test-Path $path)) { throw "Expected output is missing: $path" }
 }
 ```
@@ -165,7 +171,10 @@ foreach ($path in @($environmentPath, $summaryPath, $analysisLog)) {
 次に、全環境コスト辺にOSMノードIDがあり、道路グラフの入力辺と対応することを確認します。
 
 ```powershell
-node -e "const fs=require('fs');const env=JSON.parse(fs.readFileSync('data/generated/ichigaya-venue-environment-cost.json','utf8'));const graph=JSON.parse(fs.readFileSync('data/generated/ichigaya-pedestrian-road-network.json','utf8'));const source=new Map();for(const e of graph.edges)for(const id of e.sourceEdgeIds)source.set(id,e);const missingIds=env.edges.filter(e=>!Number.isInteger(e.fromNodeId)||!Number.isInteger(e.toNodeId));const missingGraph=env.edges.filter(e=>!source.has(e.id));const badTopology=env.edges.filter(e=>{const g=source.get(e.id);return g&&!new Set([g.fromNodeId,g.toNodeId]).has('osm-node-'+e.fromNodeId)||g&&!new Set([g.fromNodeId,g.toNodeId]).has('osm-node-'+e.toNodeId)});const badHours=env.edges.filter(e=>!Array.isArray(e.hourly)||e.hourly.length!==10);if(missingIds.length||missingGraph.length||badTopology.length||badHours.length)throw new Error(JSON.stringify({missingNodeIds:missingIds.length,missingGraphEdges:missingGraph.length,topologyMismatch:badTopology.length,badHourlySlices:badHours.length}));console.log('UNITY_OSM_GRAPH_ALIGNMENT_OK edges='+env.edges.length)"
+node --max-old-space-size=4096 tools/hourly-environment-cost/validate-hourly-output.mjs `
+  data/generated/ichigaya-venue-environment-cost.json
+
+node --max-old-space-size=4096 -e "const fs=require('fs');const env=JSON.parse(fs.readFileSync('data/generated/ichigaya-venue-environment-cost.json','utf8'));const graph=JSON.parse(fs.readFileSync('data/generated/ichigaya-pedestrian-road-network.json','utf8'));const source=new Map();for(const e of graph.edges)for(const id of e.sourceEdgeIds)source.set(id,e);const missingIds=env.edges.filter(e=>!Number.isInteger(e.fromNodeId)||!Number.isInteger(e.toNodeId));const missingGraph=env.edges.filter(e=>!source.has(e.id));const badTopology=env.edges.filter(e=>{const g=source.get(e.id);return g&&!new Set([g.fromNodeId,g.toNodeId]).has('osm-node-'+e.fromNodeId)||g&&!new Set([g.fromNodeId,g.toNodeId]).has('osm-node-'+e.toNodeId)});const badHours=env.edges.filter(e=>!Array.isArray(e.hourly)||e.hourly.length!==10);if(missingIds.length||missingGraph.length||badTopology.length||badHours.length)throw new Error(JSON.stringify({missingNodeIds:missingIds.length,missingGraphEdges:missingGraph.length,topologyMismatch:badTopology.length,badHourlySlices:badHours.length}));console.log('UNITY_OSM_GRAPH_ALIGNMENT_OK edges='+env.edges.length)"
 ```
 
 この確認が失敗した場合は#9へ進まず、次を確認します。
