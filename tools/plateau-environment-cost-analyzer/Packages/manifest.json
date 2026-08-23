@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "com.synesthesias.plateau-unity-sdk": "https://github.com/Project-PLATEAU/PLATEAU-SDK-for-Unity.git#v4.3.0",
+    "com.unity.modules.terrainphysics": "1.0.0",
+    "com.unity.modules.unitywebrequesttexture": "1.0.0"
+  }
+}
