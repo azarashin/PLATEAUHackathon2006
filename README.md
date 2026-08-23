@@ -63,3 +63,13 @@ MVPの対象地区、入力データ、座標・日時条件は
 ## ライセンス
 
 [MIT License](LICENSE)
+
+## 汎用環境コスト解析ツール
+
+PLATEAU CityGMLを道路ごとの環境コストへ変換するUnityバッチツールは
+[`tools/plateau-environment-cost-analyzer/`](tools/plateau-environment-cost-analyzer/) に置く。地域ごとの実行条件は
+[`data/analysis-configs/`](data/analysis-configs/) に置く。
+
+## 解析記録
+
+- [市ヶ谷1地域分の実解析結果](docs/ichigaya-pilot-analysis.md)
