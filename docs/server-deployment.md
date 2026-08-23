@@ -312,7 +312,39 @@ curl --include https://<public-hostname><public-base-path>environment-cost-road-
 JavaScriptとCSSのURLには `<public-base-path>` が含まれ、fixtureはHTTP 200でJSONまたはGeoJSONを
 返す必要があります。fixtureの要求にHTMLが返る場合は、Nginxのフォールバックが誤って適用されています。
 
-## 経路APIを同一サブパスで公開する
+ブラウザの`Failed to load module script`と`non-JavaScript MIME type of text/html`も同じ切り分けを
+行います。これはJavaScriptのURLにHTMLが返っていることを示し、JavaScript自体の構文エラーでは
+ありません。開発者ツールのNetworkで失敗した`*.js`のURLを確認し、応答を直接調べます。
+
+```bash
+curl --include https://<public-hostname>/<path-reported-by-browser>.js
+```
+
+応答が`Content-Type: text/html`の場合は、`VIEWER_BASE_PATH`を指定した再ビルドが反映されているか、
+ブラウザが古い`index.html`をキャッシュしていないか、Nginxのサブパス転送がViewerのHTMLへ
+フォールバックしていないかを確認します。再ビルド後は、実際のHTMLに記載されたハッシュ付きJS URLが
+HTTP 200かつJavaScriptのContent-Typeで取得できることを確認します。
+
+MapLibreはメインモジュールと同じ`assets/`から`maplibre-gl-worker.mjs`を読み込み、そのワーカーは
+`maplibre-gl-shared.mjs`を読み込みます。このリポジトリのVite設定は、本番ビルド時に両ファイルを
+`viewer/dist/assets/`へ自動配置します。MIMEエラーの要求URLがいずれかのファイルだった場合は、サーバーで
+手作業コピーする前に最新版を取得して再ビルドし、両方がJavaScriptとして取得できることを確認します。
+
+```bash
+cd <repository-root>/viewer
+npm ci --include=dev
+VIEWER_BASE_PATH='<public-base-path>' npm run build
+
+test -f dist/assets/maplibre-gl-worker.mjs
+test -f dist/assets/maplibre-gl-shared.mjs
+
+curl --fail --show-error --head \
+  https://<public-hostname><public-base-path>assets/maplibre-gl-worker.mjs
+curl --fail --show-error --head \
+  https://<public-hostname><public-base-path>assets/maplibre-gl-shared.mjs
+```
+
+## 9. 経路APIを同一サブパスで公開する
 
 Viewerの既定API URLは`<public-base-path>api/v1/routes`です。Viewerを転送する汎用`location`より前に、
 経路API用の完全一致`location`を追加します。次は公開パスが`/environment-cost-route-finder/`、
@@ -380,6 +412,30 @@ ROUTE_DEPLOY_LOCAL_BUNDLE=data/generated/<local-bundle-directory-name>
 `ROUTE_DEPLOY_LOCAL_BUNDLE`は転送元の生成済みバンドルです。ツール側には市ヶ谷などの地域固有名を
 埋め込んでいません。地域ごとに設定ファイルの値だけを変更して同じコマンドを利用できます。
 
+`deploy/route-bundle-upload.env`は配信スクリプトが読み込む設定ファイルであり、バンドル生成コマンドへは
+自動適用されません。生成先と転送元の名前違いを防ぐため、生成時は同じ値を現在のPowerShellの環境変数へ
+設定し、`--bundle-directory`へ渡します。
+
+```powershell
+$env:ROUTE_DEPLOY_LOCAL_BUNDLE = 'data/generated/<local-bundle-directory-name>'
+
+node --max-old-space-size=8192 `
+  tools/environment-cost-network/build-environment-cost-server-bundle.mjs `
+  --graph data/generated/ichigaya-pedestrian-road-network.json `
+  --environment data/generated/ichigaya-venue-environment-cost.json `
+  --bundle-directory $env:ROUTE_DEPLOY_LOCAL_BUNDLE `
+  --report data/raw/environment-cost-server-bundle-report.json `
+  --allow-unmatched-as-missing
+
+if (-not (Test-Path "$env:ROUTE_DEPLOY_LOCAL_BUNDLE/manifest.json")) {
+  throw "Route bundle generation failed: $env:ROUTE_DEPLOY_LOCAL_BUNDLE"
+}
+```
+
+環境変数で設定した値は現在のPowerShellと、そのPowerShellから起動する子プロセスに限って有効です。
+生成後の配信コマンドも同じPowerShellで実行します。`deploy/route-bundle-upload.env`にも同じ
+`ROUTE_DEPLOY_LOCAL_BUNDLE`を記録しておけば、別のターミナルから実行するときも同じ場所を参照できます。
+
 設定後の転送は1コマンドです。Windows標準のOpenSSH `ssh`と`scp`、ローカルとサーバー双方のNode.jsを
 使用します。公開鍵認証を設定しておけば、途中のパスワード入力も不要です。
 
@@ -402,12 +458,77 @@ powershell.exe -ExecutionPolicy Bypass -File tools/deployment/publish-route-bund
 Remove-Item Env:ROUTE_DEPLOY_HOST
 ```
 
+この優先順位は`ROUTE_DEPLOY_LOCAL_BUNDLE`を含む全`ROUTE_DEPLOY_*`設定に適用されます。設定ファイルを
+修正しても現在のPowerShellに古い値が残っている場合は、古い値が使用されます。配信前に実効値と
+生成済みmanifestを確認します。
+
+```powershell
+Get-ChildItem Env:ROUTE_DEPLOY_* | Sort-Object Name
+Test-Path "$env:ROUTE_DEPLOY_LOCAL_BUNDLE/manifest.json"
+```
+
+名前を変更した場合は、生成コマンドの`--bundle-directory`と`ROUTE_DEPLOY_LOCAL_BUNDLE`を同じ値へ
+更新します。不要な一時上書きを解除して設定ファイルへ戻す場合は、対象の環境変数を削除します。
+
+```powershell
+Remove-Item Env:ROUTE_DEPLOY_LOCAL_BUNDLE
+```
+
+`publish-route-bundle.ps1`が存在しない場合は、リポジトリルートにいることと、配備スクリプトを含む
+最新版を取得済みであることを確認します。
+
+```powershell
+Test-Path .\tools\deployment\publish-route-bundle.ps1
+git branch --show-current
+git pull --ff-only
+```
+
+#### 9.2.1. SSH接続と公開鍵認証
+
+初回接続ではSSHホスト鍵の確認が表示されます。表示されたフィンガープリントを管理者が提示した値と
+照合してから受け入れます。同じサーバーをIPアドレスとホスト名の両方で接続した場合、既知の同一鍵が
+別名で登録されている旨が表示されることがあります。
+
+`Permission denied (publickey)`はリモートパスの誤りではありません。SSH認証が完了していないため、
+一時ディレクトリ作成を含むリモート操作はまだ実行されていません。詳細ログを付けて直接接続を確認します。
+
+```powershell
+ssh -v -p $env:ROUTE_DEPLOY_SSH_PORT `
+  "$env:ROUTE_DEPLOY_USER@$env:ROUTE_DEPLOY_HOST"
+```
+
+秘密鍵を明示する場合は、実在する鍵のパスを指定します。
+
+```powershell
+Get-ChildItem "$env:USERPROFILE\.ssh" -File
+ssh-add -l
+$privateKey = '<absolute-path-to-private-key>'
+ssh -i $privateKey `
+  -p $env:ROUTE_DEPLOY_SSH_PORT `
+  "$env:ROUTE_DEPLOY_USER@$env:ROUTE_DEPLOY_HOST"
+```
+
+常に特定の鍵を使う場合は`$env:USERPROFILE\.ssh\config`の対象ホストへ`IdentityFile`と
+`IdentitiesOnly yes`を設定します。サーバー側では、対象ユーザーの`~/.ssh/authorized_keys`に対応する
+公開鍵が登録されている必要があります。認証確認後、次の読み取り専用コマンドが成功することを確認して
+から配信を再実行します。
+
+```powershell
+ssh -p $env:ROUTE_DEPLOY_SSH_PORT `
+  "$env:ROUTE_DEPLOY_USER@$env:ROUTE_DEPLOY_HOST" `
+  'whoami; pwd'
+```
+
 転送だけを行い、サービスは自動再起動しません。完了後にサーバーで経路サービスを再起動し、
 `/healthz`を確認します。実行内容だけを事前確認する場合は末尾へ`-WhatIf`を付けます。
 
 ### 経路サーバーのsystemdユニット
 
 Viewerとは別のサービスとして起動します。
+
+Viewerと経路サーバーを1つのユニットファイルへ連結して、`[Service]`セクションを2回記述してはいけません。
+systemdは`bad unit file setting`としてユニットを拒否します。Viewer用と経路サーバー用を別々の
+`.service`ファイルとして作成し、それぞれに1つの`[Service]`と1つの`ExecStart`を設定します。
 
 ```ini
 [Unit]
