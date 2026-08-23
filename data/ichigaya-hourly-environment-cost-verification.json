@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "hourly-environment-cost-verification-0.1",
+  "verifiedAt": "2026-08-23T14:13:12+09:00",
+  "areaId": "ichigaya-venue",
+  "analysisKey": "909c3245f6565cd30c37a9faead4245fb6e5f294d2ff802c25278a8e2d6086c7",
+  "resultFingerprintSha256": "cc078d7674acb76119e8bfd0dc8f39729d5de61f382c97a5d1a65363a85f75f5",
+  "edgeCount": 130521,
+  "hours": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "sampleCount": 305118,
+  "validSampleCount": 229652,
+  "noGroundSampleCount": 75466,
+  "statusCountPerHour": {
+    "available": 92135,
+    "partial": 7539,
+    "missing": 30847
+  },
+  "outputBytes": 296190573,
+  "cache": {
+    "fileCount": 11,
+    "bytes": 344878624,
+    "initialRunSeconds": 608.9548494,
+    "cachedRunSeconds": 190.60204099999999,
+    "cachedBaseHit": true,
+    "cachedHourlyHitCount": 10,
+    "cachedHourlyMissCount": 0,
+    "cachedImportSkipped": true
+  },
+  "validation": {
+    "allEdgesAndHoursPresent": true,
+    "sampleCountsConsistent": true,
+    "statusAndExclusionReasonsConsistent": true,
+    "shadeRatioRangeValid": true,
+    "solarExposureFormulaToleranceSeconds": 0.000001,
+    "cachedFingerprintMatchesInitial": true
+  }
+}

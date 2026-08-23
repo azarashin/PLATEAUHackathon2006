@@ -26,6 +26,9 @@ public sealed class AnalysisRunConfig
     public string coverageOutputPath;
     public string environmentCostOutputPath;
     public string summaryOutputPath;
+    public string cacheDirectoryPath;
+    public string stateOutputPath;
+    public string cancellationRequestPath;
 
     [JsonIgnore] public string repositoryRoot;
 
@@ -54,6 +57,11 @@ public sealed class AnalysisRunConfig
 
     public string ResolvePath(string path) => ResolvePath(repositoryRoot, path);
 
+    [JsonIgnore] public string CacheDirectoryPath => ResolvePath(cacheDirectoryPath);
+    [JsonIgnore] public string StateOutputPath => ResolvePath(stateOutputPath);
+    [JsonIgnore] public string CancellationRequestPath => ResolvePath(cancellationRequestPath);
+    [JsonIgnore] public bool ForceRecalculate => HasCommandLineFlag("-forceRecalculate");
+
     public string DatasetRootFor(string datasetId)
     {
         if (datasetRoots == null || !datasetRoots.TryGetValue(datasetId, out var path))
@@ -65,15 +73,24 @@ public sealed class AnalysisRunConfig
 
     private void Validate(string configPath)
     {
+        if (!string.Equals(schemaVersion, "environment-cost-analysis-config-0.2", StringComparison.Ordinal))
+            throw new InvalidOperationException($"Unsupported analysis config schemaVersion: {configPath}");
         if (string.IsNullOrWhiteSpace(areaId)) throw new InvalidOperationException($"areaId is required: {configPath}");
         if (center == null || center.Length != 2) throw new InvalidOperationException($"center must be [longitude, latitude]: {configPath}");
         if (radiusMeters <= 0) throw new InvalidOperationException($"radiusMeters must be positive: {configPath}");
         if (coordinateZoneId < 1 || coordinateZoneId > 19) throw new InvalidOperationException($"coordinateZoneId is invalid: {configPath}");
-        if (hours == null || hours.Length == 0 || hours.Any(hour => hour < 0 || hour > 23)) throw new InvalidOperationException($"hours is invalid: {configPath}");
+        if (hours == null || hours.Length == 0 || hours.Any(hour => hour < 0 || hour > 23) ||
+            hours.Distinct().Count() != hours.Length || !hours.SequenceEqual(hours.OrderBy(hour => hour)))
+        {
+            throw new InvalidOperationException($"hours must contain unique ascending local hours: {configPath}");
+        }
+        if (string.IsNullOrWhiteSpace(timezone)) throw new InvalidOperationException($"timezone is required: {configPath}");
         if (sampleSpacingMeters <= 0 || pedestrianHeightMeters < 0 || walkingSpeedMetersPerSecond <= 0) throw new InvalidOperationException($"sampling settings are invalid: {configPath}");
         _ = AnalysisDate;
         if (string.IsNullOrWhiteSpace(osmInputPath) || string.IsNullOrWhiteSpace(coverageOutputPath) ||
-            string.IsNullOrWhiteSpace(environmentCostOutputPath) || string.IsNullOrWhiteSpace(summaryOutputPath))
+            string.IsNullOrWhiteSpace(environmentCostOutputPath) || string.IsNullOrWhiteSpace(summaryOutputPath) ||
+            string.IsNullOrWhiteSpace(cacheDirectoryPath) || string.IsNullOrWhiteSpace(stateOutputPath) ||
+            string.IsNullOrWhiteSpace(cancellationRequestPath))
         {
             throw new InvalidOperationException($"input/output paths are required: {configPath}");
         }
@@ -89,12 +106,16 @@ public sealed class AnalysisRunConfig
         return null;
     }
 
+    private static bool HasCommandLineFlag(string name) => Environment.GetCommandLineArgs()
+        .Any(argument => string.Equals(argument, name, StringComparison.OrdinalIgnoreCase));
+
     private static string FindRepositoryRoot()
     {
         var current = Directory.GetParent(Application.dataPath)?.Parent;
         while (current != null)
         {
-            if (Directory.Exists(Path.Combine(current.FullName, ".git"))) return current.FullName;
+            var gitMarker = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(gitMarker) || File.Exists(gitMarker)) return current.FullName;
             current = current.Parent;
         }
         throw new DirectoryNotFoundException("Repository root (.git directory) was not found from this Unity project.");
