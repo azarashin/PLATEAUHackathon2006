@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/environment-cost-server-bundle-v1.schema.json",
+  "title": "Environment cost server bundle manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "dataset", "inputs", "area", "scenario", "costFormula", "encoding", "counts", "topology", "costSlices", "diagnostics", "bundleFingerprintSha256"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-server-bundle-1.0" },
+    "status": { "const": "completed" },
+    "dataset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "provenance", "generatedAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "provenance": { "enum": ["analysis", "fixture"] },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["roadGraphFingerprintSha256", "environmentCostAnalysisKey", "environmentCostFingerprintSha256"],
+      "properties": {
+        "roadGraphFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "environmentCostAnalysisKey": { "type": "string", "minLength": 1 },
+        "environmentCostFingerprintSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "area": {
+      "type": "object", "additionalProperties": false,
+      "required": ["areaId", "center", "radiusMeters"],
+      "properties": {
+        "areaId": { "type": "string", "minLength": 1 },
+        "center": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "prefixItems": [
+            { "type": "number", "minimum": -180, "maximum": 180 },
+            { "type": "number", "minimum": -90, "maximum": 90 }
+          ],
+          "items": false
+        },
+        "radiusMeters": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "scenario": {
+      "type": "object", "additionalProperties": false,
+      "required": ["referenceDate", "timezone", "availableTimestamps", "defaultTimestamp"],
+      "properties": {
+        "referenceDate": { "type": "string", "format": "date" },
+        "timezone": { "type": "string", "minLength": 1 },
+        "availableTimestamps": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "format": "date-time" } },
+        "defaultTimestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "costFormula": {
+      "type": "object", "additionalProperties": false,
+      "required": ["shadeRatioUnit", "solarExposureSecondsUnit", "solarExposureSeconds", "missingValuePolicy"],
+      "properties": {
+        "shadeRatioUnit": { "const": "ratio" },
+        "solarExposureSecondsUnit": { "const": "s" },
+        "solarExposureSeconds": { "const": "walkingSeconds * (1 - shadeRatio)" },
+        "missingValuePolicy": { "const": "preserve-null" }
+      }
+    },
+    "encoding": { "type": "object" },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodeCount", "physicalEdgeCount", "directedEdgeCount", "hourCount"],
+      "properties": {
+        "nodeCount": { "type": "integer", "minimum": 2 },
+        "physicalEdgeCount": { "type": "integer", "minimum": 1 },
+        "directedEdgeCount": { "type": "integer", "minimum": 1 },
+        "hourCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "topology": { "$ref": "#/$defs/fileReference" },
+    "costSlices": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/fileReference" },
+          {
+            "type": "object",
+            "required": ["timestamp", "statusCounts"],
+            "properties": {
+              "timestamp": { "type": "string", "format": "date-time" },
+              "statusCounts": {
+                "type": "object", "additionalProperties": false,
+                "required": ["available", "partial", "missing"],
+                "properties": {
+                  "available": { "type": "integer", "minimum": 0 },
+                  "partial": { "type": "integer", "minimum": 0 },
+                  "missing": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "diagnostics": { "type": "object" },
+    "bundleFingerprintSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileReference": {
+      "type": "object",
+      "required": ["file", "bytes", "fileSha256", "contentFingerprintSha256"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "fileSha256": { "$ref": "#/$defs/sha256" },
+        "contentFingerprintSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

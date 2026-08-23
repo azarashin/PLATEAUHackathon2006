@@ -1,12 +1,45 @@
 {
-  "schemaVersion": "environment-cost-network-verification-0.1",
-  "verifiedAt": "2026-08-23T14:49:49+09:00",
+  "schemaVersion": "environment-cost-network-verification-0.2",
+  "verifiedAt": "2026-08-23T15:00:00+09:00",
   "areaId": "ichigaya-venue",
+  "deliveryArchitecture": {
+    "browserDownloadsServerBundle": false,
+    "browserReceivesRouteResponseOnly": true,
+    "routeApiIssue": 11,
+    "serverBundleIsStandardOutput": true,
+    "formalContractJsonIsAuditOnly": true
+  },
   "inputs": {
     "roadGraphFingerprintSha256": "3bac211ccfba878ed6c0b4841ab9a36f52c47a1aed9fad223f9180397aedf3ed",
     "environmentCostFingerprintSha256": "cc078d7674acb76119e8bfd0dc8f39729d5de61f382c97a5d1a65363a85f75f5"
   },
-  "output": {
+  "serverBundle": {
+    "schemaVersion": "environment-cost-server-bundle-1.0",
+    "bundleFingerprintSha256": "a5701a2fe10952c62f58a22fe25258b8939f45eb22419a5667e31016e90b752d",
+    "totalBytes": 56914693,
+    "topologyBytes": 25548565,
+    "costSliceBytes": 31358040,
+    "manifestBytes": 8088,
+    "nodeCount": 108169,
+    "physicalEdgeCount": 130508,
+    "directedEdgeCount": 260779,
+    "hourCount": 10,
+    "statusCountPerHourByPhysicalEdge": {
+      "available": 92109,
+      "partial": 7535,
+      "missing": 30864
+    },
+    "comparedWithAuditOutput": {
+      "sizeRatio": 0.08860627,
+      "reductionRatio": 0.91139373
+    },
+    "representativeGenerationSeconds": 6.66,
+    "representativeLoadAllHoursSeconds": 1.59,
+    "representativeLoadOneHourSeconds": 0.73,
+    "allFilesSchemaAndSemanticsValid": true,
+    "allFileSizesAndSha256Valid": true
+  },
+  "auditOutput": {
     "schemaVersion": "environment-cost-road-network-1.0",
     "contentFingerprintSha256": "7ab4a0a584b282193e723aa8c763466d20d3b2cf2734f63290e781e683c816cd",
     "fileSha256": "a224267bc504ab82236f84343e9289abcc3f6da4b11241914265424173381aa4",
@@ -16,16 +49,13 @@
     "physicalEdgeCount": 130508,
     "hourCount": 10,
     "timeSliceCount": 2607790,
-    "statusCountPerHour": {
-      "available": 184206,
-      "partial": 15066,
-      "missing": 61507
-    }
+    "formalContractValid": true,
+    "browserDeliveryAllowed": false
   },
   "join": {
     "matchedPhysicalEdgeCount": 130396,
     "unmatchedPhysicalEdgeCount": 112,
-    "partiallyMatchedDirectedEdgeCount": 0,
+    "partiallyMatchedPhysicalEdgeCount": 0,
     "ignoredEnvironmentSourceEdgeCount": 10,
     "unmatchedPolicy": "preserve-as-missing"
   },
@@ -38,25 +68,33 @@
     "maximumLatitudeErrorDegrees": 1.4210854715202004e-14
   },
   "determinism": {
-    "repeatedRunContentFingerprintMatched": true,
-    "repeatedRunFileSha256Matched": true,
-    "representativeRunSeconds": 13.170423
+    "repeatedRunBundleFingerprintMatched": true,
+    "repeatedRunAllFileSha256Matched": true,
+    "reorderedInputFingerprintMatchedInFixture": true
   },
-  "fixture": {
-    "path": "data/fixtures/environment-cost-road-network-integration-v1.json",
-    "bytes": 8854,
-    "fileSha256": "7e11d4bad66ffcfb073a76a49dc6dfc7f1769a4c846c57587949d0ded4589b8f",
-    "nodeCount": 3,
-    "directedEdgeCount": 3,
-    "hourCount": 2,
-    "formalContractValid": true
+  "fixtures": {
+    "formalContract": {
+      "path": "data/fixtures/environment-cost-road-network-integration-v1.json",
+      "bytes": 8854,
+      "fileSha256": "7e11d4bad66ffcfb073a76a49dc6dfc7f1769a4c846c57587949d0ded4589b8f",
+      "formalContractValid": true
+    },
+    "serverBundle": {
+      "path": "data/fixtures/environment-cost-server-bundle-v1/manifest.json",
+      "fileCount": 4,
+      "totalBytes": 4742,
+      "bundleFingerprintSha256": "ceece1a95bf6ed116d82cc49353c27e639e7b77830eafc83eeaf54951b6c4504",
+      "nodeCount": 3,
+      "physicalEdgeCount": 2,
+      "directedEdgeCount": 3,
+      "hourCount": 2,
+      "tamperedFileRejected": true
+    }
   },
   "validation": {
-    "formalSchemaAndSemanticsValidBeforeWrite": true,
-    "allNodeReferencesAndGeometryEndpointsValid": true,
-    "allDirectedEdgesContainAllTimestamps": true,
-    "allValuesAndSampleCoverageValid": true,
-    "incompleteInputsRejected": true,
+    "invalidOrIncompleteInputsRejected": true,
+    "partialSourceEdgeJoinRejected": true,
+    "pathTraversalRejectedByLoader": true,
     "cityGmlOrUnityMeshIncluded": false
   }
 }

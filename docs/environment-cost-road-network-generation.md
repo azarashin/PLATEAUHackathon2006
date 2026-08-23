@@ -1,19 +1,34 @@
 # 環境コスト道路ネットワークの生成
 
-Issue #9では、#5の歩行道路グラフを接続・方向・距離・歩行時間の正本とし、#8のUnity解析結果を`sourceEdgeIds`で結合して、#3の正式契約`environment-cost-road-network-1.0`を生成する。
+Issue #9では、#5の歩行道路グラフを接続・方向・距離・歩行時間の正本とし、#8のUnity時間別解析結果を`sourceEdgeIds`で結合する。
 
-## 入力と出力
+当初生成した`environment-cost-road-network-1.0`の単一JSONは市ヶ谷で約612.58 MiBになった。これは契約監査には使えるが、ブラウザ配信には使用しない。標準成果物を経路サーバー専用の分割バンドルへ変更し、ブラウザには将来の経路APIが計算した経路形状とKPIだけを返す。
+
+```text
+歩行道路グラフ ─┐
+                 ├─ #9 分割バンドル ─ 経路サーバー ─ 経路API ─ ブラウザ
+Unity時間別結果 ─┘       （非公開）      （#11）      （経路のみ）
+```
+
+## 標準成果物
 
 | 種別 | パス | Git管理 |
 |---|---|---|
 | 歩行道路グラフ | `data/generated/ichigaya-pedestrian-road-network.json` | しない |
 | Unity時間別解析 | `data/generated/ichigaya-venue-environment-cost.json` | しない |
-| 正式契約JSON | `data/generated/ichigaya-environment-cost-road-network-v1.json` | しない |
-| 結合レポート | `data/raw/ichigaya-environment-cost-road-network-integration-report.json` | しない |
-| 小型fixture | `data/fixtures/environment-cost-road-network-integration-v1.json` | する |
+| サーバーバンドル | `data/generated/ichigaya-environment-cost-server-bundle-v1/` | しない |
+| 生成レポート | `data/raw/ichigaya-environment-cost-server-bundle-report.json` | しない |
+| サーバーバンドルfixture | `data/fixtures/environment-cost-server-bundle-v1/` | する |
+| 正式契約fixture | `data/fixtures/environment-cost-road-network-integration-v1.json` | する |
 | 実データ検証値 | `data/ichigaya-environment-cost-road-network-verification.json` | する |
 
-正式契約にはWGS84のノード・道路形状、安定ID、接続、方向、距離、歩行時間、全時刻の状態・サンプル集計・日陰率・日射曝露時間だけを含める。CityGML、3Dメッシュ、Collider、Unityオブジェクト、ローカル入力パスは含めない。Unity座標系は地理座標との対応を説明するメタデータとしてだけ残す。
+サーバーバンドルは次のファイルで構成する。
+
+- `manifest.json`: 完了状態、入力フィンガープリント、生成条件、時刻、件数、各ファイルのサイズとSHA-256
+- `topology.json`: WGS84ノード、物理辺、接続、方向、距離、歩行時間を1回だけ格納
+- `cost-HH.json`: 指定時刻の日陰率、日射曝露時間、サンプル集計、欠測状態を物理辺ごとに1回だけ格納
+
+ノード・辺・コストは、manifestの`encoding`で意味を宣言した位置配列として保存する。方向が異なる有向辺で同じ環境コストを複製せず、10時刻も別ファイルへ分離する。CityGML、3Dメッシュ、Collider、Unityオブジェクト、ローカル入力パスは含めない。
 
 ## 結合規則
 
@@ -23,45 +38,46 @@ Issue #9では、#5の歩行道路グラフを接続・方向・距離・歩行�
 2. `shadeRatio`は`validSampleCount`による加重平均とする。
 3. `solarExposureSeconds`は正式道路グラフの歩行時間を使い、`walkingSeconds * (1 - shadeRatio)`で再計算する。
 4. 有効サンプル0は`missing`、有効・欠測混在は`partial`、全サンプル有効は`available`とする。
-5. 方向違いの有向辺は同じ物理辺の解析値を持つが、形状の始終点とノード参照は進行方向へ合わせる。
+5. 方向違いの有向辺は同じ物理辺のコストを参照し、接続と形状の向きだけを個別に持つ。
 
-欠測は0ではない。正式契約v1は解析側の詳細な`exclusionReason`フィールドを持たないため、`status`、`sampleCoverage`、`null`の組合せで欠測を表す。
+欠測は0ではない。`missing`は日陰率と日射曝露時間を`null`、サンプル数を0として保持する。
 
 ## グラフ境界の不一致
 
 市ヶ谷では130,508物理辺のうち130,396辺を解析結果へ完全結合できた。112辺（0.0858%）は、道路グラフが「線分と半径4 km円の交差」で採用する一方、Unity解析が25 m間隔のサンプル点を円内に持たず、解析元辺を出力しない境界差だった。
 
-既定動作はこの112辺を不完全入力として失敗させる。実測済みの市ヶ谷生成では`--allow-unmatched-as-missing`を明示し、道路自体を落とさず、全時刻`missing`、サンプル数0で保持した。一部の`sourceEdgeIds`だけが結合できる場合は集約根拠が曖昧なため常に失敗する。道路グラフに存在しない解析元辺10件は、手動除外・正規化後のグラフを正本とするため出力しないが、件数を監査メタデータへ残す。
+既定動作はこの112辺を不完全入力として失敗させる。確認済みの市ヶ谷生成では`--allow-unmatched-as-missing`を明示し、道路自体を落とさず、全時刻`missing`で保持する。一部の`sourceEdgeIds`だけが結合できる場合は根拠が曖昧なため常に失敗する。道路グラフに存在しない解析元辺10件は出力せず、件数をmanifestの診断情報へ残す。
 
-## 座標変換の検証
-
-`japan-plane-rectangular.mjs`はGRS80/JGD2011、縮尺係数0.9999の平面直角座標系を19系すべて実装する。UnityのEUNは、解析中心の平面座標を原点として、`X=東向き`、`Y=上向き`、`Z=北向き`とする。
-
-第IX系について、[国土地理院の測量計算サイト](https://vldb.gsi.go.jp/sokuchi/surveycalc/main.html)が返す次の既知値と比較した。
-
-| 既知点 | 経度・緯度 | X（北、m） | Y（東、m） |
-|---|---|---:|---:|
-| 市ヶ谷解析中心 | `139.736043, 35.690470` | -34,336.4566 | -8,805.3267 |
-| 東京駅付近 | `139.767125, 35.681236` | -35,363.2377 | -5,992.9196 |
-
-両点とも公式値との差は1 mm未満だった。市ヶ谷をUnity原点とした東京駅付近は`[X=2812.4071, Y=0, Z=-1026.7811]`となる。実道路ノード3点の地理座標→Unity EUN→地理座標の最大誤差は、経度0度、緯度`1.4210854715202004e-14`度だった。
-
-## 生成、検証、決定性
+## 生成と検証
 
 ```powershell
 npm --prefix viewer ci
 
-node --max-old-space-size=12288 tools/environment-cost-network/build-environment-cost-road-network.mjs `
+node --max-old-space-size=8192 tools/environment-cost-network/build-environment-cost-server-bundle.mjs `
   --graph data/generated/ichigaya-pedestrian-road-network.json `
   --environment data/generated/ichigaya-venue-environment-cost.json `
-  --output data/generated/ichigaya-environment-cost-road-network-v1.json `
-  --report data/raw/ichigaya-environment-cost-road-network-integration-report.json `
+  --bundle-directory data/generated/ichigaya-environment-cost-server-bundle-v1 `
+  --report data/raw/ichigaya-environment-cost-server-bundle-report.json `
   --allow-unmatched-as-missing
+
+node --max-old-space-size=4096 viewer/scripts/validate-environment-cost-server-bundle.mjs `
+  data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json
 ```
 
-生成前に入力スキーマ、ID一意性、ノード参照、形状端点、全時刻、サンプル集計、値域、日射曝露式を検査する。生成後のオブジェクトも#3のJSON Schemaと意味検証へ通し、成功した場合だけストリーミングで`.partial`へ書いて最終パスへ置換する。不正値、時刻不足、部分的な元辺結合では出力しない。
+生成時に入力スキーマ、ID一意性、ノード参照、全時刻、サンプル集計、値域、日射曝露式を検査する。各ファイルは一時ファイルから置換し、全ファイルの書込み後に`status: completed`のmanifestを最後に置く。サーバーローダーはパス逸脱、サイズ、SHA-256、内容フィンガープリント、参照、値域を再検証し、不完全・改変済みバンドルを公開しない。
 
-同じ入力で3回実行し、安定内容フィンガープリント`7ab4a0a584b282193e723aa8c763466d20d3b2cf2734f63290e781e683c816cd`とファイルSHA-256`a224267bc504ab82236f84343e9289abcc3f6da4b11241914265424173381aa4`が一致した。入力配列順を逆転した単体テストでも、エッジ順と内容フィンガープリントは同一だった。
+ローダーは全時刻または必要時刻だけを型付き配列へ読み込める。
+
+```javascript
+import { loadEnvironmentCostServerBundle } from './tools/environment-cost-network/load-environment-cost-server-bundle.mjs'
+
+const runtime = await loadEnvironmentCostServerBundle(
+  'data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json',
+  { timestamps: ['2025-08-01T12:00:00+09:00'] },
+)
+```
+
+運用では生成・配置完了後に経路サーバーを再起動し、起動時検証に成功したバンドルだけを使用する。開始位置・終了位置の道路スナップ、最短経路計算、経路レスポンスAPIはIssue #11で実装する。
 
 ## 市ヶ谷の結果
 
@@ -71,26 +87,44 @@ node --max-old-space-size=12288 tools/environment-cost-network/build-environment
 | 物理辺 | 130,508 |
 | 有向辺 | 260,779 |
 | 時刻 | 10 |
-| 時刻スライス | 2,607,790 |
-| 各時刻の`available` | 184,206 |
-| 各時刻の`partial` | 15,066 |
-| 各時刻の`missing` | 61,507 |
-| 代表生成時間 | 13.17秒 |
-| 出力サイズ | 642,332,567 bytes（約612.58 MiB） |
+| `topology.json` | 25,548,565 bytes |
+| 10個のコストファイル合計 | 31,358,040 bytes |
+| manifest込みバンドル合計 | 56,914,693 bytes（約54.28 MiB） |
+| 旧単一JSON比 | 8.86%（91.14%削減） |
+| 代表生成時間 | 6.66秒 |
+| 全10時刻の代表読込時間 | 1.59秒 |
+| 1時刻の代表読込時間 | 0.73秒 |
 
-全域JSONは正式契約と経路計算入力の監査成果物としては完全だが、ブラウザへ一括配信するには大きい。Issue #9の対象外である配信用API、時刻・現在地周辺による範囲抽出、圧縮・分割は、E2E性能を扱うIssue #17までに設計する。現時点のViewer統合テストには次の生成fixtureを使用する。
+同じ入力から2回生成し、全12ファイルのSHA-256とバンドルフィンガープリント`a5701a2fe10952c62f58a22fe25258b8939f45eb22419a5667e31016e90b752d`が一致した。これら約54.28 MiBはサーバー配置量であり、ブラウザの初回ダウンロード量ではない。
 
-| fixture指標 | 結果 |
-|---|---:|
-| ノード | 3 |
-| 有向辺 | 3 |
-| 時刻 | 2 |
-| サイズ | 8,854 bytes（約8.65 KiB） |
+## 正式契約の監査出力
 
-fixtureは物理重複辺の加重集約、両方向辺、明示的欠測、全時刻、正式契約検証を含み、次で再生成できる。
+Issue #3の`environment-cost-road-network-1.0`を直接検査する必要がある場合だけ、従来の完全JSONを生成する。
 
 ```powershell
+node --max-old-space-size=12288 tools/environment-cost-network/build-environment-cost-road-network.mjs `
+  --graph data/generated/ichigaya-pedestrian-road-network.json `
+  --environment data/generated/ichigaya-venue-environment-cost.json `
+  --output data/generated/ichigaya-environment-cost-road-network-v1.json `
+  --report data/raw/ichigaya-environment-cost-road-network-integration-report.json `
+  --allow-unmatched-as-missing
+```
+
+この642,332,567 bytesの監査出力はブラウザにも経路APIにも配信しない。正式契約の小型fixtureはViewerの契約検証へ常時通す。
+
+## 座標変換とfixtureの検証
+
+`japan-plane-rectangular.mjs`はGRS80/JGD2011、縮尺係数0.9999の平面直角座標系を実装する。第IX系について国土地理院の既知点と比較し、市ヶ谷解析中心と東京駅付近の両点で差が1 mm未満であることを確認した。実道路ノード3点の地理座標→Unity EUN→地理座標の最大誤差は、経度0度、緯度`1.4210854715202004e-14`度だった。
+
+```powershell
+node tools/environment-cost-network/test-japan-plane-rectangular.mjs
+node tools/environment-cost-network/test-build-environment-cost-road-network.mjs
+node tools/environment-cost-network/test-environment-cost-server-bundle.mjs
 node tools/environment-cost-network/generate-viewer-fixture.mjs
+node tools/environment-cost-network/generate-server-bundle-fixture.mjs
 npm --prefix viewer run validate:contract
+npm --prefix viewer run validate:server-bundle
 npm --prefix viewer run test:contract
 ```
+
+サーバーバンドルfixtureは3ノード、2物理辺、3有向辺、2時刻、4,742 bytesで、物理重複辺の加重集約、両方向辺、明示的欠測、改変検知を検証する。

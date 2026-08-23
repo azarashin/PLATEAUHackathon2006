@@ -442,3 +442,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exitCode = 1
   })
 }
+
+export { aggregateTimeSlices, coordinateRoundTrip, equalCoordinate, validateGraph }

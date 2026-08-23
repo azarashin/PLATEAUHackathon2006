@@ -33,3 +33,14 @@ Viewer はこのファイルを直接読み込んで表示を切り替えます�
 ```bash
 node tools/environment-cost-network/generate-viewer-fixture.mjs
 ```
+
+## 経路サーバー用分割バンドル v1
+
+`environment-cost-server-bundle-v1/`はIssue #9のサーバー用fixtureです。3ノード、2物理辺、3有向辺、2時刻を、manifest、topology、時刻別コスト2ファイルの合計4,742 bytesへ分割しています。
+
+物理重複辺の有効サンプル加重集約、方向間でのコスト共有、明示的欠測、ファイル改変検知を確認できます。
+
+```bash
+node tools/environment-cost-network/generate-server-bundle-fixture.mjs
+npm --prefix viewer run validate:server-bundle
+```
