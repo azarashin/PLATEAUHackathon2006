@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.1",
+  "areaId": "ichigaya-venue",
+  "localPath": "data/raw/ichigaya-osm-highways-with-nodes.json",
+  "queryPath": "data/ichigaya-highways.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "osmTimestamp": "2026-08-23T03:03:03Z",
+  "downloadedAt": "2026-08-23T03:04:59.6170940Z",
+  "sizeBytes": 31491836,
+  "sha256": "424fac87b6ed446f75613ed7298cd3f12574e3298f5446b94f2a37ae2bb95fbd",
+  "requiredWayFields": ["id", "nodes", "geometry", "tags"],
+  "note": "Keep this exact local snapshot for the Unity reanalysis and road graph build. Requerying Overpass produces a different snapshot."
+}

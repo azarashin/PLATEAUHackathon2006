@@ -88,13 +88,17 @@ tar -xf data/raw/plateau-zips/13101-2025.zip -C data/raw/plateau/13101-2025
 
 ### 2. OSM道路を取得する
 
-[取得クエリ](../data/ichigaya-highways.overpassql)をOverpass APIへ送信し、結果を `data/raw/ichigaya-osm-highways.json` に保存する。対象bboxは `35.654497,139.692046,35.726443,139.780040` である。
+[取得クエリ](../data/ichigaya-highways.overpassql)をOverpass APIへ送信し、結果を `data/raw/ichigaya-osm-highways-with-nodes.json` に保存する。対象bboxは `35.654497,139.692046,35.726443,139.780040` である。`body`を指定してOSMノードIDを保持し、道路グラフで座標一致ではなくOSMの接続関係を使用する。
 
 ```overpass
 [out:json][timeout:180];
 way["highway"](35.654497,139.692046,35.726443,139.780040);
-out tags geom;
+out body geom;
 ```
+
+2026-08-22に実行した初回パイロット解析は、旧クエリ`out tags geom`による`data/raw/ichigaya-osm-highways.json`を使用した。Issue #5でノードID欠落を検出したため、以後は上記のノードID付き入力へ統一する。#9で環境コストと道路グラフを結合する前に、同じOSMスナップショットを使ってUnity解析を再実行する。
+
+具体的な再実行と検証は[ノードID付きOSMで市ヶ谷のUnity解析を再実行する](reanalyze-unity-with-node-id-osm.md)に記録する。
 
 ### 3. UnityとPLATEAU SDKを用意する
 
