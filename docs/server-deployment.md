@@ -355,6 +355,51 @@ ROUTE_REQUEST_TIMEOUT_MILLISECONDS=10000
 manifestには絶対パスを使用します。複数地域をロードする場合は`ROUTE_BUNDLE_MANIFESTS`をカンマ区切りに
 します。`ROUTE_TIMESTAMPS`を省略するとmanifestに含まれる全時刻をロードします。
 
+### ローカルから経路バンドルを1コマンドで配置する
+
+`data/generated/`はGit管理外なので、`git pull`では市ヶ谷の実データはサーバーへ届きません。ローカルで
+生成・検証済みのバンドルをSSHで転送するため、設定例をコピーします。
+
+```powershell
+Copy-Item deploy/route-bundle-upload.env.example deploy/route-bundle-upload.env
+```
+
+`deploy/route-bundle-upload.env`はGit管理外です。サーバーIPまたはホスト名、SSHユーザー、ポート、
+リポジトリ配置先を実環境へ合わせます。ホストには`http://`や`https://`を付けません。
+
+```dotenv
+ROUTE_DEPLOY_HOST=<server-ip-or-hostname>
+ROUTE_DEPLOY_USER=azarashin
+ROUTE_DEPLOY_SSH_PORT=22
+ROUTE_DEPLOY_ROOT=/home/azarashin/8002_EnvironmentCostRouteFinder/PLATEAUHackathon2006
+ROUTE_DEPLOY_BUNDLE_NAME=ichigaya-environment-cost-server-bundle-v1
+```
+
+設定後の転送は1コマンドです。Windows標準のOpenSSH `ssh`と`scp`、ローカルとサーバー双方のNode.jsを
+使用します。公開鍵認証を設定しておけば、途中のパスワード入力も不要です。
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File tools/deployment/publish-route-bundle.ps1
+```
+
+スクリプトは次を順に実施します。
+
+1. ローカルの`manifest.json`、`topology.json`、コストファイルを検証する。
+2. サーバーの`data/generated/`内に一時ディレクトリを作り、全ファイルを転送する。
+3. サーバー上でもSHA-256、参照、値域を検証する。
+4. 検証成功後だけ既存ディレクトリをバックアップ名へ移動し、新バンドルへ切り替える。
+
+接続先を一時的に上書きする場合は、環境変数が設定ファイルより優先されます。
+
+```powershell
+$env:ROUTE_DEPLOY_HOST = '<temporary-server-ip>'
+powershell.exe -ExecutionPolicy Bypass -File tools/deployment/publish-route-bundle.ps1
+Remove-Item Env:ROUTE_DEPLOY_HOST
+```
+
+転送だけを行い、サービスは自動再起動しません。完了後にサーバーで経路サービスを再起動し、
+`/healthz`を確認します。実行内容だけを事前確認する場合は末尾へ`-WhatIf`を付けます。
+
 ### 経路サーバーのsystemdユニット
 
 Viewerとは別のサービスとして起動します。

@@ -129,6 +129,7 @@ InitTestScene*.unity*
 .env
 .env.*
 !.env.example
+/deploy/route-bundle-upload.env
 
 # Large or generated datasets stay reproducible outside normal Git history
 /data/raw/*
