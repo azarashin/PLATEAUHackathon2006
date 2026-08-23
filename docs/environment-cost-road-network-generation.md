@@ -53,16 +53,22 @@ Unity時間別結果 ─┘       （非公開）      （#11）      （経路�
 ```powershell
 npm --prefix viewer ci
 
+$env:ROUTE_DEPLOY_LOCAL_BUNDLE = 'data/generated/ichigaya-environment-cost-server-bundle-v1'
+
 node --max-old-space-size=8192 tools/environment-cost-network/build-environment-cost-server-bundle.mjs `
   --graph data/generated/ichigaya-pedestrian-road-network.json `
   --environment data/generated/ichigaya-venue-environment-cost.json `
-  --bundle-directory data/generated/ichigaya-environment-cost-server-bundle-v1 `
+  --bundle-directory $env:ROUTE_DEPLOY_LOCAL_BUNDLE `
   --report data/raw/ichigaya-environment-cost-server-bundle-report.json `
   --allow-unmatched-as-missing
 
 node --max-old-space-size=4096 viewer/scripts/validate-environment-cost-server-bundle.mjs `
-  data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json
+  "$env:ROUTE_DEPLOY_LOCAL_BUNDLE/manifest.json"
 ```
+
+`ROUTE_DEPLOY_LOCAL_BUNDLE`を生成時の`--bundle-directory`と配信時の転送元に共用する。
+`deploy/route-bundle-upload.env`の値は生成コマンドへ自動適用されないため、生成と配信を行うPowerShellでも
+上記のように明示的に設定する。
 
 生成時に入力スキーマ、ID一意性、ノード参照、全時刻、サンプル集計、値域、日射曝露式を検査する。各ファイルは一時ファイルから置換し、全ファイルの書込み後に`status: completed`のmanifestを最後に置く。サーバーローダーはパス逸脱、サイズ、SHA-256、内容フィンガープリント、参照、値域を再検証し、不完全・改変済みバンドルを公開しない。
 
