@@ -26,6 +26,12 @@ import {
   type RouteProfileId,
   type RouteResponse,
 } from './route-domain.ts'
+import {
+  parseRoadEdgeResponse,
+  physicalEdgeId,
+  type RoadEdgeFeature,
+  type RoadEdgeResponse,
+} from './road-edge-domain.ts'
 
 type ValueDirection = 'higher-is-better' | 'higher-is-worse'
 
@@ -75,6 +81,7 @@ interface EnvironmentCostsFixture {
 }
 
 type EndpointKind = 'start' | 'end'
+type MapAction = EndpointKind | 'inspect'
 type DataState = 'available' | 'not-precomputed' | 'outside-coverage' | 'load-error'
 
 interface AccuracyPolygon {
@@ -84,6 +91,8 @@ interface AccuracyPolygon {
 }
 
 const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? `${import.meta.env.BASE_URL}api/v1/routes`
+const roadEdgeApiUrl = import.meta.env.VITE_ROAD_EDGE_API_URL
+  ?? routeApiUrl.replace(/\/routes$/, '/road-edges')
 setWorkerUrl(import.meta.env.DEV
   ? '/node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'
   : `${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`)
@@ -125,7 +134,7 @@ let map: MapLibreMap | null = null
 let mapStyleReady = false
 let basemapWarningShown = false
 let selectedArea = demoAreas.at(-1) as DemoArea
-let selectedEndpoint: EndpointKind = 'start'
+let selectedMapAction: MapAction = 'start'
 let startCoordinate: Coordinate | null = null
 let endCoordinate: Coordinate | null = null
 let startMarker: Marker | null = null
@@ -135,13 +144,17 @@ let routeRequestSequence = 0
 let routeResponse: RouteResponse | null = null
 let selectedRouteProfile: RouteProfileId = 'balanced'
 let shadeFactor = DEFAULT_SHADE_FACTOR
+let roadEdgeRequestSequence = 0
+let roadEdgeResponse: RoadEdgeResponse | null = null
+let selectedRoadEdgeId: string | null = null
 const visibleRouteProfiles = new Set<RouteProfileId>(['shortest', 'balanced', 'shade'])
 
 const routePresentations: Record<RouteProfileId, { label: string; color: string; description: string }> = {
-  shortest: { label: '最短経路', color: '#e4543f', description: '歩行時間を最小化' },
-  balanced: { label: 'バランス', color: '#7257bd', description: '距離と日向回避を両立' },
-  shade: { label: '日陰優先', color: '#16805a', description: '日向時間を強く回避' },
+  shortest: { label: '最短経路', color: '#d9485f', description: '歩行時間を最小化' },
+  balanced: { label: 'バランス', color: '#7048c8', description: '距離と日向回避を両立' },
+  shade: { label: '日陰優先', color: '#2474d2', description: '日向時間を強く回避' },
 }
+const selectedRouteCasingColor = '#c4b5fd'
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (character) => ({
@@ -408,6 +421,7 @@ function renderShell(): void {
             <div class="endpoint-controls" role="group" aria-label="地図クリックの設定先">
               <button id="select-start-button" class="endpoint-button is-active" type="button">出発地を指定</button>
               <button id="select-end-button" class="endpoint-button" type="button">目的地を指定</button>
+              <button id="inspect-edge-button" class="endpoint-button" type="button">道路詳細を確認</button>
             </div>
             <label>出発地
               <span class="coordinate-field"><output id="start-coordinate">未指定</output><button id="clear-start-button" type="button">解除</button></span>
@@ -446,6 +460,28 @@ function renderShell(): void {
             </div>
             <p class="fixture-notice" id="fixture-notice">ダミーデータを読み込んでいます。</p>
           </section>
+
+          <section class="road-evidence-card" aria-labelledby="road-evidence-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Analysis evidence</p>
+                <h2 id="road-evidence-title">日陰解析と探索コスト</h2>
+              </div>
+              <span class="preview-label" id="road-edge-count">未取得</span>
+            </div>
+            <p class="road-evidence-help">道路の緑・黄・橙・灰は解析値（日陰率）、明るい紫の縁を持つ線は選択中の移動経路を示します。道路を選択したときの探索コストは、歩行時間と日射回避係数から別に計算します。</p>
+            <ul class="road-edge-legend" aria-label="日陰解析道路の凡例">
+              <li><span style="--edge-color:#16805a"></span><strong>日陰</strong><small>日陰率75%以上</small></li>
+              <li><span style="--edge-color:#e9c46a"></span><strong>混在</strong><small>日陰率25〜75%</small></li>
+              <li><span style="--edge-color:#e76f51"></span><strong>日向</strong><small>日陰率25%未満</small></li>
+              <li><span class="is-missing" style="--edge-color:#64748b"></span><strong>欠測</strong><small>道路面未照合／未計算</small></li>
+              <li><span class="is-route"></span><strong>選択経路</strong><small>経路色＋明るい紫の縁</small></li>
+            </ul>
+            <p class="road-edge-status" id="road-edge-status" role="status">地図を拡大すると、表示範囲の実解析道路を取得します。</p>
+            <div class="road-edge-detail is-empty" id="road-edge-detail">
+              「道路詳細を確認」を選び、色付きの道路をクリックしてください。
+            </div>
+          </section>
         </aside>
       </section>
     </main>
@@ -462,6 +498,7 @@ function showDataState(kind: 'empty' | 'error', title: string, detail: string): 
 function updateModeUi(): void {
   if (!fixture) return
   const mode = activeMode()
+  const actualShadeMode = mode.id === 'shadeRatio' && selectedArea.availableTimestamps.length > 0
   const modeButtons = document.querySelector<HTMLDivElement>('#mode-buttons')
   const title = document.querySelector<HTMLElement>('#mode-title')
   const mapTitle = document.querySelector<HTMLElement>('#map-title')
@@ -470,7 +507,12 @@ function updateModeUi(): void {
   const kpiLabel = document.querySelector<HTMLElement>('#kpi-label')
   const kpiValue = document.querySelector<HTMLElement>('#kpi-value')
   const legendRange = document.querySelector<HTMLElement>('#legend-range')
+  const legendTitle = document.querySelector<HTMLElement>('.legend-title span')
   const legendList = document.querySelector<HTMLUListElement>('#legend-list')
+  const sampleKpi = document.querySelector<HTMLElement>('#mode-sample-kpi')
+  const fixtureNotice = document.querySelector<HTMLElement>('#fixture-notice')
+  const badge = document.querySelector<HTMLElement>('#dummy-badge')
+  const datasetNotice = document.querySelector<HTMLElement>('#dataset-notice')
 
   if (modeButtons) {
     modeButtons.innerHTML = fixture.costModes.map((candidate) => `
@@ -484,18 +526,35 @@ function updateModeUi(): void {
       button.addEventListener('click', () => selectMode(button.dataset.modeId ?? mode.id))
     })
   }
-  if (title) title.textContent = mode.displayName
-  if (mapTitle) mapTitle.textContent = `${mode.displayName}コスト`
-  if (description) description.textContent = mode.description
+  if (title) title.textContent = actualShadeMode ? '実日陰区間' : mode.displayName
+  if (mapTitle) mapTitle.textContent = actualShadeMode ? `${selectedArea.name}の実日陰区間` : `${mode.displayName}コスト`
+  if (description) description.textContent = actualShadeMode
+    ? '道路の色は選択日時にUnityで解析した日陰率です。探索コストは日陰率そのものではなく、日射曝露時間と日射回避係数から計算します。'
+    : mode.description
   if (direction) {
-    direction.textContent = mode.valueDirectionLabel
+    direction.textContent = actualShadeMode ? '日陰率が高いほど緑' : mode.valueDirectionLabel
     direction.className = `direction direction--${mode.valueDirection}`
+  }
+  if (sampleKpi) sampleKpi.hidden = actualShadeMode
+  if (fixtureNotice) fixtureNotice.hidden = actualShadeMode
+  if (badge) badge.textContent = actualShadeMode ? '実日陰解析' : fixture.fixture.label
+  if (datasetNotice && actualShadeMode) {
+    datasetNotice.innerHTML = `<strong>${escapeHtml(selectedArea.name)} 実解析</strong><span>道路辺の日陰率と日射曝露時間はUnity解析結果、経路と探索コストは経路サーバーの計算結果です。</span>`
+  } else if (datasetNotice) {
+    datasetNotice.innerHTML = `<strong>${escapeHtml(fixture.name)}</strong><span>${escapeHtml(fixture.fixture.notice)}</span>`
   }
   if (kpiLabel) kpiLabel.textContent = mode.sampleKpi.label
   if (kpiValue) kpiValue.textContent = formatValue(mode.sampleKpi.value, mode.sampleKpi.unit, mode.displayScale)
-  if (legendRange) legendRange.textContent = `${formatValue(mode.range.min, mode.unit, mode.displayScale)}–${formatValue(mode.range.max, mode.unit, mode.displayScale)}`
+  if (legendRange) legendRange.textContent = actualShadeMode ? '解析値 0–100%' : `${formatValue(mode.range.min, mode.unit, mode.displayScale)}–${formatValue(mode.range.max, mode.unit, mode.displayScale)}`
+  if (legendTitle) legendTitle.textContent = actualShadeMode ? '地図の凡例' : '道路の凡例'
   if (legendList) {
-    legendList.innerHTML = mode.colors.map((stop) => `
+    legendList.innerHTML = actualShadeMode ? `
+      <li><span class="legend-swatch" style="--swatch:#16805a"></span><span>日陰</span><strong>75%以上</strong></li>
+      <li><span class="legend-swatch" style="--swatch:#e9c46a"></span><span>日陰・日向が混在</span><strong>25〜75%</strong></li>
+      <li><span class="legend-swatch" style="--swatch:#e76f51"></span><span>日向</span><strong>25%未満</strong></li>
+      <li><span class="legend-swatch legend-swatch--missing" style="--swatch:#64748b"></span><span>欠測</span><strong>未照合／未計算</strong></li>
+      <li><span class="legend-swatch legend-swatch--route"></span><span>選択中の移動経路</span><strong>経路色＋明紫縁</strong></li>
+    ` : mode.colors.map((stop) => `
       <li><span class="legend-swatch" style="--swatch: ${stop.color}"></span><span>${escapeHtml(stop.label)}</span><strong>${formatValue(stop.value, mode.unit, mode.displayScale)}</strong></li>
     `).join('')
   }
@@ -508,13 +567,20 @@ function selectMode(modeId: string): void {
   updateModeUi()
   updateEndpointUi()
   if (map) renderRoadOverlay(map, activeMode())
-  if (modeId === 'shadeRatio') void requestRoutes()
+  if (modeId === 'shadeRatio') {
+    void requestRoadEdges()
+    void requestRoutes()
+  } else clearRoadEdges('内水モードの実解析道路表示は対象外です。')
 }
 
 function renderRoadOverlay(mapInstance: MapLibreMap, mode: CostMode): void {
   if (!fixture) return
   const overlay = document.querySelector<SVGSVGElement>('#road-overlay')
   if (!overlay) return
+  if (mode.id === 'shadeRatio' && selectedArea.availableTimestamps.length > 0) {
+    overlay.innerHTML = ''
+    return
+  }
   if (!shouldDisplayDataset(selectedArea.id, fixture.areaId)) {
     overlay.innerHTML = ''
     return
@@ -539,8 +605,16 @@ function updateRoadLayerLabel(): void {
   if (!fixture) return
   const label = document.querySelector<HTMLElement>('#map-data-label')
   if (!label) return
+  if (routeResponse && roadEdgeResponse) {
+    label.textContent = `${roadEdgeResponse.features.length.toLocaleString('ja-JP')}辺の日陰解析・${routeResponse.routes.length}本の経路を表示中`
+    return
+  }
   if (routeResponse) {
-    label.textContent = `${routeResponse.routes.length}本の実計算経路を表示中`
+    label.textContent = `${routeResponse.routes.length}本の実計算経路を表示中（拡大すると道路別の日陰を表示）`
+    return
+  }
+  if (roadEdgeResponse) {
+    label.textContent = `${roadEdgeResponse.features.length.toLocaleString('ja-JP')}辺の実日陰解析を表示中`
     return
   }
   if (shouldDisplayDataset(selectedArea.id, fixture.areaId)) {
@@ -561,6 +635,233 @@ function setCoverageState(state: DataState, message: string): void {
   if (!status) return
   status.dataset.state = state
   status.textContent = message
+}
+
+function emptyRoadEdgeGeoJson() {
+  return { type: 'FeatureCollection' as const, features: [] }
+}
+
+function routeProfileMembership(): Map<string, RouteProfileId[]> {
+  const membership = new Map<string, RouteProfileId[]>()
+  for (const route of routeResponse?.routes ?? []) {
+    for (const directedEdgeId of route.edgeIds) {
+      const edgeId = physicalEdgeId(directedEdgeId)
+      const profiles = membership.get(edgeId) ?? []
+      if (!profiles.includes(route.profile.id)) profiles.push(route.profile.id)
+      membership.set(edgeId, profiles)
+    }
+  }
+  return membership
+}
+
+function roadEdgeGeoJson() {
+  if (!roadEdgeResponse) return emptyRoadEdgeGeoJson()
+  const membership = routeProfileMembership()
+  return {
+    type: 'FeatureCollection' as const,
+    features: roadEdgeResponse.features.map((feature) => {
+      const routeProfiles = membership.get(feature.properties.edgeId) ?? []
+      return {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          selectedEdge: feature.properties.edgeId === selectedRoadEdgeId,
+          routeProfiles: routeProfiles.join(','),
+          selectedRoute: routeProfiles.includes(selectedRouteProfile),
+        },
+      }
+    }),
+  }
+}
+
+function ensureRoadEdgeLayers(): void {
+  if (!map || !mapStyleReady || map.getSource('analyzed-road-edges')) return
+  map.addSource('analyzed-road-edges', { type: 'geojson', data: emptyRoadEdgeGeoJson() })
+  map.addLayer({
+    id: 'analyzed-road-edges-casing',
+    type: 'line',
+    source: 'analyzed-road-edges',
+    paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.82 },
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+  })
+  map.addLayer({
+    id: 'analyzed-road-edges-lines',
+    type: 'line',
+    source: 'analyzed-road-edges',
+    filter: ['!=', ['get', 'status'], 'missing'],
+    paint: {
+      'line-color': ['step', ['get', 'shadeRatio'], '#e76f51', 0.25, '#e9c46a', 0.75, '#16805a'],
+      'line-width': 4,
+      'line-opacity': 0.9,
+    },
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+  })
+  map.addLayer({
+    id: 'analyzed-road-edges-missing',
+    type: 'line',
+    source: 'analyzed-road-edges',
+    filter: ['==', ['get', 'status'], 'missing'],
+    paint: { 'line-color': '#64748b', 'line-width': 4, 'line-opacity': 0.9, 'line-dasharray': [1.3, 1.3] },
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+  })
+  map.addLayer({
+    id: 'analyzed-road-edges-selected-route',
+    type: 'line',
+    source: 'analyzed-road-edges',
+    filter: ['==', ['get', 'selectedRoute'], true],
+    paint: { 'line-color': routePresentations[selectedRouteProfile].color, 'line-width': 6, 'line-opacity': 0.96 },
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+  })
+  map.addLayer({
+    id: 'analyzed-road-edge-selected',
+    type: 'line',
+    source: 'analyzed-road-edges',
+    filter: ['==', ['get', 'selectedEdge'], true],
+    paint: { 'line-color': '#1677ff', 'line-width': 10, 'line-opacity': 0.9 },
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+  })
+}
+
+function updateRoadEdgeMap(): void {
+  if (!map || !mapStyleReady) return
+  ensureRoadEdgeLayers()
+  const source = map.getSource('analyzed-road-edges') as GeoJSONSource | undefined
+  source?.setData(roadEdgeGeoJson())
+  if (map.getLayer('analyzed-road-edges-selected-route')) {
+    map.setPaintProperty('analyzed-road-edges-selected-route', 'line-color', routePresentations[selectedRouteProfile].color)
+  }
+  updateRoadLayerLabel()
+}
+
+function roadEdgeStatusLabel(status: RoadEdgeFeature['properties']['status']): string {
+  return status === 'available' ? '解析値あり' : status === 'partial' ? '一部欠測' : '欠測'
+}
+
+function renderRoadEdgeDetail(): void {
+  const detail = document.querySelector<HTMLElement>('#road-edge-detail')
+  if (!detail) return
+  const feature = roadEdgeResponse?.features.find((candidate) => candidate.properties.edgeId === selectedRoadEdgeId)
+  if (!feature || !roadEdgeResponse) {
+    detail.className = 'road-edge-detail is-empty'
+    detail.textContent = '「道路詳細を確認」を選び、色付きの道路をクリックしてください。'
+    return
+  }
+  const properties = feature.properties
+  const routeProfiles = routeProfileMembership().get(properties.edgeId) ?? []
+  const profileLabels = routeProfiles.length > 0 ? routeProfiles.map((id) => routePresentations[id].label).join('・') : '表示中の経路には含まれません'
+  const analysisExposure = properties.solarExposureSeconds === null ? '欠測' : formatDuration(properties.solarExposureSeconds)
+  const shade = properties.shadeRatio === null ? '欠測' : formatShadeRatio(properties.shadeRatio)
+  const missingExplanation = properties.missingCostAssumptionApplied
+    ? `<p class="edge-assumption"><strong>欠測時の扱い:</strong> 日陰とはみなさず、歩行時間と同じ${formatDuration(properties.assumedSolarExposureSeconds)}を全日向として探索コストに使用します。${properties.missingReason ? ` ${escapeHtml(properties.missingReason)}` : ''}</p>`
+    : properties.status === 'partial'
+      ? `<p class="edge-assumption"><strong>一部欠測:</strong> ${escapeHtml(properties.missingReason ?? '取得できた解析値から日射曝露時間を算出しています。')}</p>`
+      : ''
+  detail.className = 'road-edge-detail'
+  detail.innerHTML = `
+    <div class="edge-detail-heading"><strong>${escapeHtml(properties.edgeId)}</strong><span data-status="${properties.status}">${roadEdgeStatusLabel(properties.status)}</span></div>
+    <p class="edge-timestamp">対象時刻 ${escapeHtml(new Date(roadEdgeResponse.timestamp).toLocaleString('ja-JP'))}</p>
+    <div class="edge-value-groups">
+      <section><h3>解析値</h3><dl>
+        <div><dt>日陰率</dt><dd>${shade}</dd></div>
+        <div><dt>日射曝露時間</dt><dd>${analysisExposure}</dd></div>
+        <div><dt>解析点</dt><dd>${properties.validSampleCount}/${properties.sampleCount}点</dd></div>
+      </dl></section>
+      <section><h3>探索用コスト</h3><dl>
+        <div><dt>歩行時間</dt><dd>${formatDuration(properties.walkingSeconds)}</dd></div>
+        <div><dt>日射回避係数</dt><dd>${properties.solarAvoidanceFactor.toFixed(2)}</dd></div>
+        <div><dt>環境コスト加算</dt><dd>+${formatDuration(properties.environmentalCostSeconds)}</dd></div>
+        <div><dt>最終探索コスト</dt><dd>${formatDuration(properties.routeCostSeconds)}</dd></div>
+      </dl></section>
+    </div>
+    <p class="edge-formula">${formatDuration(properties.walkingSeconds)} + ${properties.solarAvoidanceFactor.toFixed(2)} × ${formatDuration(properties.assumedSolarExposureSeconds)} = ${formatDuration(properties.routeCostSeconds)}</p>
+    ${missingExplanation}
+    <p class="edge-route-membership"><strong>経路との対応:</strong> ${escapeHtml(profileLabels)}</p>
+  `
+}
+
+function selectRoadEdge(edgeId: string | null): void {
+  selectedRoadEdgeId = edgeId
+  updateRoadEdgeMap()
+  renderRoadEdgeDetail()
+}
+
+function clearRoadEdges(message = '地図を拡大すると、表示範囲の実解析道路を取得します。'): void {
+  roadEdgeRequestSequence += 1
+  roadEdgeResponse = null
+  selectedRoadEdgeId = null
+  const source = map?.getSource('analyzed-road-edges') as GeoJSONSource | undefined
+  source?.setData(emptyRoadEdgeGeoJson())
+  const status = document.querySelector<HTMLElement>('#road-edge-status')
+  const count = document.querySelector<HTMLElement>('#road-edge-count')
+  if (status) status.textContent = message
+  if (count) count.textContent = '未取得'
+  renderRoadEdgeDetail()
+  updateRoadLayerLabel()
+}
+
+async function requestRoadEdges(): Promise<void> {
+  if (!map || !mapStyleReady || selectedModeId !== 'shadeRatio' || selectedArea.availableTimestamps.length === 0) {
+    clearRoadEdges(selectedArea.availableTimestamps.length === 0 ? 'この地域の解析結果はまだ生成されていません。' : '日陰モードで実解析道路を表示します。')
+    return
+  }
+  if (map.getZoom() < 14.5) {
+    clearRoadEdges('道路辺ごとの実解析値を表示するには、地図をもう少し拡大してください。')
+    return
+  }
+  const timestamp = document.querySelector<HTMLSelectElement>('#timestamp-select')?.value
+  if (!timestamp) return
+  const bounds = map.getBounds()
+  const bbox: [number, number, number, number] = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
+  const sequence = ++roadEdgeRequestSequence
+  roadEdgeResponse = null
+  selectedRoadEdgeId = null
+  updateRoadEdgeMap()
+  renderRoadEdgeDetail()
+  const status = document.querySelector<HTMLElement>('#road-edge-status')
+  const count = document.querySelector<HTMLElement>('#road-edge-count')
+  if (status) status.textContent = '表示範囲の実解析道路を取得しています。'
+  if (count) count.textContent = '取得中'
+  try {
+    const url = new URL(roadEdgeApiUrl, window.location.href)
+    url.searchParams.set('areaId', selectedArea.id)
+    url.searchParams.set('timestamp', timestamp)
+    url.searchParams.set('bbox', bbox.join(','))
+    url.searchParams.set('solarAvoidanceFactor', String(shadeFactor))
+    let response: Response
+    try {
+      response = await fetch(url)
+    } catch {
+      throw new Error('道路辺データを取得できませんでした。時間をおいて再度お試しください。')
+    }
+    let document: Record<string, unknown>
+    try {
+      document = await response.json() as Record<string, unknown>
+    } catch {
+      throw new Error('道路辺サーバーの応答形式が不正です。')
+    }
+    if (sequence !== roadEdgeRequestSequence) return
+    if (!response.ok) {
+      const error = isRecord(document.error) ? document.error : {}
+      const code = typeof error.code === 'string' ? error.code : 'LOAD_ERROR'
+      if (code === 'TOO_MANY_ROAD_EDGES' || code === 'BBOX_TOO_LARGE') throw new Error('表示範囲の道路が多いため、地図を拡大してください。')
+      if (code === 'TIMESTAMP_NOT_AVAILABLE') throw new Error('選択日時の道路辺解析値はサーバーに読み込まれていません。')
+      throw new Error('道路辺データを取得できませんでした。時間をおいて再度お試しください。')
+    }
+    const parsed = parseRoadEdgeResponse(document)
+    if (parsed.areaId !== selectedArea.id || parsed.timestamp !== timestamp || parsed.solarAvoidanceFactor !== shadeFactor) return
+    roadEdgeResponse = parsed
+    updateRoadEdgeMap()
+    updateModeUi()
+    if (count) count.textContent = `${parsed.features.length.toLocaleString('ja-JP')}辺`
+    if (status) status.textContent = parsed.features.length === 0
+      ? 'この表示範囲には解析済み道路辺がありません。'
+      : `${parsed.features.length.toLocaleString('ja-JP')}辺を表示しています。道路詳細モードで任意の辺を選択できます。`
+  } catch (error) {
+    if (sequence !== roadEdgeRequestSequence) return
+    const message = error instanceof Error ? error.message : '道路辺データを取得できませんでした。'
+    if (status) status.textContent = message
+    if (count) count.textContent = '取得失敗'
+  }
 }
 
 function routeGeoJson(response: RouteResponse) {
@@ -595,14 +896,14 @@ function updateRouteMap(fitToRoutes = false): void {
       id: 'calculated-routes-casing',
       type: 'line',
       source: 'calculated-routes',
-      paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+      paint: { 'line-color': selectedRouteCasingColor, 'line-width': 8, 'line-opacity': 0.72 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
       id: 'calculated-routes-lines',
       type: 'line',
       source: 'calculated-routes',
-      paint: { 'line-color': colorExpression, 'line-width': 5, 'line-opacity': 0.76 },
+      paint: { 'line-color': colorExpression, 'line-width': 4, 'line-opacity': 0.82 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
@@ -610,7 +911,7 @@ function updateRouteMap(fitToRoutes = false): void {
       type: 'line',
       source: 'calculated-routes',
       filter: ['==', ['get', 'selected'], true],
-      paint: { 'line-color': '#17211d', 'line-width': 12, 'line-opacity': 0.34 },
+      paint: { 'line-color': selectedRouteCasingColor, 'line-width': 10, 'line-opacity': 0.9 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
     map.addLayer({
@@ -618,7 +919,7 @@ function updateRouteMap(fitToRoutes = false): void {
       type: 'line',
       source: 'calculated-routes',
       filter: ['==', ['get', 'selected'], true],
-      paint: { 'line-color': colorExpression, 'line-width': 8, 'line-opacity': 1 },
+      paint: { 'line-color': colorExpression, 'line-width': 6, 'line-opacity': 1 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     })
   }
@@ -680,6 +981,8 @@ function renderRouteComparison(fitToRoutes = false): void {
       selectedRouteProfile = button.dataset.selectRoute as RouteProfileId
       visibleRouteProfiles.add(selectedRouteProfile)
       renderRouteComparison()
+      updateRoadEdgeMap()
+      renderRoadEdgeDetail()
     }))
     cards.querySelectorAll<HTMLInputElement>('[data-toggle-route]').forEach((checkbox) => checkbox.addEventListener('change', () => {
       const profileId = checkbox.dataset.toggleRoute as RouteProfileId
@@ -706,6 +1009,8 @@ function clearCalculatedRoutes(): void {
   const source = map?.getSource('calculated-routes') as GeoJSONSource | undefined
   source?.setData({ type: 'FeatureCollection', features: [] })
   renderRouteComparison()
+  updateRoadEdgeMap()
+  renderRoadEdgeDetail()
 }
 
 function invalidateRoute(message = '条件が変更されました。新しい経路を計算します。'): void {
@@ -744,12 +1049,13 @@ function updateEndpointUi(): void {
   }
 }
 
-function chooseEndpoint(kind: EndpointKind): void {
-  selectedEndpoint = kind
+function chooseMapAction(kind: MapAction): void {
+  selectedMapAction = kind
   document.querySelector('#select-start-button')?.classList.toggle('is-active', kind === 'start')
   document.querySelector('#select-end-button')?.classList.toggle('is-active', kind === 'end')
+  document.querySelector('#inspect-edge-button')?.classList.toggle('is-active', kind === 'inspect')
   const label = document.querySelector<HTMLElement>('#click-target-label')
-  if (label) label.textContent = kind === 'start' ? '出発地' : '目的地'
+  if (label) label.textContent = kind === 'start' ? '出発地' : kind === 'end' ? '目的地' : '確認する道路'
 }
 
 function setEndpoint(kind: EndpointKind, coordinate: Coordinate | null): void {
@@ -757,7 +1063,7 @@ function setEndpoint(kind: EndpointKind, coordinate: Coordinate | null): void {
   else endCoordinate = coordinate
   invalidateRoute(coordinate ? `${kind === 'start' ? '出発地' : '目的地'}を指定しました。` : `${kind === 'start' ? '出発地' : '目的地'}を解除しました。`)
   updateEndpointUi()
-  if (coordinate) chooseEndpoint(kind === 'start' ? 'end' : 'start')
+  if (coordinate) chooseMapAction(kind === 'start' ? 'end' : 'start')
   void requestRoutes()
 }
 
@@ -774,6 +1080,7 @@ function selectArea(areaId: string, moveMap = true): void {
   const area = demoAreas.find((candidate) => candidate.id === areaId)
   if (!area) return
   selectedArea = area
+  clearRoadEdges('地域を変更したため、以前の道路辺詳細を消去しました。')
   const select = document.querySelector<HTMLSelectElement>('#area-select')
   if (select) select.value = area.id
   invalidateRoute('地域を変更したため、以前の経路とKPIを消去しました。')
@@ -781,11 +1088,12 @@ function selectArea(areaId: string, moveMap = true): void {
   endCoordinate = null
   updateTimestampOptions()
   updateEndpointUi()
-  chooseEndpoint('start')
+  chooseMapAction('start')
   if (area.availableTimestamps.length > 0) setCoverageState('available', `${area.name}の計算済みデータを利用できます。`)
   else setCoverageState('not-precomputed', `${area.name}は固定シミュレーション地域ですが、計算結果はまだ生成されていません。`)
   if (moveMap) map?.flyTo({ center: area.center, zoom: 12.5, essential: true })
   if (map && fixture) renderRoadOverlay(map, activeMode())
+  updateModeUi()
   updateRoadLayerLabel()
 }
 
@@ -889,6 +1197,8 @@ async function requestRoutes(): Promise<void> {
     endCoordinate = routeResponse.snapped.end.snappedCoordinate
     updateEndpointUi()
     renderRouteComparison(true)
+    updateRoadEdgeMap()
+    renderRoadEdgeDetail()
     updateRoadLayerLabel()
     const badge = document.querySelector<HTMLElement>('#dummy-badge')
     const datasetNotice = document.querySelector<HTMLElement>('#dataset-notice')
@@ -912,8 +1222,9 @@ async function requestRoutes(): Promise<void> {
 function bindLocationControls(mapInstance: MapLibreMap): void {
   document.querySelector<HTMLSelectElement>('#area-select')?.addEventListener('change', (event) => selectArea((event.currentTarget as HTMLSelectElement).value))
   document.querySelector('#current-location-button')?.addEventListener('click', requestCurrentLocation)
-  document.querySelector('#select-start-button')?.addEventListener('click', () => chooseEndpoint('start'))
-  document.querySelector('#select-end-button')?.addEventListener('click', () => chooseEndpoint('end'))
+  document.querySelector('#select-start-button')?.addEventListener('click', () => chooseMapAction('start'))
+  document.querySelector('#select-end-button')?.addEventListener('click', () => chooseMapAction('end'))
+  document.querySelector('#inspect-edge-button')?.addEventListener('click', () => chooseMapAction('inspect'))
   document.querySelector('#clear-start-button')?.addEventListener('click', () => setEndpoint('start', null))
   document.querySelector('#clear-end-button')?.addEventListener('click', () => setEndpoint('end', null))
   document.querySelector('#swap-endpoints-button')?.addEventListener('click', () => {
@@ -927,10 +1238,12 @@ function bindLocationControls(mapInstance: MapLibreMap): void {
     endCoordinate = null
     invalidateRoute('起終点と検索結果をリセットしました。')
     updateEndpointUi()
-    chooseEndpoint('start')
+    chooseMapAction('start')
   })
   document.querySelector('#timestamp-select')?.addEventListener('change', () => {
     invalidateRoute('計算済み日時を変更しました。')
+    clearRoadEdges('計算済み日時を変更したため、道路辺を更新しています。')
+    void requestRoadEdges()
     void requestRoutes()
   })
   document.querySelector('#search-button')?.addEventListener('click', () => void requestRoutes())
@@ -943,9 +1256,29 @@ function bindLocationControls(mapInstance: MapLibreMap): void {
   factorInput?.addEventListener('change', () => {
     shadeFactor = Number(factorInput.value)
     invalidateRoute('日陰優先度を変更したため、3経路を再計算します。')
+    clearRoadEdges('日陰優先度を変更したため、道路辺の探索コストを更新しています。')
+    void requestRoadEdges()
     void requestRoutes()
   })
-  mapInstance.on('click', (event) => setEndpoint(selectedEndpoint, [event.lngLat.lng, event.lngLat.lat]))
+  mapInstance.on('click', (event) => {
+    if (selectedMapAction === 'inspect') {
+      const layers = ['analyzed-road-edges-lines', 'analyzed-road-edges-missing'].filter((layerId) => mapInstance.getLayer(layerId))
+      const feature = layers.length > 0 ? mapInstance.queryRenderedFeatures(event.point, { layers })[0] : undefined
+      const edgeId = feature?.properties?.edgeId
+      selectRoadEdge(typeof edgeId === 'string' ? edgeId : null)
+      return
+    }
+    setEndpoint(selectedMapAction, [event.lngLat.lng, event.lngLat.lat])
+  })
+  mapInstance.on('mousemove', (event) => {
+    if (selectedMapAction !== 'inspect') {
+      mapInstance.getCanvas().style.cursor = ''
+      return
+    }
+    const layers = ['analyzed-road-edges-lines', 'analyzed-road-edges-missing'].filter((layerId) => mapInstance.getLayer(layerId))
+    mapInstance.getCanvas().style.cursor = layers.length > 0 && mapInstance.queryRenderedFeatures(event.point, { layers }).length > 0 ? 'pointer' : ''
+  })
+  mapInstance.on('moveend', () => void requestRoadEdges())
   updateTimestampOptions()
   updateEndpointUi()
 }
@@ -977,10 +1310,12 @@ function initializeMap(): void {
   mapInstance.on('load', () => {
     if (!fixture) return
     mapStyleReady = true
+    ensureRoadEdgeLayers()
     renderRoadOverlay(mapInstance, mode)
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
     updateRoadLayerLabel()
     updateRouteMap(routeResponse !== null)
+    void requestRoadEdges()
   })
   mapInstance.on('render', () => renderRoadOverlay(mapInstance, activeMode()))
 }

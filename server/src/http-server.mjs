@@ -45,9 +45,11 @@ export function createRouteHttpServer(routeService, options = {}) {
         sendJson(response, 200, { status: 'ok' }, corsOrigin)
         return
       }
-      if (request.method === 'OPTIONS' && url.pathname === '/api/v1/routes') {
+      const isRouteEndpoint = url.pathname === '/api/v1/routes'
+      const isRoadEdgeEndpoint = url.pathname === '/api/v1/road-edges'
+      if (request.method === 'OPTIONS' && (isRouteEndpoint || isRoadEdgeEndpoint)) {
         response.writeHead(204, {
-          'access-control-allow-methods': 'POST, OPTIONS',
+          'access-control-allow-methods': `${isRouteEndpoint ? 'POST' : 'GET'}, OPTIONS`,
           'access-control-allow-headers': 'content-type',
           'access-control-max-age': '600',
           ...(corsOrigin ? { 'access-control-allow-origin': corsOrigin, vary: 'Origin' } : {}),
@@ -55,10 +57,22 @@ export function createRouteHttpServer(routeService, options = {}) {
         response.end()
         return
       }
-      if (url.pathname !== '/api/v1/routes') throw new RouteError('NOT_FOUND', 'The requested endpoint does not exist.', 404)
-      if (request.method !== 'POST') throw new RouteError('METHOD_NOT_ALLOWED', 'Use POST for route requests.', 405)
-      const document = await readJsonBody(request, maximumBodyBytes)
-      const result = routeService.compare(document)
+      if (!isRouteEndpoint && !isRoadEdgeEndpoint) throw new RouteError('NOT_FOUND', 'The requested endpoint does not exist.', 404)
+      let result
+      if (isRouteEndpoint) {
+        if (request.method !== 'POST') throw new RouteError('METHOD_NOT_ALLOWED', 'Use POST for route requests.', 405)
+        result = routeService.compare(await readJsonBody(request, maximumBodyBytes))
+      } else {
+        if (request.method !== 'GET') throw new RouteError('METHOD_NOT_ALLOWED', 'Use GET for road edge requests.', 405)
+        const bbox = url.searchParams.get('bbox')?.split(',').map(Number)
+        const factor = url.searchParams.get('solarAvoidanceFactor')
+        result = routeService.roadEdges({
+          areaId: url.searchParams.get('areaId'),
+          timestamp: url.searchParams.get('timestamp'),
+          bbox,
+          solarAvoidanceFactor: factor === null ? null : Number(factor),
+        })
+      }
       sendJson(response, 200, { requestId, ...result }, corsOrigin)
     } catch (error) {
       const known = error instanceof RouteError

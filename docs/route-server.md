@@ -64,15 +64,39 @@ routeCostSeconds = walkingSeconds
 
 正式な構造は[`route-request-v1.schema.json`](../schemas/route-request-v1.schema.json)と[`route-response-v1.schema.json`](../schemas/route-response-v1.schema.json)で定義する。レスポンスにtopology、全ノード、全辺、全時刻コストは含めない。
 
+### `GET /api/v1/road-edges`
+
+Issue #27の日陰可視化では、全道路ネットワークを配信せず、現在の地図表示範囲に交差する物理道路辺だけを取得する。
+
+```http
+GET /api/v1/road-edges?areaId=ichigaya-venue&timestamp=2025-08-01T12%3A00%3A00%2B09%3A00&bbox=139.73,35.68,139.74,35.70&solarAvoidanceFactor=2
+```
+
+`bbox`は`minLongitude,minLatitude,maxLongitude,maxLatitude`の順で指定する。応答は`road-edge-response-1.0`のGeoJSON `FeatureCollection`で、各物理道路辺について次を返す。
+
+- 道路辺ID、2点の`LineString`、長さ、歩行時間
+- 解析状態、日陰率、日射曝露時間、解析点数、道路面未照合点数
+- 日射回避係数、探索に用いた日射曝露時間、環境コスト加算分、最終探索コスト
+- 欠測理由と、全日向仮定を適用したかどうか
+
+`available`と`partial`では#9の解析値を使用する。`missing`では`shadeRatio`と`solarExposureSeconds`を`null`のまま返し、探索用に限り歩行時間と同じ秒数を全日向として仮定する。したがって、欠測辺も次式の最終コストを説明できるが、解析済みの日向または日陰とは表示しない。
+
+```text
+environmentalCostSeconds = assumedSolarExposureSeconds * solarAvoidanceFactor
+routeCostSeconds = walkingSeconds + environmentalCostSeconds
+```
+
+サーバーは起動時に物理道路辺の空間グリッド索引を構築する。1応答は既定10,000辺まで、bboxの緯度・経度幅は各0.2度までとし、超過時は地図を拡大するようHTTP 422を返す。上限辺数は`ROUTE_MAXIMUM_ROAD_EDGE_FEATURES`で変更できる。正式な応答構造は[`road-edge-response-v1.schema.json`](../schemas/road-edge-response-v1.schema.json)で定義する。
+
 ### エラー
 
 | HTTP | code | 条件 |
 |---:|---|---|
-| 400 | `INVALID_JSON`、`INVALID_REQUEST`、`INVALID_COORDINATE`、`INVALID_PROFILE` | 構文・型・値が不正 |
+| 400 | `INVALID_JSON`、`INVALID_REQUEST`、`INVALID_COORDINATE`、`INVALID_BBOX`、`INVALID_PROFILE` | 構文・型・値が不正 |
 | 404 | `AREA_NOT_FOUND`、`NOT_FOUND` | 地域またはエンドポイントがない |
 | 405 | `METHOD_NOT_ALLOWED` | APIをPOST以外で呼んだ |
 | 413 | `REQUEST_TOO_LARGE` | 本文が上限を超えた |
-| 422 | `OUTSIDE_COVERAGE`、`SNAP_NOT_FOUND`、`TIMESTAMP_NOT_AVAILABLE`、`ROUTE_NOT_FOUND` | 正常な構文だが探索不能 |
+| 422 | `OUTSIDE_COVERAGE`、`SNAP_NOT_FOUND`、`TIMESTAMP_NOT_AVAILABLE`、`ROUTE_NOT_FOUND`、`BBOX_TOO_LARGE`、`TOO_MANY_ROAD_EDGES` | 正常な構文だが探索・道路辺取得不能 |
 | 500 | `INTERNAL_ERROR` | 予期しない内部失敗 |
 
 エラーには`requestId`と機械判別用`code`を含め、スタック、ローカルパス、入力バンドルの内容は返さない。
@@ -105,7 +129,7 @@ Nginxの`proxy_pass`と一致させる。環境ファイル、systemdユニッ�
 - #12: 地域・GPS・地図クリック・日時指定とAPI呼出し
 - #13: 返却された3経路とKPIの描画
 
-GPSはMVPでは表示位置合わせだけに使用し、利用者が地図上で明示指定した起終点だけをAPIへ送る。
+GPSはMVPでは表示位置合わせだけに使用し、利用者が地図上で明示指定した起終点だけを経路APIへ送る。道路辺APIには地図の表示範囲、地域、選択日時、係数だけを送る。
 
 ## 市ヶ谷実データ検証
 

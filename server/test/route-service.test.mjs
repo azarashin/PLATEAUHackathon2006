@@ -6,6 +6,7 @@ import { RouteError } from '../src/route-error.mjs'
 import { RouteService } from '../src/route-service.mjs'
 
 const manifestPath = fileURLToPath(new URL('../../data/fixtures/route-server-bundle-v1/manifest.json', import.meta.url))
+const missingManifestPath = fileURLToPath(new URL('../../data/fixtures/environment-cost-server-bundle-v1/manifest.json', import.meta.url))
 const fixture = createRouteFixtureInputs()
 const service = await RouteService.load([{ manifestPath, maximumSnapDistanceMeters: 100 }])
 
@@ -49,6 +50,51 @@ test('three profiles select shortest, balanced, and shaded paths', () => {
   assert.equal('costsByTimestamp' in result, false)
 })
 
+test('road edge details match the formal cost slice and aggregate to route KPIs', () => {
+  const compared = service.compare(request())
+  for (const route of compared.routes) {
+    const edges = service.roadEdges({
+      areaId: 'route-server-fixture',
+      timestamp: fixture.timestamp,
+      bbox: [139.7349, 35.6897, 139.7361, 35.6908],
+      solarAvoidanceFactor: route.profile.solarAvoidanceFactor,
+    })
+    const byId = new Map(edges.features.map((feature) => [feature.properties.edgeId, feature.properties]))
+    const routeEdges = route.edgeIds.map((directedId) => byId.get(directedId.replace(/:(?:forward|backward)$/, '')))
+    assert.equal(routeEdges.every(Boolean), true)
+    approximately(routeEdges.reduce((total, edge) => total + edge.walkingSeconds, 0), route.kpis.walkingSeconds)
+    approximately(routeEdges.reduce((total, edge) => total + edge.assumedSolarExposureSeconds, 0), route.kpis.solarExposureSeconds)
+    approximately(routeEdges.reduce((total, edge) => total + edge.routeCostSeconds, 0), route.kpis.routeCostSeconds)
+  }
+  const shortestEdge = service.roadEdges({
+    areaId: 'route-server-fixture', timestamp: fixture.timestamp,
+    bbox: [139.7349, 35.6897, 139.7361, 35.6908], solarAvoidanceFactor: 2,
+  }).features.find((feature) => feature.properties.edgeId === 'osm-way-201-0')
+  assert.equal(shortestEdge.properties.shadeRatio, 0.1)
+  assert.equal(shortestEdge.properties.solarExposureSeconds, 90)
+  assert.equal(shortestEdge.properties.walkingSeconds, 100)
+  assert.equal(shortestEdge.properties.environmentalCostSeconds, 180)
+  assert.equal(shortestEdge.properties.routeCostSeconds, 280)
+})
+
+test('missing road edges preserve null analysis values and disclose the full-sun assumption', async () => {
+  const missingService = await RouteService.load([{ manifestPath: missingManifestPath, maximumSnapDistanceMeters: 100 }])
+  const result = missingService.roadEdges({
+    areaId: 'ichigaya-integration-fixture',
+    timestamp: '2025-08-01T08:00:00+09:00',
+    bbox: [139.735, 35.689, 139.738, 35.692],
+    solarAvoidanceFactor: 2,
+  })
+  const missing = result.features.find((feature) => feature.properties.status === 'missing')
+  assert.ok(missing)
+  assert.equal(missing.properties.shadeRatio, null)
+  assert.equal(missing.properties.solarExposureSeconds, null)
+  assert.equal(missing.properties.missingCostAssumptionApplied, true)
+  assert.equal(missing.properties.assumedSolarExposureSeconds, missing.properties.walkingSeconds)
+  assert.equal(missing.properties.routeCostSeconds, missing.properties.walkingSeconds * 3)
+  assert.match(missing.properties.missingReason, /未計算|照合|解析値/)
+})
+
 test('factor zero exactly follows minimum walking time', () => {
   const custom = service.compare(request({
     profiles: [{ id: 'zero', solarAvoidanceFactor: 0 }],
@@ -89,5 +135,13 @@ test('snapping and route failures return stable error codes', () => {
   assert.throws(
     () => service.compare(request({ profiles: [{ id: 'bad', solarAvoidanceFactor: 1, unexpected: true }] })),
     (error) => error instanceof RouteError && error.code === 'INVALID_PROFILE',
+  )
+  assert.throws(
+    () => service.roadEdges({ areaId: 'route-server-fixture', timestamp: fixture.timestamp, bbox: [139, 35, 140], solarAvoidanceFactor: 2 }),
+    (error) => error instanceof RouteError && error.code === 'INVALID_BBOX',
+  )
+  assert.throws(
+    () => service.roadEdges({ areaId: 'route-server-fixture', timestamp: fixture.timestamp, bbox: [139, 35, 140, 36], solarAvoidanceFactor: 2 }),
+    (error) => error instanceof RouteError && error.code === 'BBOX_TOO_LARGE',
   )
 })

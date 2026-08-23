@@ -15,6 +15,8 @@ const manifestPaths = (process.env.ROUTE_BUNDLE_MANIFESTS ?? '').split(',').map(
 if (manifestPaths.length === 0) throw new Error('ROUTE_BUNDLE_MANIFESTS is required')
 const timestamps = (process.env.ROUTE_TIMESTAMPS ?? '').split(',').map((value) => value.trim()).filter(Boolean)
 const maximumSnapDistanceMeters = positiveNumber(process.env.ROUTE_MAXIMUM_SNAP_DISTANCE_METERS, 250, 'ROUTE_MAXIMUM_SNAP_DISTANCE_METERS')
+const maximumRoadEdgeFeatures = positiveNumber(process.env.ROUTE_MAXIMUM_ROAD_EDGE_FEATURES, 10_000, 'ROUTE_MAXIMUM_ROAD_EDGE_FEATURES')
+if (!Number.isInteger(maximumRoadEdgeFeatures)) throw new Error('ROUTE_MAXIMUM_ROAD_EDGE_FEATURES must be an integer')
 const port = positiveNumber(process.env.PORT, 3000, 'PORT')
 if (!Number.isInteger(port) || port > 65535) throw new Error('PORT must be an integer between 1 and 65535')
 
@@ -22,6 +24,7 @@ const service = await RouteService.load(manifestPaths.map((manifestPath) => ({
   manifestPath: resolve(manifestPath),
   ...(timestamps.length > 0 ? { timestamps } : {}),
   maximumSnapDistanceMeters,
+  maximumRoadEdgeFeatures,
 })))
 const server = createRouteHttpServer(service, {
   corsOrigin: process.env.ROUTE_CORS_ORIGIN || undefined,

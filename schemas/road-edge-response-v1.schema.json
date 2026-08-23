@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/road-edge-response-v1.schema.json",
+  "title": "Road edge response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requestId", "schemaVersion", "type", "areaId", "timestamp", "bbox", "solarAvoidanceFactor", "missingCostPolicy", "features", "diagnostics"],
+  "properties": {
+    "requestId": { "type": "string", "format": "uuid" },
+    "schemaVersion": { "const": "road-edge-response-1.0" },
+    "type": { "const": "FeatureCollection" },
+    "areaId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "bbox": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "prefixItems": [
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 },
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 }
+      ],
+      "items": false
+    },
+    "solarAvoidanceFactor": { "type": "number", "minimum": 0, "maximum": 100 },
+    "missingCostPolicy": { "const": "assume-fully-sun-and-report-unknown-coverage" },
+    "features": { "type": "array", "items": { "$ref": "#/$defs/feature" } },
+    "diagnostics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["edgeCount", "queryMilliseconds", "bundleFingerprintSha256"],
+      "properties": {
+        "edgeCount": { "type": "integer", "minimum": 0 },
+        "queryMilliseconds": { "type": "number", "minimum": 0 },
+        "bundleFingerprintSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  },
+  "$defs": {
+    "coordinate": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 }
+      ],
+      "items": false
+    },
+    "nullableRatio": { "anyOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "type": "null" }] },
+    "nullableSeconds": { "anyOf": [{ "type": "number", "minimum": 0 }, { "type": "null" }] },
+    "feature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "id", "properties", "geometry"],
+      "properties": {
+        "type": { "const": "Feature" },
+        "id": { "type": "string", "minLength": 1 },
+        "properties": {
+          "type": "object", "additionalProperties": false,
+          "required": ["edgeId", "status", "missingReason", "sampleCount", "validSampleCount", "noGroundSampleCount", "shadeRatio", "solarExposureSeconds", "walkingSeconds", "lengthMeters", "solarAvoidanceFactor", "assumedSolarExposureSeconds", "environmentalCostSeconds", "routeCostSeconds", "missingCostAssumptionApplied"],
+          "properties": {
+            "edgeId": { "type": "string", "minLength": 1 },
+            "status": { "enum": ["available", "partial", "missing"] },
+            "missingReason": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+            "sampleCount": { "type": "integer", "minimum": 0 },
+            "validSampleCount": { "type": "integer", "minimum": 0 },
+            "noGroundSampleCount": { "type": "integer", "minimum": 0 },
+            "shadeRatio": { "$ref": "#/$defs/nullableRatio" },
+            "solarExposureSeconds": { "$ref": "#/$defs/nullableSeconds" },
+            "walkingSeconds": { "type": "number", "minimum": 0 },
+            "lengthMeters": { "type": "number", "minimum": 0 },
+            "solarAvoidanceFactor": { "type": "number", "minimum": 0, "maximum": 100 },
+            "assumedSolarExposureSeconds": { "type": "number", "minimum": 0 },
+            "environmentalCostSeconds": { "type": "number", "minimum": 0 },
+            "routeCostSeconds": { "type": "number", "minimum": 0 },
+            "missingCostAssumptionApplied": { "type": "boolean" }
+          }
+        },
+        "geometry": {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "const": "LineString" },
+            "coordinates": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/coordinate" } }
+          }
+        }
+      }
+    }
+  }
+}
