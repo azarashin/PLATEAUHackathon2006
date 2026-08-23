@@ -16,7 +16,8 @@
     "validate:server-bundle": "node scripts/validate-environment-cost-server-bundle.mjs ../data/fixtures/environment-cost-server-bundle-v1/manifest.json",
     "test:contract": "node scripts/test-environment-cost-data.mjs",
     "test:route-server-contract": "node scripts/test-route-server-contract.mjs",
-    "test:location-controls": "node --experimental-strip-types --test test/location-domain.test.ts"
+    "test:location-controls": "node --experimental-strip-types --test test/location-domain.test.ts",
+    "test:route-display": "node --experimental-strip-types --test test/route-domain.test.ts"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

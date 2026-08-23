@@ -32,5 +32,6 @@ function copyMapLibreWorkerAssets(): Plugin {
 export default defineConfig(({ command }) => ({
   base: normalizeBasePath(process.env.VIEWER_BASE_PATH ?? (command === 'build' ? DEFAULT_PRODUCTION_BASE_PATH : '/')),
   publicDir: '../data/fixtures',
+  optimizeDeps: { exclude: ['maplibre-gl'] },
   plugins: [copyMapLibreWorkerAssets()],
 }))
