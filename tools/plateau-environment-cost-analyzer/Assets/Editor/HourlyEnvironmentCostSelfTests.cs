@@ -9,12 +9,16 @@ public static class HourlyEnvironmentCostSelfTests
         try
         {
             AssertNear(75.0, HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 0.25));
+            AssertNear(100.0, HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 0.0));
+            AssertNear(0.0, HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 1.0));
             AssertEqual("available", HourlyEnvironmentCostRules.DetermineStatus(4, 4, 0, 60.0, out var availableReason));
             AssertEqual(null, availableReason);
             AssertEqual("partial", HourlyEnvironmentCostRules.DetermineStatus(4, 3, 1, 60.0, out var partialReason));
             AssertEqual("some-road-samples-not-found", partialReason);
             AssertEqual("missing", HourlyEnvironmentCostRules.DetermineStatus(4, 0, 4, 60.0, out var missingReason));
             AssertEqual("road-surface-not-found", missingReason);
+            AssertEqual("missing", HourlyEnvironmentCostRules.DetermineStatus(0, 0, 0, 60.0, out var zeroSampleReason));
+            AssertEqual("road-surface-not-found", zeroSampleReason);
             AssertEqual("missing", HourlyEnvironmentCostRules.DetermineStatus(4, 4, 0, -1.0, out var nightReason));
             AssertEqual("sun-below-horizon", nightReason);
             AssertEqual("2025-08-01T08:00:00+09:00",
