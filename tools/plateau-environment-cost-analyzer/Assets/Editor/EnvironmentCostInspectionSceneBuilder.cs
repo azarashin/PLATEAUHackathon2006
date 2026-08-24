@@ -80,9 +80,17 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
                 return;
             }
 
-            inspectionScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                status = "Creation cancelled because the current Scene was not saved.";
+                return;
+            }
+
+            // Unity cannot create an additive Scene while its only open Scene is an unsaved Untitled Scene.
+            // The inspection Scene is intentionally isolated, so switch to it after offering Unity's normal
+            // save confirmation for any user changes in the current Scene.
+            inspectionScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             sceneCreated = true;
-            SceneManager.SetActiveScene(inspectionScene);
             var root = new GameObject($"Environment Cost Inspection - {config.areaId}");
             EditorSceneManager.MarkSceneDirty(inspectionScene);
 

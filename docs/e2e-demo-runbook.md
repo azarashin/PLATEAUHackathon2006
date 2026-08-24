@@ -5,7 +5,7 @@
 解析バッチがCityGMLを読み込むのは一時的であり、Git管理する`.unity`シーンは残しません。デモの前に`tools/plateau-environment-cost-analyzer/`をUnityで開き、次の手順で確認用のローカルSceneを作成します。
 
 1. **PLATEAU > Environment Cost > Create Inspection Scene** を開く。
-2. `data/analysis-configs/ichigaya-venue.json`（またはデモ対象地域の設定ファイル）を選び、**Create inspection Scene** を実行する。
+2. `data/analysis-configs/ichigaya-venue.json`（またはデモ対象地域の設定ファイル）を選び、**Create inspection Scene** を実行する。現在のSceneに未保存変更があれば、Unityの保存確認で保存またはキャンセルする。未保存の空Sceneを手動で作る必要はない。
 3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` を待つ。`buildingColliders` と `roadColliders` はともに0より大きくなければならない。このコマンドは`bldg`と`tran`のLOD1だけを読み込み、MeshColliderを追加し、`Building=8`と`Road=9`を検証する。
 4. **PLATEAU > Environment Cost > Hourly Heatmap** を開き、完了済み環境コストJSONを読み込む。`12:00`と道路辺を選択する。Sceneビューでは緑が日陰、橙が日向、赤が道路面を取得できなかったサンプル、紫の矢印が太陽方向を示す。
 
