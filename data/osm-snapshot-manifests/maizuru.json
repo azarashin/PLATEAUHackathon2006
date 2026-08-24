@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.1",
+  "areaId": "maizuru",
+  "localPath": "data/raw/osm/maizuru/highways-with-nodes.json",
+  "queryPath": "data/osm-queries/maizuru-highways.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "osmTimestamp": "2026-08-24T15:45:06Z",
+  "downloadedAt": "2026-08-24T15:52:05.756Z",
+  "sizeBytes": 2044609,
+  "sha256": "dad86c1381d5880176b0d0b498308c10600b38f2e6d5373cbdf90d118ca63187",
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ],
+  "note": "Keep this exact local snapshot for road graph generation and downstream Unity analysis. Requerying Overpass produces a different snapshot."
+}

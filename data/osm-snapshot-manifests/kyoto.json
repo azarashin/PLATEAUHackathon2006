@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.1",
+  "areaId": "kyoto",
+  "localPath": "data/raw/osm/kyoto/highways-with-nodes.json",
+  "queryPath": "data/osm-queries/kyoto-highways.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "osmTimestamp": "2026-08-24T15:45:06Z",
+  "downloadedAt": "2026-08-24T15:52:05.591Z",
+  "sizeBytes": 16786578,
+  "sha256": "18494207b9c89e00cdb86a399c241b7b7385642844742ec7ae7cbc30a902ffc4",
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ],
+  "note": "Keep this exact local snapshot for road graph generation and downstream Unity analysis. Requerying Overpass produces a different snapshot."
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "environment-cost-analysis-config-0.2",
+  "areaId": "kyoto",
+  "center": [135.758770, 34.985350],
+  "radiusMeters": 4000,
+  "coordinateZoneId": 6,
+  "date": "2025-08-01",
+  "timezone": "Asia/Tokyo",
+  "hours": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "sampleSpacingMeters": 25,
+  "pedestrianHeightMeters": 1.5,
+  "walkingSpeedMetersPerSecond": 1.4,
+  "candidateDatasetIds": ["26100"],
+  "datasetRoots": { "26100": "data/raw/plateau/26100-kyoto-2025" },
+  "osmInputPath": "data/raw/osm/kyoto/highways-with-nodes.json",
+  "coverageOutputPath": "data/raw/kyoto-mesh-coverage.json",
+  "environmentCostOutputPath": "data/generated/kyoto-environment-cost.json",
+  "summaryOutputPath": "data/raw/kyoto-analysis-summary.json",
+  "cacheDirectoryPath": "data/raw/environment-cost-cache/kyoto",
+  "stateOutputPath": "data/raw/kyoto-analysis-state.json",
+  "cancellationRequestPath": "data/raw/kyoto-analysis.cancel"
+}

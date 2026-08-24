@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.1",
+  "areaId": "fujisawa",
+  "localPath": "data/raw/osm/fujisawa/highways-with-nodes.json",
+  "queryPath": "data/osm-queries/fujisawa-highways.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "osmTimestamp": "2026-08-24T15:46:07Z",
+  "downloadedAt": "2026-08-24T15:52:05.991Z",
+  "sizeBytes": 10441732,
+  "sha256": "c163e0e2f796d53a897809db9b348b41c239facba2e3e03ce354da7689f2f8c6",
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ],
+  "note": "Keep this exact local snapshot for road graph generation and downstream Unity analysis. Requerying Overpass produces a different snapshot."
+}
