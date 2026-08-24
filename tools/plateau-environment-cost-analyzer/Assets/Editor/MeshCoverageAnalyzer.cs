@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using PLATEAU.Dataset;
 using PLATEAU.Network;
@@ -25,13 +26,16 @@ public static class MeshCoverageAnalyzer
 
             var report = new CoverageReport
             {
+                areaId = runConfig.areaId,
                 generatedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
                 center = new[] { runConfig.CenterLongitude, runConfig.CenterLatitude },
                 radiusMeters = runConfig.radiusMeters,
+                coordinateZoneId = runConfig.coordinateZoneId,
                 datasets = new List<DatasetCoverage>()
             };
 
             var client = Client.Create(string.Empty, string.Empty);
+            var foundDatasetIds = new HashSet<string>();
             using var groups = client.GetDatasetMetadataGroup();
             for (var groupIndex = 0; groupIndex < groups.Length; groupIndex++)
             {
@@ -40,6 +44,7 @@ public static class MeshCoverageAnalyzer
                 {
                     var dataset = datasets.At(datasetIndex);
                     if (!candidateDatasetIds.Contains(dataset.ID)) continue;
+                    foundDatasetIds.Add(dataset.ID);
 
                     var selectedCodes = FindIntersectingGridCodes(dataset.ID);
                     if (selectedCodes.Count == 0) continue;
@@ -53,6 +58,11 @@ public static class MeshCoverageAnalyzer
                 }
             }
             client.Dispose();
+            if (!candidateDatasetIds.SetEquals(foundDatasetIds))
+            {
+                var missing = candidateDatasetIds.Where(id => !foundDatasetIds.Contains(id));
+                throw new InvalidOperationException($"PLATEAU dataset catalog did not resolve requested dataset IDs: {string.Join(",", missing)}");
+            }
 
             var outputPath = runConfig.ResolvePath(runConfig.coverageOutputPath);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException());
@@ -69,7 +79,7 @@ public static class MeshCoverageAnalyzer
         EditorApplication.Exit(0);
     }
 
-    private static List<string> FindIntersectingGridCodes(string datasetId)
+    internal static List<string> FindIntersectingGridCodes(string datasetId)
     {
         var selected = new List<string>();
         var sourceConfig = new DatasetSourceConfigRemote(datasetId, string.Empty, string.Empty);
@@ -81,9 +91,23 @@ public static class MeshCoverageAnalyzer
             var gridCode = gridCodes.At(index);
             if (IntersectsCircle(gridCode.Extent)) selected.Add(gridCode.StringCode);
         }
-        selected.Sort(StringComparer.Ordinal);
-        return selected;
+        return NormalizeGridCodes(selected);
     }
+
+    /// <summary>
+    /// Keeps the most detailed supported mesh code for each covered area. A 6-digit
+    /// code is retained only when the source does not expose an 8-digit child; this
+    /// prevents an entire parent mesh and its children from being imported twice.
+    /// </summary>
+    internal static List<string> NormalizeGridCodes(IEnumerable<string> gridCodes)
+    {
+        var candidates = new HashSet<string>((gridCodes ?? Array.Empty<string>())
+            .Where(IsSupportedGridCode), StringComparer.Ordinal);
+        return candidates.Where(code => code.Length != 6 || !candidates.Any(child => child.Length == 8 && child.StartsWith(code, StringComparison.Ordinal)))
+            .OrderBy(code => code, StringComparer.Ordinal).ToList();
+    }
+
+    internal static bool IsSupportedGridCode(string code) => code != null && (code.Length == 6 || code.Length == 8) && code.All(char.IsDigit);
 
     private static bool IntersectsCircle(PLATEAU.Native.Extent extent)
     {
@@ -112,6 +136,6 @@ public static class MeshCoverageAnalyzer
         return count;
     }
 
-    [Serializable] private sealed class CoverageReport { public string generatedAt; public double[] center; public double radiusMeters; public List<DatasetCoverage> datasets; }
+    [Serializable] private sealed class CoverageReport { public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public List<DatasetCoverage> datasets; }
     [Serializable] private sealed class DatasetCoverage { public string id; public string title; public List<string> gridCodes; }
 }

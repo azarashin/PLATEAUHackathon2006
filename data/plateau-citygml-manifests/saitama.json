@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "plateau-citygml-acquisition-plan-0.1",
+  "areaId": "saitama",
+  "radiusMeters": 4000,
+  "note": "半径4 kmを満たすため、さいたま市を中心に上尾市・川口市の境界側データを併用する。年度差は本MVPでは許容する。",
+  "datasets": [
+    {
+      "id": "11100",
+      "municipality": "さいたま市",
+      "year": 2025,
+      "archiveFile": "11100_saitama-shi_city_2025_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/65/77eae6-8d0f-411a-aecb-abe26d464fa8/11100_saitama-shi_city_2025_citygml_1_op.zip",
+      "catalogZipBytes": 2516277800,
+      "extractPath": "data/raw/plateau/11100-saitama-2025"
+    },
+    {
+      "id": "11219",
+      "municipality": "上尾市",
+      "year": 2025,
+      "archiveFile": "11219_ageo-shi_pref_2025_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/6f/b9ceb0-78cd-4e94-b18f-2636e52f3e95/11219_ageo-shi_pref_2025_citygml_1_op.zip",
+      "catalogZipBytes": 196710480,
+      "extractPath": "data/raw/plateau/11219-ageo-2025"
+    },
+    {
+      "id": "11203",
+      "municipality": "川口市",
+      "year": 2024,
+      "archiveFile": "11203_kawaguchi-shi_pref_2024_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/e2/adab26-a177-47ff-a6d8-18bd04f6baae/11203_kawaguchi-shi_pref_2024_citygml_1_op.zip",
+      "catalogZipBytes": 410936130,
+      "extractPath": "data/raw/plateau/11203-kawaguchi-2024"
+    }
+  ]
+}
