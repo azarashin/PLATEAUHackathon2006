@@ -18,6 +18,7 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
     private string loadedPath;
     private int selectedHourIndex;
     private int selectedEdgeIndex;
+    private int lastFocusedEdgeIndex = -1;
     private int displayLimit = 200000;
     private int sampleDrawLimit = 200;
     private float lineWidth = 3.0f;
@@ -58,7 +59,12 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
         lineWidth = EditorGUILayout.Slider("道路の線幅", lineWidth, 1.0f, 8.0f);
         EditorGUILayout.Space();
 
-        selectedEdgeIndex = EditorGUILayout.IntSlider("確認する道路辺", selectedEdgeIndex, 0, document.edges.Count - 1);
+        var nextSelectedEdgeIndex = EditorGUILayout.IntSlider("確認する道路辺", selectedEdgeIndex, 0, document.edges.Count - 1);
+        if (nextSelectedEdgeIndex != selectedEdgeIndex)
+        {
+            selectedEdgeIndex = nextSelectedEdgeIndex;
+            FocusSelectedEdge();
+        }
         var selectedEdge = document.edges[selectedEdgeIndex];
         var selectedHourly = selectedEdge.hourly.First(value => value.hour == hours[selectedHourIndex]);
         EditorGUILayout.LabelField("選択辺", string.IsNullOrWhiteSpace(selectedEdge.id) ? $"#{selectedEdgeIndex + 1}" : selectedEdge.id);
@@ -98,10 +104,32 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
         loadedPath = path;
         selectedHourIndex = 0;
         selectedEdgeIndex = 0;
+        lastFocusedEdgeIndex = -1;
         displayLimit = Math.Min(Math.Max(1000, document.edges.Count), 200000);
         lastInspection = null;
+        FocusSelectedEdge();
         SceneView.RepaintAll();
         Repaint();
+    }
+
+    private void FocusSelectedEdge()
+    {
+        if (document == null || selectedEdgeIndex == lastFocusedEdgeIndex ||
+            selectedEdgeIndex < 0 || selectedEdgeIndex >= document.edges.Count) return;
+        var sceneView = SceneView.lastActiveSceneView;
+        if (sceneView == null) return;
+
+        var edge = document.edges[selectedEdgeIndex];
+        if (edge.coordinates == null || edge.coordinates.Length < 2) return;
+        using var localReference = CreateLocalReference();
+        var points = edge.coordinates.Select(coordinate => Project(localReference, coordinate, 2.0f)).ToArray();
+        var center = points.Aggregate(Vector3.zero, (sum, point) => sum + point) / points.Length;
+        var spanMeters = points.Max(point => Vector3.Distance(point, center)) * 2.0f;
+        var viewSize = Mathf.Clamp(Mathf.Max(16.0f, spanMeters * 2.5f), 16.0f, 250.0f);
+
+        sceneView.LookAt(center, sceneView.rotation, viewSize, sceneView.orthographic, true);
+        sceneView.Repaint();
+        lastFocusedEdgeIndex = selectedEdgeIndex;
     }
 
     private void DrawScene(SceneView sceneView)
