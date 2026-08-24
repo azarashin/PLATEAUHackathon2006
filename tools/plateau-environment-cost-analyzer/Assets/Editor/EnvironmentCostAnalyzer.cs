@@ -263,18 +263,18 @@ public static class EnvironmentCostAnalyzer
         foreach (var packagePair in importConfig.PackageImportConfigDict.ForEachPackagePair)
         {
             var package = packagePair.Key;
-            var config = packagePair.Value;
+            var packageConfig = packagePair.Value;
             var shouldImport = package == PredefinedCityModelPackage.Building || package == PredefinedCityModelPackage.Road;
-            config.ImportPackage = shouldImport;
+            packageConfig.ImportPackage = shouldImport;
             if (!shouldImport) continue;
 
-            var targetLod = Math.Min(1, config.LODRange.AvailableMaxLOD);
-            config.LODRange = new LODRange(targetLod, targetLod, config.LODRange.AvailableMaxLOD);
-            config.IncludeTexture = false;
-            config.EnableTexturePacking = false;
-            config.DoSetAttrInfo = false;
-            config.DoSetMeshCollider = true;
-            config.MeshGranularity = MeshGranularity.PerCityModelArea;
+            var targetLod = Math.Min(1, packageConfig.LODRange.AvailableMaxLOD);
+            packageConfig.LODRange = new LODRange(targetLod, targetLod, packageConfig.LODRange.AvailableMaxLOD);
+            packageConfig.IncludeTexture = false;
+            packageConfig.EnableTexturePacking = false;
+            packageConfig.DoSetAttrInfo = false;
+            packageConfig.DoSetMeshCollider = true;
+            packageConfig.MeshGranularity = MeshGranularity.PerCityModelArea;
         }
 
         await CityImporter.ImportAsync(importConfig, null, null);
