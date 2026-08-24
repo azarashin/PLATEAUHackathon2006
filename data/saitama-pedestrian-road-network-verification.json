@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "regional-pedestrian-road-network-verification-0.1",
+  "verifiedAt": "2026-08-24T15:53:36.583Z",
+  "areaId": "saitama",
+  "inputs": {
+    "configPath": "data/analysis-configs/saitama.json",
+    "osmSnapshot": {
+      "schemaVersion": "osm-snapshot-manifest-0.1",
+      "areaId": "saitama",
+      "localPath": "data/raw/osm/saitama/highways-with-nodes.json",
+      "queryPath": "data/osm-queries/saitama-highways.overpassql",
+      "endpoint": "https://overpass-api.de/api/interpreter",
+      "osmTimestamp": "2026-08-24T15:46:07Z",
+      "downloadedAt": "2026-08-24T15:52:06.235Z",
+      "sizeBytes": 11402953,
+      "sha256": "0c4ea72d1754e41c668edcdc85f9d57ea6b7814c35fd58684ba9361fe105a915",
+      "requiredWayFields": [
+        "id",
+        "nodes",
+        "geometry",
+        "tags"
+      ],
+      "note": "Keep this exact local snapshot for road graph generation and downstream Unity analysis. Requerying Overpass produces a different snapshot."
+    },
+    "overridesPath": "data/road-network-overrides.geojson"
+  },
+  "reproducibility": {
+    "firstGraphFingerprintSha256": "2a31100916fc9bac0c5cefbd1dc197024cceab834fec3d53a5c7dd17db8fc9d9",
+    "secondGraphFingerprintSha256": "2a31100916fc9bac0c5cefbd1dc197024cceab834fec3d53a5c7dd17db8fc9d9",
+    "matches": true
+  },
+  "quality": {
+    "graphFingerprintSha256": "2a31100916fc9bac0c5cefbd1dc197024cceab834fec3d53a5c7dd17db8fc9d9",
+    "counts": {
+      "nodeCount": 46924,
+      "directedEdgeCount": 112586,
+      "physicalEdgeCount": 56293,
+      "sourceWayCount": 17798,
+      "walkableWayCount": 17571,
+      "excludedWayCount": 227,
+      "sourceSegmentCount": 73447,
+      "outsideAreaSegmentCount": 17147,
+      "malformedSegmentCount": 0,
+      "zeroLengthSegmentCount": 3,
+      "removedByOverrideCount": 0,
+      "duplicatePhysicalSegmentCount": 4,
+      "nodeCoordinateConflictCount": 0
+    },
+    "connectivity": {
+      "componentCount": 111,
+      "largestComponentNodeCount": 46161,
+      "isolatedNodeCount": 0,
+      "deadEndNodeCount": 3957,
+      "smallComponentCount": 94,
+      "largestComponentSizes": [
+        46161,
+        87,
+        39,
+        37,
+        27,
+        25,
+        23,
+        21,
+        19,
+        17,
+        17,
+        16,
+        16,
+        14,
+        13,
+        12,
+        11,
+        10,
+        10,
+        10
+      ]
+    },
+    "validation": {
+      "isValid": true,
+      "duplicateNodeIdCount": 0,
+      "duplicateEdgeIdCount": 0,
+      "duplicateDirectedConnectionCount": 0,
+      "missingReferenceCount": 0,
+      "zeroLengthEdgeCount": 0,
+      "selfLoopCount": 0,
+      "failures": []
+    },
+    "manualOverrides": []
+  },
+  "demoRoute": {
+    "requestedStart": [
+      139.640025,
+      35.900757
+    ],
+    "requestedEnd": [
+      139.617,
+      35.877
+    ],
+    "snappedStart": {
+      "physicalEdgeId": "osm-way-99170907-1",
+      "ratio": 0.09548216637860915,
+      "coordinate": [
+        139.64007190549006,
+        35.900711878229835
+      ],
+      "distanceMeters": 6.559188245793643
+    },
+    "snappedEnd": {
+      "physicalEdgeId": "osm-way-958497446-0",
+      "ratio": 0.29807458357826144,
+      "coordinate": [
+        139.61707652361758,
+        35.87702199134615
+      ],
+      "distanceMeters": 7.315485769561152
+    },
+    "edgeCount": 188,
+    "edgeIdFingerprintSha256": "c135503fa6ef8a5d855c7ead0fd23f9613721cee25cbab7c15731f1610a7527b",
+    "lengthMeters": 4185.649400983813,
+    "walkingSeconds": 2989.7495721312957
+  },
+  "validation": {
+    "graphQualityValid": true,
+    "deterministicFingerprint": true,
+    "routeFound": true,
+    "routeLengthBetween3And5Km": true,
+    "endpointSnapsWithin250Meters": true
+  }
+}

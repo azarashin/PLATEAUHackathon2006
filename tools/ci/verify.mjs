@@ -8,6 +8,7 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '.
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const steps = [
   ['道路グラフ', process.execPath, ['tools/road-network/test-build-pedestrian-graph.mjs']],
+  ['OSMスナップショット取得', process.execPath, ['tools/road-network/test-capture-osm-snapshot.mjs']],
   ['時間別環境コスト', process.execPath, ['tools/hourly-environment-cost/test-validate-hourly-output.mjs']],
   ['座標変換', process.execPath, ['tools/environment-cost-network/test-japan-plane-rectangular.mjs']],
   ['環境コスト結合', process.execPath, ['tools/environment-cost-network/test-build-environment-cost-road-network.mjs']],

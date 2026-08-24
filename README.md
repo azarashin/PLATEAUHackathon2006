@@ -65,6 +65,8 @@ PLATEAU SDK for Unity は v4.3.0 を採用予定ですが、導入と動作確�
 MVPの対象地区、入力データ、座標・日時条件は
 [対象地区と入力データ](docs/target-area-and-input-data.md) に記録しています。
 
+資料の目的別一覧は[資料索引](docs/README.md)を参照してください。
+
 詳細は [開発ガイド](docs/development.md) と [バージョン方針](docs/versions.md) を参照してください。
 
 小型fixtureによるデータ・日陰・経路・Viewerの統合検証とGitHub Actionsについては

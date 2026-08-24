@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "environment-cost-analysis-config-0.2",
+  "areaId": "saitama",
+  "center": [139.640025, 35.900757],
+  "radiusMeters": 4000,
+  "coordinateZoneId": 9,
+  "date": "2025-08-01",
+  "timezone": "Asia/Tokyo",
+  "hours": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "sampleSpacingMeters": 25,
+  "pedestrianHeightMeters": 1.5,
+  "walkingSpeedMetersPerSecond": 1.4,
+  "candidateDatasetIds": ["11100"],
+  "datasetRoots": { "11100": "data/raw/plateau/11100-saitama-2025" },
+  "osmInputPath": "data/raw/osm/saitama/highways-with-nodes.json",
+  "coverageOutputPath": "data/raw/saitama-mesh-coverage.json",
+  "environmentCostOutputPath": "data/generated/saitama-environment-cost.json",
+  "summaryOutputPath": "data/raw/saitama-analysis-summary.json",
+  "cacheDirectoryPath": "data/raw/environment-cost-cache/saitama",
+  "stateOutputPath": "data/raw/saitama-analysis-state.json",
+  "cancellationRequestPath": "data/raw/saitama-analysis.cancel"
+}

@@ -17,6 +17,33 @@ node tools/road-network/build-pedestrian-graph.mjs `
 
 OSM取得クエリには`out body geom`を指定してください。`out tags geom`にはノードIDがなく、座標上は交差していても接続していない橋・トンネル等を区別できません。ノードIDがない入力は品質検査で失敗します。
 
+## OSMスナップショットの取得
+
+`capture-osm-snapshot.mjs`は、地域設定の中心点・半径から外接bboxを計算し、`out body geom`を含むOverpassクエリ、OSM JSON、取得時刻・SHA-256を持つ台帳を作成します。
+
+```powershell
+$areaId = 'kyoto'
+node tools/road-network/capture-osm-snapshot.mjs `
+  --config "data/analysis-configs/$areaId.json" `
+  --output "data/raw/osm/$areaId/highways-with-nodes.json" `
+  --query "data/osm-queries/$areaId-highways.overpassql" `
+  --manifest "data/osm-snapshot-manifests/$areaId.json"
+```
+
+Node.jsの`fetch`がネットワークプロキシを使用できない環境では、最初の実行後に作成されたクエリファイルを`curl.exe`で送信し、`--existing-snapshot`で台帳を確定します。
+
+```powershell
+curl.exe --fail --data-urlencode "data@data/osm-queries/$areaId-highways.overpassql" `
+  https://overpass-api.de/api/interpreter `
+  --output "data/raw/osm/$areaId/highways-with-nodes.json"
+node tools/road-network/capture-osm-snapshot.mjs `
+  --config "data/analysis-configs/$areaId.json" `
+  --output "data/raw/osm/$areaId/highways-with-nodes.json" `
+  --query "data/osm-queries/$areaId-highways.overpassql" `
+  --manifest "data/osm-snapshot-manifests/$areaId.json" `
+  --existing-snapshot
+```
+
 ## 変換規則
 
 - OSM wayの隣接ノードごとに物理辺を作り、同一OSMノードIDだけを接続する。
@@ -42,3 +69,5 @@ node tools/road-network/test-build-pedestrian-graph.mjs
 ```
 
 テストはOSMノード接続、立体交差相当の非接続、歩行一方向、重複統合、手動除外、最短経路、入力順を変えた場合の決定性、不正入力の検出を確認します。
+
+4地域の実データ展開、品質結果、代表経路、再生成手順は[4地域の歩行道路ネットワーク](../../docs/four-region-pedestrian-road-networks.md)を参照してください。

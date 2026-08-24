@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "environment-cost-analysis-config-0.2",
+  "areaId": "fujisawa",
+  "center": [139.487293, 35.338882],
+  "radiusMeters": 4000,
+  "coordinateZoneId": 9,
+  "date": "2025-08-01",
+  "timezone": "Asia/Tokyo",
+  "hours": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "sampleSpacingMeters": 25,
+  "pedestrianHeightMeters": 1.5,
+  "walkingSpeedMetersPerSecond": 1.4,
+  "candidateDatasetIds": ["14205"],
+  "datasetRoots": { "14205": "data/raw/plateau/14205-fujisawa-2025" },
+  "osmInputPath": "data/raw/osm/fujisawa/highways-with-nodes.json",
+  "coverageOutputPath": "data/raw/fujisawa-mesh-coverage.json",
+  "environmentCostOutputPath": "data/generated/fujisawa-environment-cost.json",
+  "summaryOutputPath": "data/raw/fujisawa-analysis-summary.json",
+  "cacheDirectoryPath": "data/raw/environment-cost-cache/fujisawa",
+  "stateOutputPath": "data/raw/fujisawa-analysis-state.json",
+  "cancellationRequestPath": "data/raw/fujisawa-analysis.cancel"
+}

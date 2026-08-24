@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.1",
+  "areaId": "saitama",
+  "localPath": "data/raw/osm/saitama/highways-with-nodes.json",
+  "queryPath": "data/osm-queries/saitama-highways.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "osmTimestamp": "2026-08-24T15:46:07Z",
+  "downloadedAt": "2026-08-24T15:52:06.235Z",
+  "sizeBytes": 11402953,
+  "sha256": "0c4ea72d1754e41c668edcdc85f9d57ea6b7814c35fd58684ba9361fe105a915",
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ],
+  "note": "Keep this exact local snapshot for road graph generation and downstream Unity analysis. Requerying Overpass produces a different snapshot."
+}
