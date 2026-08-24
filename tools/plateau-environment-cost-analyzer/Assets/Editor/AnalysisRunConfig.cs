@@ -48,11 +48,16 @@ public sealed class AnalysisRunConfig
         var configPath = ResolvePath(repositoryRoot, configArgument);
         if (!File.Exists(configPath)) throw new FileNotFoundException("Analysis config was not found.", configPath);
 
-        var config = JsonConvert.DeserializeObject<AnalysisRunConfig>(File.ReadAllText(configPath))
-            ?? throw new InvalidOperationException("Analysis config could not be parsed.");
-        config.repositoryRoot = repositoryRoot;
-        config.Validate(configPath);
-        return config;
+        return LoadFromPath(configPath, repositoryRoot);
+    }
+
+    /// <summary>Loads and validates a configuration selected from an Editor window.</summary>
+    public static AnalysisRunConfig LoadForEditor(string configPath)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var resolvedPath = ResolvePath(repositoryRoot, configPath);
+        if (!File.Exists(resolvedPath)) throw new FileNotFoundException("Analysis config was not found.", resolvedPath);
+        return LoadFromPath(resolvedPath, repositoryRoot);
     }
 
     public string ResolvePath(string path) => ResolvePath(repositoryRoot, path);
@@ -69,6 +74,15 @@ public sealed class AnalysisRunConfig
             throw new KeyNotFoundException($"datasetRoots does not contain dataset ID {datasetId}.");
         }
         return ResolvePath(path);
+    }
+
+    private static AnalysisRunConfig LoadFromPath(string configPath, string repositoryRoot)
+    {
+        var config = JsonConvert.DeserializeObject<AnalysisRunConfig>(File.ReadAllText(configPath))
+            ?? throw new InvalidOperationException("Analysis config could not be parsed.");
+        config.repositoryRoot = repositoryRoot;
+        config.Validate(configPath);
+        return config;
     }
 
     private void Validate(string configPath)

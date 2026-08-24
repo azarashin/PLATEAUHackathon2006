@@ -23,8 +23,18 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual("sun-below-horizon", nightReason);
             AssertEqual("2025-08-01T08:00:00+09:00",
                 HourlyEnvironmentCostRules.Timestamp(new DateTime(2025, 8, 1), 8, "Asia/Tokyo"));
+            var noonSun = HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 12,
+                35.6916, 139.7365, "Asia/Tokyo");
+            var nightSun = HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 0,
+                35.6916, 139.7365, "Asia/Tokyo");
+            if (noonSun.elevationDegrees <= 0.0) throw new InvalidOperationException("Expected the noon sun to be above the horizon.");
+            if (nightSun.elevationDegrees >= 0.0) throw new InvalidOperationException("Expected the midnight sun to be below the horizon.");
+            AssertNear(1.0, noonSun.direction.magnitude);
+            AssertNear(1.0, nightSun.direction.magnitude);
             AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 1.1));
             AssertThrows<ArgumentException>(() => HourlyEnvironmentCostRules.DetermineStatus(4, 2, 1, 60.0, out _));
+            AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 24,
+                35.6916, 139.7365, "Asia/Tokyo"));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }

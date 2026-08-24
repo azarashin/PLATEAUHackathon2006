@@ -32,6 +32,8 @@ import {
   type RoadEdgeFeature,
   type RoadEdgeResponse,
 } from './road-edge-domain.ts'
+import { ICHIGAYA_DEMO_ROUTE } from './demo-route.ts'
+import { routeErrorMessage } from './route-error-domain.ts'
 
 type ValueDirection = 'higher-is-better' | 'higher-is-worse'
 
@@ -98,6 +100,8 @@ setWorkerUrl(import.meta.env.DEV
   : `${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`)
 
 const fixtureUrl = `${import.meta.env.BASE_URL}environment-cost-road-network-v1.json`
+const viewerStartedAt = performance.now()
+const viewerMetrics: { fixtureLoadedMilliseconds?: number; mapStyleReadyMilliseconds?: number } = {}
 const baseStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -155,6 +159,16 @@ const routePresentations: Record<RouteProfileId, { label: string; color: string;
   shade: { label: '日陰優先', color: '#2474d2', description: '日向時間を強く回避' },
 }
 const selectedRouteCasingColor = '#c4b5fd'
+
+function recordViewerMetric(name: string, milliseconds: number): void {
+  const rounded = Math.max(0, milliseconds)
+  console.info(`VIEWER_PERFORMANCE ${name}=${rounded.toFixed(1)}ms`)
+}
+
+function recordInitialRenderMetric(): void {
+  if (viewerMetrics.fixtureLoadedMilliseconds === undefined || viewerMetrics.mapStyleReadyMilliseconds === undefined) return
+  recordViewerMetric('initial-render', Math.max(viewerMetrics.fixtureLoadedMilliseconds, viewerMetrics.mapStyleReadyMilliseconds))
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (character) => ({
@@ -432,6 +446,7 @@ function renderShell(): void {
             <div class="endpoint-actions">
               <button id="swap-endpoints-button" type="button">起終点を入れ替え</button>
               <button id="reset-conditions-button" type="button">全リセット</button>
+              <button id="apply-demo-route-button" type="button">市ヶ谷デモ条件を設定</button>
             </div>
             <div class="condition-row">
               <label>計算済み日時<select id="timestamp-select"></select></label>
@@ -539,7 +554,7 @@ function updateModeUi(): void {
   if (fixtureNotice) fixtureNotice.hidden = actualShadeMode
   if (badge) badge.textContent = actualShadeMode ? '実日陰解析' : fixture.fixture.label
   if (datasetNotice && actualShadeMode) {
-    datasetNotice.innerHTML = `<strong>${escapeHtml(selectedArea.name)} 実解析</strong><span>道路辺の日陰率と日射曝露時間はUnity解析結果、経路と探索コストは経路サーバーの計算結果です。</span>`
+    datasetNotice.innerHTML = `<strong>${escapeHtml(selectedArea.name)} 実解析</strong><span>道路辺の日陰率と日射曝露時間はUnity解析結果、経路と探索コストは経路サーバーの計算結果です。日陰率は体感温度ではなく、安全を保証するナビではありません。</span>`
   } else if (datasetNotice) {
     datasetNotice.innerHTML = `<strong>${escapeHtml(fixture.name)}</strong><span>${escapeHtml(fixture.fixture.notice)}</span>`
   }
@@ -810,6 +825,7 @@ async function requestRoadEdges(): Promise<void> {
   }
   const timestamp = document.querySelector<HTMLSelectElement>('#timestamp-select')?.value
   if (!timestamp) return
+  const requestedAt = performance.now()
   const bounds = map.getBounds()
   const bbox: [number, number, number, number] = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()]
   const sequence = ++roadEdgeRequestSequence
@@ -852,6 +868,7 @@ async function requestRoadEdges(): Promise<void> {
     roadEdgeResponse = parsed
     updateRoadEdgeMap()
     updateModeUi()
+    recordViewerMetric('road-edges-to-render', performance.now() - requestedAt)
     if (count) count.textContent = `${parsed.features.length.toLocaleString('ja-JP')}辺`
     if (status) status.textContent = parsed.features.length === 0
       ? 'この表示範囲には解析済み道路辺がありません。'
@@ -1097,6 +1114,26 @@ function selectArea(areaId: string, moveMap = true): void {
   updateRoadLayerLabel()
 }
 
+function applyIchigayaDemoRoute(): void {
+  const preset = ICHIGAYA_DEMO_ROUTE
+  selectArea(preset.areaId)
+  selectedModeId = 'shadeRatio'
+  shadeFactor = preset.shadeFactor
+  const factorInput = document.querySelector<HTMLInputElement>('#shade-factor')
+  const factorOutput = document.querySelector<HTMLOutputElement>('#shade-factor-value')
+  if (factorInput) factorInput.value = preset.shadeFactor.toFixed(2)
+  if (factorOutput) factorOutput.value = preset.shadeFactor.toFixed(2)
+  const timestampSelect = document.querySelector<HTMLSelectElement>('#timestamp-select')
+  if (timestampSelect) timestampSelect.value = preset.timestamp
+  startCoordinate = [...preset.start]
+  endCoordinate = [...preset.end]
+  updateModeUi()
+  updateEndpointUi()
+  invalidateRoute('市ヶ谷の固定デモ条件を設定しました。3経路を計算します。')
+  void requestRoadEdges()
+  void requestRoutes()
+}
+
 function accuracyPolygon(center: Coordinate, radiusMeters: number): AccuracyPolygon {
   const coordinates: Coordinate[] = []
   const latitudeScale = 111320
@@ -1157,6 +1194,7 @@ async function requestRoutes(): Promise<void> {
   if (!startCoordinate || !endCoordinate || selectedArea.availableTimestamps.length === 0 || selectedModeId !== 'shadeRatio') return
   const timestamp = document.querySelector<HTMLSelectElement>('#timestamp-select')?.value
   if (!timestamp) return
+  const requestedAt = performance.now()
   const sequence = ++routeRequestSequence
   const status = document.querySelector<HTMLElement>('#route-status')
   if (status) status.textContent = '道路へのスナップと3経路の計算を実行しています。'
@@ -1188,9 +1226,7 @@ async function requestRoutes(): Promise<void> {
     if (!response.ok) {
       const error = isRecord(responseDocument.error) ? responseDocument.error : {}
       const code = typeof error.code === 'string' ? error.code : 'LOAD_ERROR'
-      if (code === 'SNAP_NOT_FOUND') throw new Error('許容距離内に歩行可能な道路がないため、経路を検索できません。')
-      if (code === 'OUTSIDE_COVERAGE') throw new Error('選択地点が計算済み範囲外のため、経路を検索できません。')
-      throw new Error('経路データを取得できませんでした。時間をおいて再度お試しください。')
+      throw new Error(routeErrorMessage(code))
     }
     routeResponse = parseRouteResponse(responseDocument)
     startCoordinate = routeResponse.snapped.start.snappedCoordinate
@@ -1200,12 +1236,13 @@ async function requestRoutes(): Promise<void> {
     updateRoadEdgeMap()
     renderRoadEdgeDetail()
     updateRoadLayerLabel()
+    recordViewerMetric('route-to-render', performance.now() - requestedAt)
     const badge = document.querySelector<HTMLElement>('#dummy-badge')
     const datasetNotice = document.querySelector<HTMLElement>('#dataset-notice')
     const sampleKpi = document.querySelector<HTMLElement>('#mode-sample-kpi')
     const fixtureNotice = document.querySelector<HTMLElement>('#fixture-notice')
     if (badge) badge.textContent = '実計算経路'
-    if (datasetNotice) datasetNotice.innerHTML = '<strong>市ヶ谷 実計算</strong><span>経路とKPIは実道路グラフとUnity日陰解析結果からサーバーで計算しています。</span>'
+    if (datasetNotice) datasetNotice.innerHTML = '<strong>市ヶ谷 実計算</strong><span>経路とKPIは実道路グラフとUnity日陰解析結果からサーバーで計算しています。日陰率は体感温度ではなく、安全を保証するナビではありません。</span>'
     if (sampleKpi) sampleKpi.hidden = true
     if (fixtureNotice) fixtureNotice.hidden = true
     if (status) status.textContent = `起終点を道路へスナップし、${routeResponse.routes.length}経路を計算・描画しました。`
@@ -1240,6 +1277,7 @@ function bindLocationControls(mapInstance: MapLibreMap): void {
     updateEndpointUi()
     chooseMapAction('start')
   })
+  document.querySelector('#apply-demo-route-button')?.addEventListener('click', applyIchigayaDemoRoute)
   document.querySelector('#timestamp-select')?.addEventListener('change', () => {
     invalidateRoute('計算済み日時を変更しました。')
     clearRoadEdges('計算済み日時を変更したため、道路辺を更新しています。')
@@ -1315,6 +1353,9 @@ function initializeMap(): void {
     document.querySelector<HTMLElement>('#map-state')?.setAttribute('hidden', '')
     updateRoadLayerLabel()
     updateRouteMap(routeResponse !== null)
+    viewerMetrics.mapStyleReadyMilliseconds = performance.now() - viewerStartedAt
+    recordViewerMetric('map-style-ready', viewerMetrics.mapStyleReadyMilliseconds)
+    recordInitialRenderMetric()
     void requestRoadEdges()
   })
   mapInstance.on('render', () => renderRoadOverlay(mapInstance, activeMode()))
@@ -1326,6 +1367,9 @@ async function start(): Promise<void> {
     const response = await fetch(fixtureUrl)
     if (!response.ok) throw new Error(`fixture の取得に失敗しました（HTTP ${response.status}）。`)
     fixture = parseFixture(await response.json() as unknown)
+    viewerMetrics.fixtureLoadedMilliseconds = performance.now() - viewerStartedAt
+    recordViewerMetric('fixture-loaded', viewerMetrics.fixtureLoadedMilliseconds)
+    recordInitialRenderMetric()
     if (fixture.features.length === 0) {
       showDataState('empty', '表示できる道路がありません', 'fixture に LineString を追加して再読み込みしてください。')
       return
