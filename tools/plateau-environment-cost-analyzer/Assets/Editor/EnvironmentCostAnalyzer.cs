@@ -255,7 +255,7 @@ public static class EnvironmentCostAnalyzer
         using var gridCodeList = GridCodeList.CreateFromGridCodesStr(gridCodes);
         Debug.Log($"ENVIRONMENT_COST_LOCAL_SOURCE dataset={datasetId} path={localDatasetRoot}");
         var sourceConfig = new DatasetSourceConfigLocal(localDatasetRoot);
-        var areaResult = new AreaSelectResult(new ConfigBeforeAreaSelect(sourceConfig, CoordinateZoneId), gridCodeList,
+        var areaResult = new AreaSelectResult(new ConfigBeforeAreaSelect(sourceConfig, config.coordinateZoneId), gridCodeList,
             AreaSelectResult.ResultReason.Confirm);
         var importConfig = CityImportConfig.CreateWithAreaSelectResult(areaResult);
         importConfig.ReferencePoint = referencePoint;
