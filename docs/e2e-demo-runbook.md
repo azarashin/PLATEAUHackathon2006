@@ -1,5 +1,16 @@
 # 市ヶ谷 E2E デモ運用手順
 
+## Unity inspection Scene（再現可能なローカル準備）
+
+解析バッチがCityGMLを読み込むのは一時的であり、Git管理する`.unity`シーンは残しません。デモの前に`tools/plateau-environment-cost-analyzer/`をUnityで開き、次の手順で確認用のローカルSceneを作成します。
+
+1. **PLATEAU > Environment Cost > Create Inspection Scene** を開く。
+2. `data/analysis-configs/ichigaya-venue.json`（またはデモ対象地域の設定ファイル）を選び、**Create inspection Scene** を実行する。
+3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` を待つ。`buildingColliders` と `roadColliders` はともに0より大きくなければならない。このコマンドは`bldg`と`tran`のLOD1だけを読み込み、MeshColliderを追加し、`Building=8`と`Road=9`を検証する。
+4. **PLATEAU > Environment Cost > Hourly Heatmap** を開き、完了済み環境コストJSONを読み込む。`12:00`と道路辺を選択する。Sceneビューでは緑が日陰、橙が日向、赤が道路面を取得できなかったサンプル、紫の矢印が太陽方向を示す。
+
+生成先は`Assets/Scenes/EnvironmentCostInspection.unity`で、Git管理外です。**Request cancellation**は実行中のCityGMLデータセットの読込み完了後に停止し、未保存の部分Sceneを閉じます。失敗時は、選択した設定ファイル・coverage report・ローカルCityGMLパス・`ProjectSettings/TagManager.asset`の`Building`/`Road`レイヤーを確認します。Collider数は確認用入力が存在することを示すだけで、すべてのCityGMLメッシュが完全であることまでは保証しません。
+
 Issue #17 の受け入れ確認用に、Unity 解析済みの市ヶ谷データを、経路 API と Viewer で実演するための手順を定義する。
 
 ## 前提と注意事項
@@ -86,11 +97,12 @@ Viewer は `VIEWER_PERFORMANCE` をブラウザコンソールへ記録する。
 
 ## Unity での根拠確認
 
-1. `tools/plateau-environment-cost-analyzer/` を Unity Editor で開く。市ヶ谷の CityGML を読み込み済みの検証用 Scene を使用する。
-2. **PLATEAU > Environment Cost > Hourly Heatmap** を開き、解析済み JSON を `Load` する。
-3. 時刻を 08〜17 時で切り替える。Heatmap の太陽方向矢印・方位・高度が変わることを確認する。
-4. Scene 上の道路を選択し、その道路だけのサンプルを表示する。日向・日陰・道路面を取得できなかったサンプル、太陽方向を色と矢印で確認する。
-5. 表示される `sampleCount`、`validSampleCount`、`noGroundSampleCount`、日陰率が、該当時刻の出力 JSON の値と矛盾しないことを確認する。
+1. `tools/plateau-environment-cost-analyzer/` を Unity Editor で開く。既存のCityGML読込済みSceneは不要である。
+2. **PLATEAU > Environment Cost > Create Inspection Scene** を開き、解析に使用した `data/analysis-configs/<areaId>.json`（市ヶ谷では `ichigaya-venue.json`）を選び、`Create inspection Scene` を実行する。
+3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` ログで Building と Road のCollider件数がともに0より大きいことを確認する。生成先は `Assets/Scenes/EnvironmentCostInspection.unity` であり、CityGMLに由来するローカル生成物のためGit管理しない。
+4. Unityを再起動しても同Sceneを開けることを確認し、**PLATEAU > Environment Cost > Hourly Heatmap** を開いて解析済みJSONを `Load` する。
+5. 12:00を選び、道路辺を1本選ぶ。太陽方向矢印・方位・高度、緑（日陰）・橙（日向）・赤（道路面未照合）のサンプルがSceneビューに描画され、全件が道路面未照合ではないことを確認する。
+6. 表示される `sampleCount`、`validSampleCount`、`noGroundSampleCount`、日陰率が、該当時刻の出力 JSON の値と矛盾しないことを確認する。Collider件数だけではCityGML全メッシュの完全性は保証しないため、必要に応じて複数の道路辺を確認する。
 
 全道路・全サンプルを一度に描画しない。選択道路だけを再判定・描画し、発表中の Editor 負荷を抑える。
 

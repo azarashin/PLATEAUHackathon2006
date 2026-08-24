@@ -1,5 +1,13 @@
 # PLATEAU Environment Cost Analyzer
 
+## Reproducible inspection Scene
+
+The analysis batch run does not save its temporary CityGML objects as a Unity Scene. To inspect an existing result without rerunning the analysis, open this project in Unity and choose **PLATEAU > Environment Cost > Create Inspection Scene**. Select the same `data/analysis-configs/<areaId>.json` that was used for analysis.
+
+The command validates the config and its coverage report, imports only `bldg` and `tran` at LOD1, adds MeshColliders, assigns `Building` (layer 8) and `Road` (layer 9), and saves the local generated Scene to `Assets/Scenes/EnvironmentCostInspection.unity`. That Scene and its meta file are ignored by Git because CityGML input is large and locally licensed. The command is cancellable between datasets; a cancelled or failed partial Scene is closed without saving.
+
+After the `ENVIRONMENT_COST_INSPECTION_SCENE_READY` log confirms both collider counts are greater than zero, open **PLATEAU > Environment Cost > Hourly Heatmap**, load the completed environment-cost JSON, select 12:00, and select one road edge. In the Scene view, green markers are shaded samples, orange markers are sunlit samples, red markers could not find a Road collider, and the purple arrow is the calculated sun direction. Nonzero collider counts demonstrate that the inspection data is present; they do not by themselves prove complete CityGML coverage.
+
 PLATEAU CityGMLとOpenStreetMap道路を入力に、指定地域の道路エッジごとの日陰率・日射曝露時間を出力する汎用Unityバッチツールである。地域固有の値は`data/analysis-configs/<areaId>.json`に置き、ツールのC#コードやUnityプロジェクト名には含めない。
 
 ## 前提条件

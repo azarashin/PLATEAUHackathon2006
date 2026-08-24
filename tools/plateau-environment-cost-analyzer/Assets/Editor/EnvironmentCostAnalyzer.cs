@@ -100,8 +100,8 @@ public static class EnvironmentCostAnalyzer
                     ThrowIfCancellationRequested(cancellationPath);
                     var thirdMeshCodes = dataset.gridCodes.Where(code => code.Length == 8).Distinct().ToArray();
                     if (thirdMeshCodes.Length == 0) continue;
-                    var localDatasetRoot = FindLocalDatasetRoot(dataset.id);
-                    importReports.Add(await ImportDataset(dataset.id, dataset.title, localDatasetRoot, thirdMeshCodes, referencePoint));
+                    var localDatasetRoot = FindLocalDatasetRoot(runConfig, dataset.id);
+                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, thirdMeshCodes, referencePoint));
                 }
 
                 layerCounts = AssignColliderLayers();
@@ -245,12 +245,12 @@ public static class EnvironmentCostAnalyzer
         }
     }
 
-    private static async Task<DatasetImportReport> ImportDataset(string datasetId, string title,
+    internal static async Task<DatasetImportReport> ImportDataset(AnalysisRunConfig config, string datasetId, string title,
         string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint)
     {
         var stopwatch = Stopwatch.StartNew();
         var collidersBefore = UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None).Length;
-        Debug.Log($"ENVIRONMENT_COST_IMPORT_START area={runConfig.areaId} dataset={datasetId} title={title} grids={gridCodes.Length}");
+        Debug.Log($"ENVIRONMENT_COST_IMPORT_START area={config.areaId} dataset={datasetId} title={title} grids={gridCodes.Length}");
 
         using var gridCodeList = GridCodeList.CreateFromGridCodesStr(gridCodes);
         Debug.Log($"ENVIRONMENT_COST_LOCAL_SOURCE dataset={datasetId} path={localDatasetRoot}");
@@ -281,7 +281,7 @@ public static class EnvironmentCostAnalyzer
         stopwatch.Stop();
         var collidersAfter = UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None).Length;
         var importedColliderCount = collidersAfter - collidersBefore;
-        Debug.Log($"ENVIRONMENT_COST_IMPORT_DONE area={runConfig.areaId} dataset={datasetId} seconds={stopwatch.Elapsed.TotalSeconds:F1} newColliders={importedColliderCount}");
+        Debug.Log($"ENVIRONMENT_COST_IMPORT_DONE area={config.areaId} dataset={datasetId} seconds={stopwatch.Elapsed.TotalSeconds:F1} newColliders={importedColliderCount}");
         return new DatasetImportReport
         {
             datasetId = datasetId,
@@ -292,9 +292,9 @@ public static class EnvironmentCostAnalyzer
         };
     }
 
-    private static string FindLocalDatasetRoot(string datasetId)
+    internal static string FindLocalDatasetRoot(AnalysisRunConfig config, string datasetId)
     {
-        var extractionRoot = runConfig.DatasetRootFor(datasetId);
+        var extractionRoot = config.DatasetRootFor(datasetId);
         if (!Directory.Exists(extractionRoot))
         {
             throw new DirectoryNotFoundException($"Extracted PLATEAU dataset was not found: {extractionRoot}");
@@ -311,13 +311,17 @@ public static class EnvironmentCostAnalyzer
             ?? throw new InvalidOperationException($"PLATEAU dataset root could not be resolved from: {udxDirectory}");
     }
 
-    private static (int building, int road, int other) AssignColliderLayers()
+    internal static (int building, int road, int other) AssignColliderLayers() => AssignColliderLayers(null);
+
+    /// <summary>Assigns layers only within a generated inspection Scene when one is supplied.</summary>
+    internal static (int building, int road, int other) AssignColliderLayers(UnityEngine.SceneManagement.Scene? targetScene)
     {
         var building = 0;
         var road = 0;
         var other = 0;
         foreach (var collider in UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
         {
+            if (targetScene.HasValue && collider.gameObject.scene != targetScene.Value) continue;
             var package = FindPackageFromHierarchy(collider.transform);
             if (package == "bldg")
             {
@@ -841,7 +845,7 @@ public static class EnvironmentCostAnalyzer
     [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; public List<EdgeResult> edges; }
     [Serializable] private sealed class EdgeResult { public string id; public long osmWayId; public long? fromNodeId; public long? toNodeId; public string highway; public double[][] coordinates; public double lengthMeters; public double walkingSeconds; public int sampleCount; public int validSampleCount; public int noGroundSampleCount; public HourlyCost[] hourly; }
     [Serializable] private sealed class HourlyCost { public int hour; public string timestamp; public string status; public string exclusionReason; public double sunElevationDegrees; public double? shadeRatio; public double? solarExposureSeconds; }
-    [Serializable] private sealed class DatasetImportReport { public string datasetId; public string title; public int thirdMeshCount; public double importSeconds; public int importedColliderCount; }
+    [Serializable] internal sealed class DatasetImportReport { public string datasetId; public string title; public int thirdMeshCount; public double importSeconds; public int importedColliderCount; }
     [Serializable] private sealed class AnalysisSummary { public string schemaVersion; public string status; public string generatedAt; public string areaId; public double[] center; public double radiusMeters; public List<DatasetImportReport> datasets; public int uniqueThirdMeshes; public int buildingColliderCount; public int roadColliderCount; public int osmWayCount; public int sourceSegmentCount; public int analyzedEdgeCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public double analysisSeconds; public double totalSeconds; public long peakWorkingSetBytes; public long outputBytes; public string outputPath; public string analysisKey; public string resultFingerprintSha256; public bool cacheEnabled; public bool cacheBaseHit; public int cacheHourlyHitCount; public int cacheHourlyMissCount; public double cacheReadSeconds; public double cacheWriteSeconds; public bool importSkipped; }
     [Serializable] private sealed class BaseEdgeCache { public string schemaVersion; public string analysisKey; public int osmWayCount; public int sourceSegmentCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public List<EdgeResult> edges; }
     [Serializable] private sealed class HourlySliceCache { public string schemaVersion; public string analysisKey; public int hour; public List<EdgeHourlyCache> edges; }
