@@ -28,6 +28,10 @@ public static class DatasetCatalogProbe
             }
             client.Dispose();
             Debug.Log($"ENVIRONMENT_COST_DATASET_SUMMARY area={config.areaId} found={found} requested={candidateDatasetIds.Count}");
+            if (found != candidateDatasetIds.Count)
+            {
+                throw new InvalidOperationException($"PLATEAU dataset catalog did not resolve every requested dataset: found={found}, requested={candidateDatasetIds.Count}.");
+            }
         }
         catch (Exception exception)
         {

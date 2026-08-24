@@ -10,8 +10,12 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
-  "candidateDatasetIds": ["11100"],
-  "datasetRoots": { "11100": "data/raw/plateau/11100-saitama-2025" },
+  "candidateDatasetIds": ["11100", "11219", "11203"],
+  "datasetRoots": {
+    "11100": "data/raw/plateau/11100-saitama-2025",
+    "11219": "data/raw/plateau/11219-ageo-2025",
+    "11203": "data/raw/plateau/11203-kawaguchi-2024"
+  },
   "osmInputPath": "data/raw/osm/saitama/highways-with-nodes.json",
   "coverageOutputPath": "data/raw/saitama-mesh-coverage.json",
   "environmentCostOutputPath": "data/generated/saitama-environment-cost.json",

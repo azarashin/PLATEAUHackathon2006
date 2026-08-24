@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "plateau-citygml-acquisition-plan-0.1",
+  "areaId": "fujisawa",
+  "radiusMeters": 4000,
+  "note": "半径4 kmを満たすため、藤沢市を中心に鎌倉市・横浜市の境界側データを併用する。年度差は本MVPでは許容する。",
+  "datasets": [
+    {
+      "id": "14205",
+      "municipality": "藤沢市",
+      "year": 2025,
+      "archiveFile": "14205_fujisawa-shi_city_2025_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/f6/937d63-b787-4319-a5a5-bedcafde2cc7/14205_fujisawa-shi_city_2025_citygml_1_op.zip",
+      "catalogZipBytes": 736037950,
+      "extractPath": "data/raw/plateau/14205-fujisawa-2025"
+    },
+    {
+      "id": "14204",
+      "municipality": "鎌倉市",
+      "year": 2024,
+      "archiveFile": "14204_kamakura-shi_city_2024_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/24/fdd285-69b7-4ded-acab-5182de9a966a/14204_kamakura-shi_city_2024_citygml_1_op.zip",
+      "catalogZipBytes": 469040320,
+      "extractPath": "data/raw/plateau/14204-kamakura-2024"
+    },
+    {
+      "id": "14100",
+      "municipality": "横浜市",
+      "year": 2024,
+      "archiveFile": "14100_yokohama-shi_city_2024_citygml_2_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/04/96d45a-a30b-4c9f-88c0-c1323b5a0f86/14100_yokohama-shi_city_2024_citygml_2_op.zip",
+      "catalogZipBytes": 2777094000,
+      "extractPath": "data/raw/plateau/14100-yokohama-2024"
+    }
+  ]
+}

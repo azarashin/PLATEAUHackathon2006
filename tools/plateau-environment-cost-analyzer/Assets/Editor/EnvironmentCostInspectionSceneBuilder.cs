@@ -101,8 +101,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             foreach (var dataset in coverage.datasets)
             {
                 ThrowIfCancellationRequested();
-                var gridCodes = (dataset.gridCodes ?? new List<string>()).Where(code => code?.Length == 8)
-                    .Distinct(StringComparer.Ordinal).ToArray();
+                var gridCodes = MeshCoverageAnalyzer.NormalizeGridCodes(dataset.gridCodes).ToArray();
                 if (gridCodes.Length == 0) continue;
                 status = $"Importing {dataset.title ?? dataset.id} ({++imported}/{coverage.datasets.Count})…";
                 Repaint();

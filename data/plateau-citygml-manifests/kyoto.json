@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "plateau-citygml-acquisition-plan-0.1",
+  "areaId": "kyoto",
+  "radiusMeters": 4000,
+  "datasets": [
+    {
+      "id": "26100",
+      "municipality": "京都市",
+      "year": 2025,
+      "archiveFile": "26100_kyoto-shi_city_2025_citygml_1_op.zip",
+      "url": "https://assets.cms.plateau.reearth.io/assets/c8/4c6540-2bcf-4773-b21d-74ad2d9f1ba1/26100_kyoto-shi_city_2025_citygml_1_op.zip",
+      "catalogZipBytes": 2700713500,
+      "extractPath": "data/raw/plateau/26100-kyoto-2025"
+    }
+  ]
+}

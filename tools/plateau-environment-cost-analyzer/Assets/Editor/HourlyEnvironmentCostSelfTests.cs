@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -35,6 +36,9 @@ public static class HourlyEnvironmentCostSelfTests
             AssertThrows<ArgumentException>(() => HourlyEnvironmentCostRules.DetermineStatus(4, 2, 1, 60.0, out _));
             AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 24,
                 35.6916, 139.7365, "Asia/Tokyo"));
+            AssertGridCodes(new[] { "53396530", "53396531" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "53396530", "53396531" }));
+            AssertGridCodes(new[] { "533974", "533975" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533974", "533975" }));
+            AssertGridCodes(new[] { "533965", "53396530" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "invalid", "53396530", "53396530" }));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -62,5 +66,13 @@ public static class HourlyEnvironmentCostSelfTests
         try { action(); }
         catch (T) { return; }
         throw new InvalidOperationException($"Expected exception {typeof(T).Name}.");
+    }
+
+    private static void AssertGridCodes(string[] expected, System.Collections.Generic.List<string> actual)
+    {
+        if (expected.Length != actual.Count || !expected.SequenceEqual(actual, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException($"Unexpected normalized grid codes: {string.Join(",", actual)}.");
+        }
     }
 }

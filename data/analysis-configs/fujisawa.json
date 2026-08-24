@@ -10,8 +10,12 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
-  "candidateDatasetIds": ["14205"],
-  "datasetRoots": { "14205": "data/raw/plateau/14205-fujisawa-2025" },
+  "candidateDatasetIds": ["14205", "14204", "14100"],
+  "datasetRoots": {
+    "14205": "data/raw/plateau/14205-fujisawa-2025",
+    "14204": "data/raw/plateau/14204-kamakura-2024",
+    "14100": "data/raw/plateau/14100-yokohama-2024"
+  },
   "osmInputPath": "data/raw/osm/fujisawa/highways-with-nodes.json",
   "coverageOutputPath": "data/raw/fujisawa-mesh-coverage.json",
   "environmentCostOutputPath": "data/generated/fujisawa-environment-cost.json",

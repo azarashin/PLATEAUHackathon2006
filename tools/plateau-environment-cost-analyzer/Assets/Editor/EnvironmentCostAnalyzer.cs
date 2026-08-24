@@ -98,10 +98,10 @@ public static class EnvironmentCostAnalyzer
                 foreach (var dataset in coverage.datasets)
                 {
                     ThrowIfCancellationRequested(cancellationPath);
-                    var thirdMeshCodes = dataset.gridCodes.Where(code => code.Length == 8).Distinct().ToArray();
-                    if (thirdMeshCodes.Length == 0) continue;
+                    var gridCodes = MeshCoverageAnalyzer.NormalizeGridCodes(dataset.gridCodes);
+                    if (gridCodes.Count == 0) continue;
                     var localDatasetRoot = FindLocalDatasetRoot(runConfig, dataset.id);
-                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, thirdMeshCodes, referencePoint));
+                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, gridCodes.ToArray(), referencePoint));
                 }
 
                 layerCounts = AssignColliderLayers();
@@ -195,7 +195,7 @@ public static class EnvironmentCostAnalyzer
                 radiusMeters = RadiusMeters,
                 datasets = importReports,
                 uniqueThirdMeshes = coverage.datasets.SelectMany(item => item.gridCodes)
-                    .Where(code => code.Length == 8).Distinct().Count(),
+                    .Where(MeshCoverageAnalyzer.IsSupportedGridCode).Distinct().Count(),
                 buildingColliderCount = layerCounts.building,
                 roadColliderCount = layerCounts.road,
                 osmWayCount = osmWayCount,
