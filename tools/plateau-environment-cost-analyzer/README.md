@@ -55,8 +55,20 @@ New-Item -ItemType File data/raw/ichigaya-venue-analysis.cancel
 
 小規模な規則テストはUnityバッチで実行できる。
 
+> **重要: Unity Hubを完全に終了してから実行する。** Hub が常駐させる
+> `Unity.Licensing.Client` と Unity 6000.3.18f1 同梱のライセンスクライアントでは
+> プロトコル差により、自己テストが成功してもプロセス終了コードが `1` になることがある。
+> Editor と Hub を閉じた後、タスクマネージャーで `Unity Hub` と
+> `Unity.Licensing.Client` が残っていないことを確認する。テスト完了後は Hub を再起動してよい。
+
 ```powershell
-& $unity -batchmode -projectPath $project -executeMethod HourlyEnvironmentCostSelfTests.Run -logFile data/raw/hourly-cost-self-test.log
+$log = 'H:\MyDevelopment\PLATEAUHackathon2006\data\raw\hourly-cost-self-test.log'
+$process = Start-Process -FilePath $unity -ArgumentList @(
+  '-batchmode', '-nographics', '-projectPath', $project,
+  '-executeMethod', 'HourlyEnvironmentCostSelfTests.Run', '-logFile', $log
+) -Wait -PassThru
+if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+Select-String -Path $log -Pattern 'HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED'
 ```
 
 大規模な結果JSONは次の検証スクリプトで全エッジ・全時刻、欠測理由、計算式を確認する。市ヶ谷の約300 MiBのJSONではNode.jsのヒープ上限を明示する。

@@ -49,7 +49,7 @@ public static class HourlyEnvironmentCostSelfTests
                 35.6916, 139.7365, "Asia/Tokyo"));
             AssertGridCodes(new[] { "53396530", "53396531" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "53396530", "53396531" }));
             AssertGridCodes(new[] { "533974", "533975" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533974", "533975" }));
-            AssertGridCodes(new[] { "533965", "53396530" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "invalid", "53396530", "53396530" }));
+            AssertGridCodes(new[] { "53396530" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "invalid", "53396530", "53396530" }));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
