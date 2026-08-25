@@ -50,7 +50,9 @@ $config = "data/analysis-configs/$area.json"
 
 ## Unity 読込・Collider・座標系の確認
 
-Unity Editorで `tools/plateau-environment-cost-analyzer` を開き、**PLATEAU > Environment Cost > Create Inspection Scene** を選び、対象の設定ファイルを指定します。生成される検証用Sceneは `Assets/Scenes/EnvironmentCostInspection.unity` です（ローカル生成物のためGit管理外）。
+Unity Editorで `tools/plateau-environment-cost-analyzer` を開き、**PLATEAU > Environment Cost > Create Inspection Scene** を選び、対象の設定ファイルを指定します。生成される検証用Sceneは `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` です（ローカル生成物のためGit管理外）。地域ごとに別ファイルとなるため、京都を生成しても市ヶ谷など他地域のSceneは上書きされません。同じ地域を再生成する場合だけ置換確認が表示されます。
+
+CityGMLの準備済み地域を自動生成する場合は、Unity Editor と Unity Hub を閉じてから `-executeMethod EnvironmentCostInspectionSceneBuilder.Run -analysisConfig data/analysis-configs/<areaId>.json` を指定してUnityをバッチ起動します。既存の同一地域Sceneは上書きせず終了コード `1` で停止するため、地域ごとに安全に1回ずつ実行できます。完全なPowerShellコマンドは解析ツールのREADMEを参照してください。
 
 この処理はPLATEAU SDK for Unity 4.3.0の `CityImporter` APIを使い、選定済みメッシュから `bldg`、`tran`、`dem` を利用可能なLODのうちLOD1以下で読み込みます。建物には `Building`（layer 8）、道路には `Road`（layer 9）、地形には `Terrain`（layer 10）の `MeshCollider` を付与します。完了ログ `ENVIRONMENT_COST_INSPECTION_SCENE_READY` の建物・道路・地形Collider数がすべて0より大きいことを確認します。建物と地形は明示的に影を投影し、道路は影を受けます。実行時カメラとWindows Playerの確認は [環境コスト Inspection Scene のDEM・影・実行時確認](environment-cost-inspection-runtime.md) を参照してください。
 
@@ -64,7 +66,7 @@ Unity Editorで `tools/plateau-environment-cost-analyzer` を開き、**PLATEAU 
 | `data/raw/plateau-zips/` と `data/raw/plateau/` | ZIPと展開済みCityGML | 管理しない |
 | `data/raw/<area>-dataset-catalog.log` | データセットIDのカタログ照合 | 管理しない |
 | `data/raw/<area>-mesh-coverage.json` | 中心点・半径から選んだメッシュ | 管理しない |
-| `Assets/Scenes/EnvironmentCostInspection.unity` | Unity読込・Colliderを目視確認するScene | 管理しない |
+| `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` | Unity読込・Colliderを目視確認する地域別Scene | 管理しない |
 
 ## Issue #4 の残作業
 

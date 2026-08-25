@@ -4,7 +4,26 @@
 
 The analysis batch run does not save its temporary CityGML objects as a Unity Scene. To inspect an existing result without rerunning the analysis, open this project in Unity and choose **PLATEAU > Environment Cost > Create Inspection Scene**. Select the same `data/analysis-configs/<areaId>.json` that was used for analysis.
 
-The command validates the config and its coverage report, imports only `bldg` and `tran` at LOD1, adds MeshColliders, assigns `Building` (layer 8) and `Road` (layer 9), and saves the local generated Scene to `Assets/Scenes/EnvironmentCostInspection.unity`. That Scene and its meta file are ignored by Git because CityGML input is large and locally licensed. It first offers Unity's normal save confirmation for any modified current Scene, then switches to the generated inspection Scene; an unsaved empty Scene does not need to be created manually. The command is cancellable between datasets; a cancelled or failed partial Scene is closed without saving.
+The command validates the config and its coverage report, imports `bldg`, `tran`, and `dem` at LOD1, adds MeshColliders, assigns `Building` (layer 8), `Road` (layer 9), and `Terrain` (layer 10), and saves the local generated Scene to `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity`. The `areaId` must use lowercase ASCII letters, digits, and single hyphens. Each area has its own Scene, so regenerating one does not replace another; only an existing Scene for the same area prompts for replacement. These Scenes and their meta files are ignored by Git because CityGML input is large and locally licensed. It first offers Unity's normal save confirmation for any modified current Scene, then switches to the generated inspection Scene; an unsaved empty Scene does not need to be created manually. The command is cancellable between datasets; a cancelled or failed partial Scene is closed without saving.
+
+To create a city Scene non-interactively, close Unity Editor and Unity Hub, then run the following. The batch command waits for CityGML import through Unity's Editor event loop and exits `0` only after `ENVIRONMENT_COST_INSPECTION_SCENE_READY` is logged. It never shows save or replacement dialogs; if `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` already exists, it exits `1` without changing that Scene.
+
+```powershell
+$unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.18f1\Editor\Unity.exe'
+$project = 'H:\MyDevelopment\PLATEAUHackathon2006\tools\plateau-environment-cost-analyzer'
+$config = 'data/analysis-configs/kyoto.json'
+$log = 'H:\MyDevelopment\PLATEAUHackathon2006\data\raw\kyoto-inspection-scene.log'
+
+$process = Start-Process -FilePath $unity -ArgumentList @(
+  '-batchmode', '-projectPath', $project,
+  '-executeMethod', 'EnvironmentCostInspectionSceneBuilder.Run',
+  '-analysisConfig', $config, '-logFile', $log
+) -Wait -PassThru
+if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+Select-String -Path $log -Pattern 'ENVIRONMENT_COST_INSPECTION_SCENE_READY'
+```
+
+Do not add `-nographics`: PLATEAU SDK may need the graphics device while converting relief textures. To generate several areas sequentially without overwriting existing Scenes, run `./generate-city-inspection-scenes.ps1` after closing Unity Editor and Unity Hub.
 
 After the `ENVIRONMENT_COST_INSPECTION_SCENE_READY` log confirms both collider counts are greater than zero, open **PLATEAU > Environment Cost > Hourly Heatmap**, load the completed environment-cost JSON, select 12:00, and select one road edge. In the Scene view, green markers are shaded samples, orange markers are sunlit samples, red markers could not find a Road collider, and the purple arrow is the calculated sun direction. Nonzero collider counts demonstrate that the inspection data is present; they do not by themselves prove complete CityGML coverage.
 

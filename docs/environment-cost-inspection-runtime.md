@@ -1,6 +1,6 @@
 # 環境コスト Inspection Scene のDEM・影・実行時確認
 
-Issue #4後半で追加した、CityGML検証用Sceneの地形、影、実行時カメラ、Windowsビルドの手順です。対象となる生成Sceneは `tools/plateau-environment-cost-analyzer/Assets/Scenes/EnvironmentCostInspection.unity` であり、CityGML本体と同様にローカル生成物としてGit管理しません。
+Issue #4後半で追加した、CityGML検証用Sceneの地形、影、実行時カメラ、Windowsビルドの手順です。対象となる生成Sceneは `tools/plateau-environment-cost-analyzer/Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` であり、CityGML本体と同様にローカル生成物としてGit管理しません。地域ごとに別ファイルを生成し、同じ地域を再生成する場合だけ既存Sceneを置換します。
 
 ## Sceneの構成
 
@@ -17,7 +17,7 @@ Issue #4後半で追加した、CityGML検証用Sceneの地形、影、実行時
 生成完了ログは次の形式です。
 
 ```text
-ENVIRONMENT_COST_INSPECTION_SCENE_READY area=<areaId> buildingColliders=<n> roadColliders=<n> terrainColliders=<n> shadowCasters=<n> shadowReceivers=<n>
+ENVIRONMENT_COST_INSPECTION_SCENE_READY area=<areaId> buildingColliders=<n> roadColliders=<n> terrainColliders=<n> shadowCasters=<n> shadowReceivers=<n> scene=Assets/Scenes/EnvironmentCostInspection/<areaId>.unity
 ```
 
 `buildingColliders`、`roadColliders`、`terrainColliders`がすべて0より大きいことを確認します。`shadowCasters`は建物・地形のRenderer数、`shadowReceivers`はScene内で影を受けるRenderer数です。
@@ -35,16 +35,16 @@ ENVIRONMENT_COST_INSPECTION_SCENE_READY area=<areaId> buildingColliders=<n> road
 
 ## Windows Playerの確認
 
-Inspection Sceneを作成後、**PLATEAU > Environment Cost > Build Inspection Player (Windows)** を実行します。出力先は次です。
+Inspection Sceneを作成後、ビルドしたい地域の `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` を開いた状態で、**PLATEAU > Environment Cost > Build Inspection Player (Windows)** を実行します。出力先は次です。
 
 ```text
-tools/plateau-environment-cost-analyzer/Builds/EnvironmentCostInspection/EnvironmentCostInspection.exe
+tools/plateau-environment-cost-analyzer/Builds/EnvironmentCostInspection/<areaId>/<areaId>.exe
 ```
 
 成功時は次のログを出力します。
 
 ```text
-ENVIRONMENT_COST_INSPECTION_PLAYER_READY path=Builds/EnvironmentCostInspection/EnvironmentCostInspection.exe bytes=<n>
+ENVIRONMENT_COST_INSPECTION_PLAYER_READY area=<areaId> scene=Assets/Scenes/EnvironmentCostInspection/<areaId>.unity path=Builds/EnvironmentCostInspection/<areaId>/<areaId>.exe bytes=<n>
 ```
 
 Playerを起動し、自由カメラ、DEM、建物・地形の影、道路面の表示を確認します。ビルド出力はGit管理外です。
@@ -62,7 +62,7 @@ Scene表示では、建物・道路の下にDEM地表面が配置され、建物
 Windows Playerも生成でき、Unityのビルドログは次を出力しました。
 
 ```text
-ENVIRONMENT_COST_INSPECTION_PLAYER_READY path=Builds/EnvironmentCostInspection/EnvironmentCostInspection.exe bytes=4076852264
+ENVIRONMENT_COST_INSPECTION_PLAYER_READY area=ichigaya-venue scene=Assets/Scenes/EnvironmentCostInspection/ichigaya-venue.unity path=Builds/EnvironmentCostInspection/ichigaya-venue/ichigaya-venue.exe bytes=4076852264
 ```
 
 展開後の出力は302ファイル、約4.08 GBです。これは4 km半径の7データセットを、DEM・建物・道路の全メッシュおよびテクスチャを含めてPlayerへ梱包した結果です。配布用の軽量化（対象メッシュの絞込み、Addressables等）は別途の最適化課題として扱います。

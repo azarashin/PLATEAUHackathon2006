@@ -20,7 +20,9 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
     private const int BuildingLayer = 8;
     private const int RoadLayer = 9;
     private const int TerrainLayer = 10;
-    private const string SceneAssetPath = "Assets/Scenes/EnvironmentCostInspection.unity";
+    private const string SceneAssetDirectory = "Assets/Scenes/EnvironmentCostInspection";
+    private static EnvironmentCostInspectionSceneBuilder batchRunner;
+    private static Task<bool> batchTask;
     private string configPath = "data/analysis-configs/ichigaya-venue.json";
     private string status = "Choose a validated analysis config to create a local inspection Scene.";
     private bool isRunning;
@@ -28,6 +30,31 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
 
     [MenuItem("PLATEAU/Environment Cost/Create Inspection Scene")]
     public static void Open() => GetWindow<EnvironmentCostInspectionSceneBuilder>("Environment Cost Inspection");
+
+    /// <summary>Creates one city inspection Scene from -analysisConfig in Unity batch mode.</summary>
+    public static void Run()
+    {
+        if (!Application.isBatchMode)
+        {
+            Debug.LogError("ENVIRONMENT_COST_INSPECTION_SCENE_FAILED Run requires Unity -batchmode.");
+            EditorApplication.Exit(1);
+            return;
+        }
+
+        try
+        {
+            var config = AnalysisRunConfig.LoadForCurrentProcess();
+            batchRunner = CreateInstance<EnvironmentCostInspectionSceneBuilder>();
+            batchTask = batchRunner.CreateInspectionSceneAsync(config, isBatchMode: true);
+            EditorApplication.update += ExitBatchWhenComplete;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+            Debug.LogError("ENVIRONMENT_COST_INSPECTION_SCENE_FAILED");
+            EditorApplication.Exit(1);
+        }
+    }
 
     private void OnGUI()
     {
@@ -53,19 +80,34 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         }
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Status", status, EditorStyles.wordWrappedLabel);
-        EditorGUILayout.LabelField("Output", SceneAssetPath);
+        EditorGUILayout.LabelField("Output", $"{SceneAssetDirectory}/<areaId>.unity");
     }
 
-    private async Task CreateInspectionSceneAsync()
+    private static void ExitBatchWhenComplete()
     {
-        if (isRunning) return;
+        if (batchTask == null || !batchTask.IsCompleted) return;
+
+        EditorApplication.update -= ExitBatchWhenComplete;
+        var succeeded = batchTask.Status == TaskStatus.RanToCompletion && batchTask.Result;
+        if (!succeeded) Debug.LogError("ENVIRONMENT_COST_INSPECTION_SCENE_FAILED");
+        batchTask = null;
+        batchRunner = null;
+        EditorApplication.Exit(succeeded ? 0 : 1);
+    }
+
+    private async Task<bool> CreateInspectionSceneAsync(AnalysisRunConfig suppliedConfig = null, bool isBatchMode = false)
+    {
+        if (isRunning) return false;
         isRunning = true;
         cancelRequested = false;
         Scene inspectionScene = default;
         var sceneCreated = false;
         try
         {
-            var config = AnalysisRunConfig.LoadForEditor(configPath);
+            var config = suppliedConfig ?? AnalysisRunConfig.LoadForEditor(configPath);
+            var sceneAssetPath = GetSceneAssetPath(config.areaId);
+            var outputPath = Path.Combine(Application.dataPath, "Scenes", "EnvironmentCostInspection",
+                Path.GetFileName(sceneAssetPath));
             ValidateLayerNames();
             var coveragePath = config.ResolvePath(config.coverageOutputPath);
             var coverage = JsonConvert.DeserializeObject<CoverageReport>(File.ReadAllText(coveragePath))
@@ -73,18 +115,20 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             if (coverage.datasets == null || coverage.datasets.Count == 0)
                 throw new InvalidOperationException("Coverage report does not contain any datasets.");
 
-            var outputPath = Path.Combine(Application.dataPath, "Scenes", "EnvironmentCostInspection.unity");
+            if (File.Exists(outputPath) && isBatchMode)
+                throw new InvalidOperationException($"Inspection Scene already exists and batch mode will not overwrite it: {sceneAssetPath}");
             if (File.Exists(outputPath) && !EditorUtility.DisplayDialog("Replace inspection Scene?",
-                    "The previous local inspection Scene will be replaced. It is generated and ignored by Git.", "Replace", "Cancel"))
+                    $"The existing local inspection Scene for '{config.areaId}' will be replaced:\n{sceneAssetPath}\n\n" +
+                    "It is generated and ignored by Git. Scenes for other areas are not changed.", "Replace", "Cancel"))
             {
                 status = "Creation cancelled before any Scene was changed.";
-                return;
+                return false;
             }
 
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            if (!isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
                 status = "Creation cancelled because the current Scene was not saved.";
-                return;
+                return false;
             }
 
             // Unity cannot create an additive Scene while its only open Scene is an unsaved Untitled Scene.
@@ -120,23 +164,26 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             ConfigureRuntimePresentation(root, config, inspectionScene);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException("Scene directory is missing."));
-            EditorSceneManager.SaveScene(inspectionScene, SceneAssetPath, false);
+            EditorSceneManager.SaveScene(inspectionScene, sceneAssetPath, false);
             AssetDatabase.Refresh();
-            status = $"Created {SceneAssetPath}: Building={layers.building:N0}, Road={layers.road:N0}, Terrain={layers.terrain:N0}, shadow casters={shadows.casters:N0}.";
-            Debug.Log($"ENVIRONMENT_COST_INSPECTION_SCENE_READY area={config.areaId} buildingColliders={layers.building} roadColliders={layers.road} terrainColliders={layers.terrain} shadowCasters={shadows.casters} shadowReceivers={shadows.receivers} scene={SceneAssetPath}");
+            status = $"Created {sceneAssetPath}: Building={layers.building:N0}, Road={layers.road:N0}, Terrain={layers.terrain:N0}, shadow casters={shadows.casters:N0}.";
+            Debug.Log($"ENVIRONMENT_COST_INSPECTION_SCENE_READY area={config.areaId} buildingColliders={layers.building} roadColliders={layers.road} terrainColliders={layers.terrain} shadowCasters={shadows.casters} shadowReceivers={shadows.receivers} scene={sceneAssetPath}");
             Selection.activeGameObject = root;
+            return true;
         }
         catch (OperationCanceledException)
         {
             status = "Cancelled. The partial inspection Scene was closed without saving.";
             Debug.LogWarning("ENVIRONMENT_COST_INSPECTION_SCENE_CANCELLED");
             CleanupPartialScene(inspectionScene, sceneCreated);
+            return false;
         }
         catch (Exception exception)
         {
             status = $"Failed: {exception.Message}";
             Debug.LogException(exception);
             CleanupPartialScene(inspectionScene, sceneCreated);
+            return false;
         }
         finally
         {
@@ -162,6 +209,26 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         if (LayerMask.LayerToName(BuildingLayer) != "Building" || LayerMask.LayerToName(RoadLayer) != "Road" ||
             LayerMask.LayerToName(TerrainLayer) != "Terrain")
             throw new InvalidOperationException("ProjectSettings/TagManager.asset must reserve layers 8=Building, 9=Road, and 10=Terrain. Do not replace occupied layers.");
+    }
+
+    private static string GetSceneAssetPath(string areaId)
+    {
+        if (string.IsNullOrWhiteSpace(areaId) || areaId[0] == '-' || areaId[areaId.Length - 1] == '-')
+            throw new InvalidOperationException("areaId must contain lowercase ASCII letters, digits, and single hyphens to create an inspection Scene.");
+
+        var previousWasHyphen = false;
+        foreach (var character in areaId)
+        {
+            var isLowercaseLetter = character >= 'a' && character <= 'z';
+            var isDigit = character >= '0' && character <= '9';
+            if (!isLowercaseLetter && !isDigit && character != '-')
+                throw new InvalidOperationException("areaId must contain lowercase ASCII letters, digits, and single hyphens to create an inspection Scene.");
+            if (character == '-' && previousWasHyphen)
+                throw new InvalidOperationException("areaId must not contain consecutive hyphens to create an inspection Scene.");
+            previousWasHyphen = character == '-';
+        }
+
+        return $"{SceneAssetDirectory}/{areaId}.unity";
     }
 
     private static string DefaultConfigDirectory()
