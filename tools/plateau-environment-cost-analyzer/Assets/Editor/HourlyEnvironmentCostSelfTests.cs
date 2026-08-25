@@ -32,9 +32,20 @@ public static class HourlyEnvironmentCostSelfTests
             if (nightSun.elevationDegrees >= 0.0) throw new InvalidOperationException("Expected the midnight sun to be below the horizon.");
             AssertNear(1.0, noonSun.direction.magnitude);
             AssertNear(1.0, nightSun.direction.magnitude);
+            // NOAA's general solar-position equations, using Ichigaya's analysis centre and JST.
+            var referenceMorning = HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 8.0,
+                35.690470, 139.736043, "Asia/Tokyo");
+            var referenceNoon = HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 12.0,
+                35.690470, 139.736043, "Asia/Tokyo");
+            AssertNear(37.166051, referenceMorning.elevationDegrees, 0.05);
+            AssertNear(93.458541, referenceMorning.azimuthDegrees, 0.05);
+            AssertNear(72.317290, referenceNoon.elevationDegrees, 0.05);
+            AssertNear(189.768435, referenceNoon.azimuthDegrees, 0.05);
             AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 1.1));
             AssertThrows<ArgumentException>(() => HourlyEnvironmentCostRules.DetermineStatus(4, 2, 1, 60.0, out _));
             AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 24,
+                35.6916, 139.7365, "Asia/Tokyo"));
+            AssertThrows<ArgumentOutOfRangeException>(() => HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 24.0,
                 35.6916, 139.7365, "Asia/Tokyo"));
             AssertGridCodes(new[] { "53396530", "53396531" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "53396530", "53396531" }));
             AssertGridCodes(new[] { "533974", "533975" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533974", "533975" }));
@@ -51,7 +62,12 @@ public static class HourlyEnvironmentCostSelfTests
 
     private static void AssertNear(double expected, double actual)
     {
-        if (Math.Abs(expected - actual) > HourlyEnvironmentCostRules.FormulaToleranceSeconds)
+        AssertNear(expected, actual, HourlyEnvironmentCostRules.FormulaToleranceSeconds);
+    }
+
+    private static void AssertNear(double expected, double actual, double tolerance)
+    {
+        if (Math.Abs(expected - actual) > tolerance)
             throw new InvalidOperationException($"Expected {expected}, actual {actual}.");
     }
 

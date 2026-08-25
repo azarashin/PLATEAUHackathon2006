@@ -58,6 +58,18 @@ public static class HourlyEnvironmentCostRules
         double longitudeDegrees, string timezone)
     {
         if (localHour < 0 || localHour > 23) throw new ArgumentOutOfRangeException(nameof(localHour));
+        return CalculateSun(analysisDate, (double)localHour, latitudeDegrees, longitudeDegrees, timezone);
+    }
+
+    /// <summary>
+    /// Calculates a solar position for a local civil time. The hour may contain a fractional part so the
+    /// runtime time slider can move shadows continuously, while batch analysis continues to use whole hours.
+    /// Azimuth is degrees clockwise from true north and direction points from the ground towards the sun.
+    /// </summary>
+    public static SunPosition CalculateSun(DateTime analysisDate, double localHour, double latitudeDegrees,
+        double longitudeDegrees, string timezone)
+    {
+        if (localHour < 0.0 || localHour >= 24.0) throw new ArgumentOutOfRangeException(nameof(localHour));
         if (latitudeDegrees < -90.0 || latitudeDegrees > 90.0) throw new ArgumentOutOfRangeException(nameof(latitudeDegrees));
         if (longitudeDegrees < -180.0 || longitudeDegrees > 180.0) throw new ArgumentOutOfRangeException(nameof(longitudeDegrees));
 
