@@ -19,12 +19,14 @@ using PLATEAU.Native;
 using PLATEAU.PolygonMesh;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Debug = UnityEngine.Debug;
 
 public static class EnvironmentCostAnalyzer
 {
     private const int BuildingLayer = 8;
     private const int RoadLayer = 9;
+    private const int TerrainLayer = 10;
     private static AnalysisRunConfig runConfig;
     private static double CenterLatitude => runConfig.CenterLatitude;
     private static double CenterLongitude => runConfig.CenterLongitude;
@@ -75,7 +77,7 @@ public static class EnvironmentCostAnalyzer
             var missingHours = AnalysisHours.Where(hour => !cache.hourlyByHour.ContainsKey(hour)).ToArray();
 
             var importReports = new List<DatasetImportReport>();
-            var layerCounts = (building: 0, road: 0, other: 0);
+            var layerCounts = (building: 0, road: 0, terrain: 0, other: 0);
             var analysisStopwatch = new Stopwatch();
             List<EdgeResult> baseEdges;
             var osmWayCount = cache.osmWayCount;
@@ -246,7 +248,7 @@ public static class EnvironmentCostAnalyzer
     }
 
     internal static async Task<DatasetImportReport> ImportDataset(AnalysisRunConfig config, string datasetId, string title,
-        string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint)
+        string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint, bool includeRelief = false)
     {
         var stopwatch = Stopwatch.StartNew();
         var collidersBefore = UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None).Length;
@@ -264,9 +266,11 @@ public static class EnvironmentCostAnalyzer
         {
             var package = packagePair.Key;
             var packageConfig = packagePair.Value;
-            var shouldImport = package == PredefinedCityModelPackage.Building || package == PredefinedCityModelPackage.Road;
-            packageConfig.ImportPackage = shouldImport;
-            if (!shouldImport) continue;
+            var isSupportedPackage = package == PredefinedCityModelPackage.Building ||
+                package == PredefinedCityModelPackage.Road ||
+                (includeRelief && package == PredefinedCityModelPackage.Relief);
+            packageConfig.ImportPackage = isSupportedPackage;
+            if (!packageConfig.ImportPackage) continue;
 
             var targetLod = Math.Min(1, packageConfig.LODRange.AvailableMaxLOD);
             packageConfig.LODRange = new LODRange(targetLod, targetLod, packageConfig.LODRange.AvailableMaxLOD);
@@ -311,13 +315,14 @@ public static class EnvironmentCostAnalyzer
             ?? throw new InvalidOperationException($"PLATEAU dataset root could not be resolved from: {udxDirectory}");
     }
 
-    internal static (int building, int road, int other) AssignColliderLayers() => AssignColliderLayers(null);
+    internal static (int building, int road, int terrain, int other) AssignColliderLayers() => AssignColliderLayers(null);
 
     /// <summary>Assigns layers only within a generated inspection Scene when one is supplied.</summary>
-    internal static (int building, int road, int other) AssignColliderLayers(UnityEngine.SceneManagement.Scene? targetScene)
+    internal static (int building, int road, int terrain, int other) AssignColliderLayers(UnityEngine.SceneManagement.Scene? targetScene)
     {
         var building = 0;
         var road = 0;
+        var terrain = 0;
         var other = 0;
         foreach (var collider in UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
         {
@@ -333,12 +338,17 @@ public static class EnvironmentCostAnalyzer
                 collider.gameObject.layer = RoadLayer;
                 road++;
             }
+            else if (package == "dem")
+            {
+                collider.gameObject.layer = TerrainLayer;
+                terrain++;
+            }
             else
             {
                 other++;
             }
         }
-        return (building, road, other);
+        return (building, road, terrain, other);
     }
 
     private static string FindPackageFromHierarchy(Transform transform)
@@ -348,8 +358,28 @@ public static class EnvironmentCostAnalyzer
             var name = current.name.ToLowerInvariant();
             if (name.Contains("_bldg_")) return "bldg";
             if (name.Contains("_tran_")) return "tran";
+            if (name.Contains("_dem_") || name.Contains("_relief_") ||
+                name.StartsWith("dem", StringComparison.Ordinal) || name.StartsWith("relief", StringComparison.Ordinal)) return "dem";
         }
         return string.Empty;
+    }
+
+    /// <summary>Configures explicit shadow casting and receiving roles for an inspection Scene.</summary>
+    internal static (int casters, int receivers) ConfigureInspectionShadows(UnityEngine.SceneManagement.Scene targetScene)
+    {
+        var casters = 0;
+        var receivers = 0;
+        foreach (var renderer in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (renderer.gameObject.scene != targetScene) continue;
+            var package = FindPackageFromHierarchy(renderer.transform);
+            var castsShadow = package == "bldg" || package == "dem";
+            renderer.shadowCastingMode = castsShadow ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
+            receivers++;
+            if (castsShadow) casters++;
+        }
+        return (casters, receivers);
     }
 
     private static List<EdgeResult> AnalyzeOsmEdges(string osmPath, GeoReference geoReference, int[] analysisHours,
