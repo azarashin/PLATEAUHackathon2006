@@ -42,15 +42,22 @@ node tools/ci/verify.mjs
 
 Unity側にはCityGMLを読み込まない小型規則テストがあり、日陰率0・1、サンプル数0、欠測状態、時刻形式を確認する。
 
+実行前に Unity Editor と **Unity Hub を完全に終了**する。Hub が残した
+`Unity.Licensing.Client` は Unity 6000.3.18f1 同梱クライアントとプロトコル不整合を
+起こし、自己テストが成功していても終了コード `1` を返すことがある。タスクマネージャーで
+`Unity Hub` と `Unity.Licensing.Client` が残っていないことを確認する。self-hosted runner
+でも、Unity Hub を起動せずにこのジョブを実行する。
+
 ```powershell
 $unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.18f1\Editor\Unity.exe'
 $project = '<repository-root>\tools\plateau-environment-cost-analyzer'
-& $unity -batchmode -nographics -quit `
-  -projectPath $project `
-  -executeMethod HourlyEnvironmentCostSelfTests.Run `
-  -logFile hourly-cost-self-test.log
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Select-String -Path hourly-cost-self-test.log -Pattern 'HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED'
+$log = '<repository-root>\hourly-cost-self-test.log'
+$process = Start-Process -FilePath $unity -ArgumentList @(
+  '-batchmode', '-nographics', '-projectPath', $project,
+  '-executeMethod', 'HourlyEnvironmentCostSelfTests.Run', '-logFile', $log
+) -Wait -PassThru
+if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+Select-String -Path $log -Pattern 'HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED'
 ```
 
 Unity Editor本体、PLATEAU SDKのGit依存、Unityライセンスが必要なため、GitHubホストランナーの必須CIには含めない。
