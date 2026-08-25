@@ -189,10 +189,12 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         sun.type = LightType.Directional;
         sun.shadows = LightShadows.Soft;
         sun.intensity = 1.0f;
-        sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
         var metadata = root.AddComponent<EnvironmentCostInspectionMetadata>();
-        metadata.Configure(config.areaId, config.coordinateZoneId, config.CenterLongitude, config.CenterLatitude, config.radiusMeters);
+        metadata.Configure(config.areaId, config.coordinateZoneId, config.CenterLongitude, config.CenterLatitude,
+            config.radiusMeters, config.date, config.timezone);
+        var solarController = root.AddComponent<EnvironmentCostSolarController>();
+        solarController.Configure(metadata, sun, config.hours);
     }
 
     private static Bounds CalculateRenderableBounds(Scene scene)
