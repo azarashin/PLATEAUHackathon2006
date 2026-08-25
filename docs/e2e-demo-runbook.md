@@ -9,7 +9,7 @@
 3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` を待つ。`buildingColliders` と `roadColliders` はともに0より大きくなければならない。このコマンドは`bldg`と`tran`のLOD1だけを読み込み、MeshColliderを追加し、`Building=8`と`Road=9`を検証する。
 4. **PLATEAU > Environment Cost > Hourly Heatmap** を開き、完了済み環境コストJSONを読み込む。`12:00`と道路辺を選択する。Sceneビューでは緑が日陰、橙が日向、赤が道路面を取得できなかったサンプル、紫の矢印が太陽方向を示す。
 
-生成先は`Assets/Scenes/EnvironmentCostInspection.unity`で、Git管理外です。**Request cancellation**は実行中のCityGMLデータセットの読込み完了後に停止し、未保存の部分Sceneを閉じます。失敗時は、選択した設定ファイル・coverage report・ローカルCityGMLパス・`ProjectSettings/TagManager.asset`の`Building`/`Road`レイヤーを確認します。Collider数は確認用入力が存在することを示すだけで、すべてのCityGMLメッシュが完全であることまでは保証しません。
+生成先は`Assets/Scenes/EnvironmentCostInspection/<areaId>.unity`で、Git管理外です。地域ごとに別ファイルを生成するため、他地域の確認Sceneを上書きしません。同じ地域を再生成する場合だけ置換確認が表示されます。**Request cancellation**は実行中のCityGMLデータセットの読込み完了後に停止し、未保存の部分Sceneを閉じます。失敗時は、選択した設定ファイル・coverage report・ローカルCityGMLパス・`ProjectSettings/TagManager.asset`の`Building`/`Road`レイヤーを確認します。Collider数は確認用入力が存在することを示すだけで、すべてのCityGMLメッシュが完全であることまでは保証しません。
 
 Issue #17 の受け入れ確認用に、Unity 解析済みの市ヶ谷データを、経路 API と Viewer で実演するための手順を定義する。
 
@@ -99,10 +99,12 @@ Viewer は `VIEWER_PERFORMANCE` をブラウザコンソールへ記録する。
 
 1. `tools/plateau-environment-cost-analyzer/` を Unity Editor で開く。既存のCityGML読込済みSceneは不要である。
 2. **PLATEAU > Environment Cost > Create Inspection Scene** を開き、解析に使用した `data/analysis-configs/<areaId>.json`（市ヶ谷では `ichigaya-venue.json`）を選び、`Create inspection Scene` を実行する。
-3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` ログで Building と Road のCollider件数がともに0より大きいことを確認する。生成先は `Assets/Scenes/EnvironmentCostInspection.unity` であり、CityGMLに由来するローカル生成物のためGit管理しない。
+3. `ENVIRONMENT_COST_INSPECTION_SCENE_READY` ログで Building と Road のCollider件数がともに0より大きいことを確認する。生成先は `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` であり、地域ごとに別ファイルを保持する。CityGMLに由来するローカル生成物のためGit管理しない。
 4. Unityを再起動しても同Sceneを開けることを確認し、**PLATEAU > Environment Cost > Hourly Heatmap** を開いて解析済みJSONを `Load` する。
 5. 12:00を選び、道路辺を1本選ぶ。太陽方向矢印・方位・高度、緑（日陰）・橙（日向）・赤（道路面未照合）のサンプルがSceneビューに描画され、全件が道路面未照合ではないことを確認する。
 6. 表示される `sampleCount`、`validSampleCount`、`noGroundSampleCount`、日陰率が、該当時刻の出力 JSON の値と矛盾しないことを確認する。Collider件数だけではCityGML全メッシュの完全性は保証しないため、必要に応じて複数の道路辺を確認する。
+
+Windows Playerを作る場合は、ビルド対象の `Assets/Scenes/EnvironmentCostInspection/<areaId>.unity` を開いたまま **PLATEAU > Environment Cost > Build Inspection Player (Windows)** を実行する。出力先は `Builds/EnvironmentCostInspection/<areaId>/<areaId>.exe` である。
 
 全道路・全サンプルを一度に描画しない。選択道路だけを再判定・描画し、発表中の Editor 負荷を抑える。
 
