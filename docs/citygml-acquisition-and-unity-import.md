@@ -52,7 +52,7 @@ $config = "data/analysis-configs/$area.json"
 
 Unity Editorで `tools/plateau-environment-cost-analyzer` を開き、**PLATEAU > Environment Cost > Create Inspection Scene** を選び、対象の設定ファイルを指定します。生成される検証用Sceneは `Assets/Scenes/EnvironmentCostInspection.unity` です（ローカル生成物のためGit管理外）。
 
-この処理はPLATEAU SDK for Unity 4.3.0の `CityImporter` APIを使い、選定済みメッシュから `bldg` と `tran` をLOD1で読み込みます。建物には `Building`（layer 8）、道路には `Road`（layer 9）の `MeshCollider` を付与します。完了ログ `ENVIRONMENT_COST_INSPECTION_SCENE_READY` の建物・道路Collider数がともに0より大きいことを確認します。
+この処理はPLATEAU SDK for Unity 4.3.0の `CityImporter` APIを使い、選定済みメッシュから `bldg`、`tran`、`dem` を利用可能なLODのうちLOD1以下で読み込みます。建物には `Building`（layer 8）、道路には `Road`（layer 9）、地形には `Terrain`（layer 10）の `MeshCollider` を付与します。完了ログ `ENVIRONMENT_COST_INSPECTION_SCENE_READY` の建物・道路・地形Collider数がすべて0より大きいことを確認します。建物と地形は明示的に影を投影し、道路は影を受けます。実行時カメラとWindows Playerの確認は [環境コスト Inspection Scene のDEM・影・実行時確認](environment-cost-inspection-runtime.md) を参照してください。
 
 座標系は設定ファイルの `coordinateZoneId` をPLATEAU SDKの `GeoReference` へ渡します。京都・舞鶴は平面直角座標系第VI系（zone 6、EPSG:6674）、藤沢・さいたまは第IX系（zone 9、EPSG:6677）です。Scene上で建物と道路が同一地点に重なり、極端に離れないことを確認します。
 
