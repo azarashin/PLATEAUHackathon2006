@@ -32,9 +32,15 @@ npm run generate:fixture
 ## 市ヶ谷実データの確認
 
 ```powershell
+npm run verify:ichigaya
+```
+
+既定では `../data/generated/localHackathon2026Summer/manifest.json` を読み、`../data/ichigaya-route-server-verification.json` を更新します。別の生成済みバンドルを確認する場合は、次のように `--manifest` と `--report` を後ろに追加して既定値を置き換えます。
+
+```powershell
 npm run verify:ichigaya -- `
-  --manifest ../data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json `
-  --report ../data/raw/ichigaya-route-server-verification.json
+  --manifest ../data/generated/<bundle>/manifest.json `
+  --report ../data/<report>.json
 ```
 
 市ヶ谷中心付近から新宿駅付近までの約3〜5 km条件で、3経路、決定性、HTTPレスポンス量、読込・探索時間、RSS・V8メモリを記録します。

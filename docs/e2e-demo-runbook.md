@@ -40,9 +40,7 @@ Viewer の **「市ヶ谷デモ条件を設定」** を押す。次の値が設�
 実バンドルをローカルへ配置した上で、次を実行する。バンドル本体は Git 管理しない。
 
 ```powershell
-npm --prefix server run verify:ichigaya -- `
-  --manifest data/generated/localHackathon2026Summer/manifest.json `
-  --iterations 7
+npm --prefix server run verify:ichigaya -- --iterations 7
 ```
 
 2026-08-24 に fingerprint `5850c4d5b8e0e7f8b3a8b0b5f3fda161873928aa0558eda871ec748382055771` で確認した基準値は次のとおりである。解析データを作り直した場合は、出力された fingerprint と KPI を採用し、本表を更新する。
