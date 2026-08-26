@@ -136,10 +136,10 @@ GPSはMVPでは表示位置合わせだけに使用し、利用者が地図上�
 次のコマンドは市ヶ谷の12:00コストだけを読み込み、市ヶ谷中心付近から新宿駅付近までの3経路を複数回計算する。最短経路が3〜5 kmであること、係数0、日射曝露の単調性、エッジ列の決定性、HTTPレスポンスが全バンドルを含まないことを検証する。
 
 ```powershell
-npm --prefix server run verify:ichigaya -- `
-  --manifest data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json `
-  --report data/raw/ichigaya-route-server-verification.json
+npm --prefix server run verify:ichigaya
 ```
+
+既定で `data/generated/localHackathon2026Summer/manifest.json` を読み、検証結果を `data/ichigaya-route-server-verification.json` へ記録する。別の生成済みバンドルを確認する場合は、`npm --prefix server run verify:ichigaya -- --manifest data/generated/<bundle>/manifest.json --report data/<report>.json` のように上書きする。
 
 追跡対象の代表値は`data/ichigaya-route-server-verification.json`へ記録する。実行ごとの詳細レポートと大規模バンドルはGit管理しない。
 

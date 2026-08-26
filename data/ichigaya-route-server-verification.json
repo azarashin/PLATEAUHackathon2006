@@ -1,85 +1,164 @@
 {
   "schemaVersion": "ichigaya-route-server-verification-0.1",
-  "verifiedAt": "2026-08-23T16:10:06+09:00",
-  "areaId": "ichigaya-venue",
+  "verifiedAt": "2026-08-26T03:39:22.957Z",
   "input": {
-    "manifestPath": "data/generated/ichigaya-environment-cost-server-bundle-v1/manifest.json",
-    "bundleFingerprintSha256": "a5701a2fe10952c62f58a22fe25258b8939f45eb22419a5667e31016e90b752d",
-    "nodeCount": 108169,
-    "physicalEdgeCount": 130508,
-    "directedEdgeCount": 260779,
-    "loadedTimestamp": "2025-08-01T12:00:00+09:00",
-    "start": [139.736043, 35.69047],
-    "end": [139.700556, 35.689606],
+    "manifestPath": "../data/generated/localHackathon2026Summer/manifest.json",
+    "bundleFingerprintSha256": "5850c4d5b8e0e7f8b3a8b0b5f3fda161873928aa0558eda871ec748382055771",
+    "counts": {
+      "nodeCount": 108169,
+      "physicalEdgeCount": 130508,
+      "directedEdgeCount": 260779,
+      "hourCount": 10
+    },
+    "request": {
+      "areaId": "ichigaya-venue",
+      "timestamp": "2025-08-01T12:00:00+09:00",
+      "start": [
+        139.736043,
+        35.69047
+      ],
+      "end": [
+        139.700556,
+        35.689606
+      ]
+    },
     "directDistanceMeters": 3206.305161157386,
-    "iterationCount": 7
+    "iterationCount": 5
   },
   "snapped": {
     "start": {
+      "nodeIndex": 43591,
       "nodeId": "osm-node-2392318065",
-      "coordinate": [139.7358423, 35.6906957],
+      "inputCoordinate": [
+        139.736043,
+        35.69047
+      ],
+      "snappedCoordinate": [
+        139.7358423,
+        35.6906957
+      ],
       "distanceMeters": 30.95758263064127
     },
     "end": {
+      "nodeIndex": 76412,
       "nodeId": "osm-node-5583613051",
-      "coordinate": [139.700558, 35.6896211],
+      "inputCoordinate": [
+        139.700556,
+        35.689606
+      ],
+      "snappedCoordinate": [
+        139.700558,
+        35.6896211
+      ],
       "distanceMeters": 1.6887329971563676
     }
   },
   "routes": [
     {
-      "profileId": "shortest",
-      "solarAvoidanceFactor": 0,
+      "profile": {
+        "id": "shortest",
+        "solarAvoidanceFactor": 0
+      },
       "edgeCount": 173,
       "edgeIdFingerprintSha256": "6f7f2f7b42dd43cb7b3773d1ac3c092cc3c9bfc5e36f5bc4bdc7f5f0978e2dff",
-      "distanceMeters": 3631.0018798365486,
-      "walkingSeconds": 2593.5727713118204,
-      "solarExposureSeconds": 1726.3511432108075,
-      "observedSolarExposureSeconds": 1638.553813628046,
-      "unknownWalkingSeconds": 87.79732958276281,
-      "shadeRatio": 0.33437335466102036,
-      "missingEdgeCount": 12,
-      "partialEdgeCount": 1
+      "kpis": {
+        "distanceMeters": 3631.0018798365486,
+        "walkingSeconds": 2593.5727713118204,
+        "solarExposureSeconds": 1726.3511432108075,
+        "observedSolarExposureSeconds": 1638.553813628046,
+        "unknownWalkingSeconds": 87.79732958276281,
+        "shadeRatio": 0.33437335466102036,
+        "observedShadeRatio": 0.34608912421242477,
+        "routeCostSeconds": 2593.5727713118204,
+        "edgeCount": 173,
+        "missingEdgeCount": 12,
+        "partialEdgeCount": 1,
+        "coverageStatus": "missing"
+      },
+      "representativeSearchMilliseconds": 35.90319999999997,
+      "representativeVisitedNodeCount": 56723
     },
     {
-      "profileId": "balanced",
-      "solarAvoidanceFactor": 0.5,
+      "profile": {
+        "id": "balanced",
+        "solarAvoidanceFactor": 0.5
+      },
       "edgeCount": 208,
       "edgeIdFingerprintSha256": "b10c0eeb4d077f79649c99332aed2e6ac7d93da668af86f9a2cbf8bdf53676f6",
-      "distanceMeters": 3776.617342277459,
-      "walkingSeconds": 2697.583815912474,
-      "solarExposureSeconds": 779.8782515718643,
-      "observedSolarExposureSeconds": 741.9786549015188,
-      "unknownWalkingSeconds": 37.899596670346,
-      "shadeRatio": 0.7108974902015914,
-      "missingEdgeCount": 7,
-      "partialEdgeCount": 5
+      "kpis": {
+        "distanceMeters": 3776.617342277459,
+        "walkingSeconds": 2697.583815912474,
+        "solarExposureSeconds": 779.8782515718643,
+        "observedSolarExposureSeconds": 741.9786549015188,
+        "unknownWalkingSeconds": 37.899596670346,
+        "shadeRatio": 0.7108974902015914,
+        "observedShadeRatio": 0.7210275379560118,
+        "routeCostSeconds": 3087.522941698406,
+        "edgeCount": 208,
+        "missingEdgeCount": 7,
+        "partialEdgeCount": 5,
+        "coverageStatus": "missing"
+      },
+      "representativeSearchMilliseconds": 25.156100000000038,
+      "representativeVisitedNodeCount": 47129
     },
     {
-      "profileId": "shade",
-      "solarAvoidanceFactor": 2,
+      "profile": {
+        "id": "shade",
+        "solarAvoidanceFactor": 2
+      },
       "edgeCount": 197,
       "edgeIdFingerprintSha256": "ac93042e927d44546ed13495f325cda1a02b57f4b3e2db694a00bc8d3770156f",
-      "distanceMeters": 3790.6254515506944,
-      "walkingSeconds": 2707.5896082504987,
-      "solarExposureSeconds": 771.6270944665816,
-      "observedSolarExposureSeconds": 735.0770527584814,
-      "unknownWalkingSeconds": 36.55004170810071,
-      "shadeRatio": 0.7150132752336991,
-      "missingEdgeCount": 6,
-      "partialEdgeCount": 1
+      "kpis": {
+        "distanceMeters": 3790.6254515506944,
+        "walkingSeconds": 2707.5896082504987,
+        "solarExposureSeconds": 771.6270944665816,
+        "observedSolarExposureSeconds": 735.0770527584814,
+        "unknownWalkingSeconds": 36.55004170810071,
+        "shadeRatio": 0.7150132752336991,
+        "observedShadeRatio": 0.7247973927581977,
+        "routeCostSeconds": 4250.843797183662,
+        "edgeCount": 197,
+        "missingEdgeCount": 6,
+        "partialEdgeCount": 1,
+        "coverageStatus": "missing"
+      },
+      "representativeSearchMilliseconds": 15.475099999999998,
+      "representativeVisitedNodeCount": 35247
     }
   ],
   "performance": {
-    "loadOneTimestampMilliseconds": 764.29,
-    "compareP50Milliseconds": 98.69,
-    "compareP95Milliseconds": 116.21,
-    "httpRoundTripMilliseconds": 137.32,
-    "httpResponseBytes": 34743,
-    "memoryDeltaAfterLoadBytes": {
-      "rss": 127635456,
-      "heapUsed": 20000416,
-      "external": 41492001,
+    "loadOneTimestampMilliseconds": 690.0614,
+    "compareMilliseconds": [
+      94.63249999999994,
+      78.2269,
+      80.17690000000005,
+      88.99129999999991,
+      78.1717000000001
+    ],
+    "compareP50Milliseconds": 80.17690000000005,
+    "compareP95Milliseconds": 94.63249999999994,
+    "httpRoundTripMilliseconds": 111.0594000000001,
+    "httpResponseBytes": 34835,
+    "memoryBefore": {
+      "rss": 48476160,
+      "heapTotal": 11890688,
+      "heapUsed": 6705752,
+      "external": 3477346,
+      "arrayBuffers": 67698
+    },
+    "memoryAfterLoad": {
+      "rss": 232341504,
+      "heapTotal": 129069056,
+      "heapUsed": 79284880,
+      "external": 44530195,
+      "arrayBuffers": 15486877
+    },
+    "memoryDeltaAfterLoad": {
+      "rss": 183865344,
+      "heapTotal": 117178368,
+      "heapUsed": 72579128,
+      "external": 41052849,
       "arrayBuffers": 15419179
     }
   },
@@ -89,7 +168,6 @@
     "exposureMonotonicallyNonIncreasing": true,
     "repeatedEdgeIdsDeterministic": true,
     "httpStatusOk": true,
-    "browserBundleDataExcluded": true,
-    "missingCoverageExplicitlyReported": true
+    "browserBundleDataExcluded": true
   }
 }

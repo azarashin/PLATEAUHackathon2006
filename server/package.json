@@ -10,6 +10,6 @@
     "start": "node src/cli.mjs",
     "test": "node --test test/*.test.mjs",
     "generate:fixture": "node scripts/generate-route-fixture.mjs",
-    "verify:ichigaya": "node --expose-gc --max-old-space-size=4096 scripts/verify-ichigaya-route.mjs"
+    "verify:ichigaya": "node --expose-gc --max-old-space-size=4096 scripts/verify-ichigaya-route.mjs --manifest ../data/generated/localHackathon2026Summer/manifest.json --report ../data/ichigaya-route-server-verification.json"
   }
 }
