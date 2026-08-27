@@ -50,6 +50,11 @@ public static class HourlyEnvironmentCostSelfTests
             AssertGridCodes(new[] { "53396530", "53396531" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "53396530", "53396531" }));
             AssertGridCodes(new[] { "533974", "533975" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533974", "533975" }));
             AssertGridCodes(new[] { "53396530" }, MeshCoverageAnalyzer.NormalizeGridCodes(new[] { "533965", "invalid", "53396530", "53396530" }));
+            AssertGridCodes(new[] { "53396500", "53396501", "53396510", "53396511" }, MeshPartitionPlanner.ExpandToThirdMeshes("533965").ToList());
+            AssertGridCodes(new[] { "53396530" }, MeshPartitionPlanner.ExpandToThirdMeshes("53396530").ToList());
+            var meshUnit = new MeshPartitionUnit { minLatitude = 35.0, minLongitude = 139.0, maxLatitude = 36.0, maxLongitude = 140.0 };
+            AssertEqual(true, MeshPartitionPlanner.Owns(meshUnit, 35.0, 139.0));
+            AssertEqual(false, MeshPartitionPlanner.Owns(meshUnit, 36.0, 139.5));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -82,6 +87,11 @@ public static class HourlyEnvironmentCostSelfTests
         try { action(); }
         catch (T) { return; }
         throw new InvalidOperationException($"Expected exception {typeof(T).Name}.");
+    }
+
+    private static void AssertEqual(bool expected, bool actual)
+    {
+        if (expected != actual) throw new InvalidOperationException($"Expected {expected}, actual {actual}.");
     }
 
     private static void AssertGridCodes(string[] expected, System.Collections.Generic.List<string> actual)

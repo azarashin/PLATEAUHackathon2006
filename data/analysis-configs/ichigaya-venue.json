@@ -26,5 +26,12 @@
   "summaryOutputPath": "data/raw/ichigaya-venue-analysis-summary.json",
   "cacheDirectoryPath": "data/raw/environment-cost-cache/ichigaya-venue",
   "stateOutputPath": "data/raw/ichigaya-venue-analysis-state.json",
-  "cancellationRequestPath": "data/raw/ichigaya-venue-analysis.cancel"
+  "cancellationRequestPath": "data/raw/ichigaya-venue-analysis.cancel",
+  "meshPartition": {
+    "planOutputPath": "data/raw/ichigaya-venue-mesh-partition-plan.json",
+    "unitOutputDirectory": "data/generated/ichigaya-venue-mesh-units",
+    "unitStateDirectory": "data/raw/ichigaya-venue-mesh-unit-state",
+    "unitCacheDirectory": "data/raw/environment-cost-cache/ichigaya-venue-mesh-units",
+    "shadowBufferMeters": 750
+  }
 }
