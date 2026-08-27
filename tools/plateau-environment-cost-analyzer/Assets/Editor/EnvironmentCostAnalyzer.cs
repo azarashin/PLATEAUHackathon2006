@@ -28,6 +28,7 @@ public static class EnvironmentCostAnalyzer
     private const int RoadLayer = 9;
     private const int TerrainLayer = 10;
     private static AnalysisRunConfig runConfig;
+    private static MeshPartitionUnit activeMeshUnit;
     private static double CenterLatitude => runConfig.CenterLatitude;
     private static double CenterLongitude => runConfig.CenterLongitude;
     private static double RadiusMeters => runConfig.radiusMeters;
@@ -36,6 +37,9 @@ public static class EnvironmentCostAnalyzer
     private static double WalkingSpeedMetersPerSecond => runConfig.walkingSpeedMetersPerSecond;
     private static DateTime AnalysisDate => runConfig.AnalysisDate;
     private static int[] AnalysisHours => runConfig.hours;
+    private static string ActiveCacheDirectory => activeMeshUnit == null
+        ? runConfig.CacheDirectoryPath
+        : runConfig.ResolvePath(activeMeshUnit.cacheDirectoryPath);
 
     public static async void Run()
     {
@@ -49,30 +53,36 @@ public static class EnvironmentCostAnalyzer
         try
         {
             runConfig = AnalysisRunConfig.LoadForCurrentProcess();
+            activeMeshUnit = MeshPartitionPlanner.LoadSelectedUnit(runConfig);
             var coveragePath = runConfig.ResolvePath(runConfig.coverageOutputPath);
             var osmPath = runConfig.ResolvePath(runConfig.osmInputPath);
-            outputPath = runConfig.ResolvePath(runConfig.environmentCostOutputPath);
-            summaryPath = runConfig.ResolvePath(runConfig.summaryOutputPath);
-            statePath = runConfig.StateOutputPath;
-            cancellationPath = runConfig.CancellationRequestPath;
+            outputPath = activeMeshUnit == null ? runConfig.ResolvePath(runConfig.environmentCostOutputPath) : runConfig.ResolvePath(activeMeshUnit.outputPath);
+            summaryPath = activeMeshUnit == null ? runConfig.ResolvePath(runConfig.summaryOutputPath) : outputPath + ".summary.json";
+            statePath = activeMeshUnit == null ? runConfig.StateOutputPath : runConfig.ResolvePath(activeMeshUnit.statePath);
+            cancellationPath = activeMeshUnit == null ? runConfig.CancellationRequestPath : Path.ChangeExtension(statePath, ".cancel");
             DeleteIfExists(outputPath + ".partial");
             DeleteIfExists(cancellationPath);
             state = AnalysisState.Start(runConfig.areaId, outputPath, AnalysisHours.Length);
             WriteJsonAtomic(statePath, state, Formatting.Indented);
 
-            var coverage = JsonConvert.DeserializeObject<CoverageReport>(File.ReadAllText(coveragePath))
+            var fullCoverage = JsonConvert.DeserializeObject<CoverageReport>(File.ReadAllText(coveragePath))
                 ?? throw new InvalidOperationException("Coverage report could not be parsed.");
+            var buildingCoverage = activeMeshUnit == null ? fullCoverage : SelectUnitCoverage(fullCoverage, activeMeshUnit);
+            // Road meshes establish the raycast ground. CityGML road geometry can extend across
+            // its nominal third-mesh boundary, so a bounded halo is not sufficient to preserve
+            // the monolithic valid/no-ground classification at ownership boundaries.
+            var groundCoverage = fullCoverage;
             if (!File.Exists(osmPath)) throw new FileNotFoundException("OSM input was not found.", osmPath);
 
             state.phase = "cache-check";
-            state.analysisKey = CalculateAnalysisKey(coverage, coveragePath, osmPath);
+            state.analysisKey = CalculateAnalysisKey(buildingCoverage, groundCoverage, coveragePath, osmPath);
             state.message = "時刻別キャッシュを確認しています。";
             state.Touch();
             WriteJsonAtomic(statePath, state, Formatting.Indented);
             var cacheStopwatch = Stopwatch.StartNew();
             var cache = runConfig.ForceRecalculate
                 ? HourlyCacheBundle.Empty(state.analysisKey, AnalysisHours)
-                : LoadHourlyCache(runConfig.CacheDirectoryPath, state.analysisKey, AnalysisHours);
+                : LoadHourlyCache(ActiveCacheDirectory, state.analysisKey, AnalysisHours);
             cacheStopwatch.Stop();
             var missingHours = AnalysisHours.Where(hour => !cache.hourlyByHour.ContainsKey(hour)).ToArray();
 
@@ -97,13 +107,23 @@ public static class EnvironmentCostAnalyzer
                 state.message = $"CityGMLを読み込んでいます（未キャッシュ {missingHours.Length}/{AnalysisHours.Length} 時刻）。";
                 state.Touch();
                 WriteJsonAtomic(statePath, state, Formatting.Indented);
-                foreach (var dataset in coverage.datasets)
+                foreach (var dataset in buildingCoverage.datasets)
                 {
                     ThrowIfCancellationRequested(cancellationPath);
                     var gridCodes = MeshCoverageAnalyzer.NormalizeGridCodes(dataset.gridCodes);
                     if (gridCodes.Count == 0) continue;
                     var localDatasetRoot = FindLocalDatasetRoot(runConfig, dataset.id);
-                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, gridCodes.ToArray(), referencePoint));
+                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, gridCodes.ToArray(), referencePoint,
+                        includeBuildings: true, includeRoads: false));
+                }
+                foreach (var dataset in groundCoverage.datasets)
+                {
+                    ThrowIfCancellationRequested(cancellationPath);
+                    var gridCodes = MeshCoverageAnalyzer.NormalizeGridCodes(dataset.gridCodes);
+                    if (gridCodes.Count == 0) continue;
+                    var localDatasetRoot = FindLocalDatasetRoot(runConfig, dataset.id);
+                    importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, gridCodes.ToArray(), referencePoint,
+                        includeBuildings: false, includeRoads: true));
                 }
 
                 layerCounts = AssignColliderLayers();
@@ -119,6 +139,7 @@ public static class EnvironmentCostAnalyzer
                 var calculatedEdges = AnalyzeOsmEdges(osmPath, localGeoReference, hoursToCalculate,
                     (completed, total) => ReportAnalysisProgress(state, statePath, cancellationPath, completed, total,
                         AnalysisHours.Length - missingHours.Length, AnalysisHours.Length),
+                    activeMeshUnit == null ? null : (Func<double, double, bool>)((latitude, longitude) => MeshPartitionPlanner.Owns(activeMeshUnit, latitude, longitude)),
                     out osmWayCount, out sourceSegmentCount, out sampleCount, out validSampleCount, out noGroundSampleCount);
                 analysisStopwatch.Stop();
                 baseEdges = calculatedEdges.Select(CloneWithoutHourly).ToList();
@@ -128,7 +149,7 @@ public static class EnvironmentCostAnalyzer
                     foreach (var hourly in edge.hourly) cache.AddHourly(edge.id, hourly);
                 }
                 var cacheWriteStopwatch = Stopwatch.StartNew();
-                SaveHourlyCache(runConfig.CacheDirectoryPath, state.analysisKey, baseEdges, cache,
+                SaveHourlyCache(ActiveCacheDirectory, state.analysisKey, baseEdges, cache,
                     osmWayCount, sourceSegmentCount, sampleCount, validSampleCount, noGroundSampleCount,
                     hoursToCalculate);
                 cacheWriteStopwatch.Stop();
@@ -148,7 +169,7 @@ public static class EnvironmentCostAnalyzer
 
             cache.readSeconds = cacheStopwatch.Elapsed.TotalSeconds;
             var edges = AssembleEdges(baseEdges, cache.hourlyByHour, AnalysisHours);
-            ValidateCompleteResult(edges, AnalysisHours);
+            ValidateCompleteResult(edges, AnalysisHours, activeMeshUnit != null);
 
             var process = Process.GetCurrentProcess();
             var output = new AnalysisOutput
@@ -163,7 +184,8 @@ public static class EnvironmentCostAnalyzer
                 coordinateZoneId = CoordinateZoneId,
                 source = new SourceMetadata
                 {
-                    plateauDatasetIds = coverage.datasets.Select(report => report.id).ToArray(),
+                    plateauDatasetIds = buildingCoverage.datasets.Concat(groundCoverage.datasets).Select(report => report.id)
+                        .Distinct(StringComparer.Ordinal).ToArray(),
                     plateauSdkVersion = "4.3.0",
                     unityVersion = Application.unityVersion,
                     osmSource = "OpenStreetMap via Overpass API",
@@ -179,6 +201,12 @@ public static class EnvironmentCostAnalyzer
                     walkingSpeedMetersPerSecond = WalkingSpeedMetersPerSecond,
                     obstaclePackages = new[] { "bldg" },
                     groundPackages = new[] { "tran" }
+                },
+                meshPartition = activeMeshUnit == null ? null : new MeshPartitionResult
+                {
+                    unitId = activeMeshUnit.id,
+                    coreGridCode = activeMeshUnit.coreGridCode,
+                    ownershipRule = "latitude/longitude minimum-inclusive, maximum-exclusive"
                 },
                 edges = edges
             };
@@ -196,7 +224,7 @@ public static class EnvironmentCostAnalyzer
                 center = output.center,
                 radiusMeters = RadiusMeters,
                 datasets = importReports,
-                uniqueThirdMeshes = coverage.datasets.SelectMany(item => item.gridCodes)
+                uniqueThirdMeshes = buildingCoverage.datasets.Concat(groundCoverage.datasets).SelectMany(item => item.gridCodes)
                     .Where(MeshCoverageAnalyzer.IsSupportedGridCode).Distinct().Count(),
                 buildingColliderCount = layerCounts.building,
                 roadColliderCount = layerCounts.road,
@@ -248,7 +276,8 @@ public static class EnvironmentCostAnalyzer
     }
 
     internal static async Task<DatasetImportReport> ImportDataset(AnalysisRunConfig config, string datasetId, string title,
-        string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint, bool includeRelief = false)
+        string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint, bool includeRelief = false,
+        bool includeBuildings = true, bool includeRoads = true)
     {
         var stopwatch = Stopwatch.StartNew();
         var collidersBefore = UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None).Length;
@@ -266,8 +295,8 @@ public static class EnvironmentCostAnalyzer
         {
             var package = packagePair.Key;
             var packageConfig = packagePair.Value;
-            var isSupportedPackage = package == PredefinedCityModelPackage.Building ||
-                package == PredefinedCityModelPackage.Road ||
+            var isSupportedPackage = (includeBuildings && package == PredefinedCityModelPackage.Building) ||
+                (includeRoads && package == PredefinedCityModelPackage.Road) ||
                 (includeRelief && package == PredefinedCityModelPackage.Relief);
             packageConfig.ImportPackage = isSupportedPackage;
             if (!packageConfig.ImportPackage) continue;
@@ -364,6 +393,21 @@ public static class EnvironmentCostAnalyzer
         return string.Empty;
     }
 
+    private static CoverageReport SelectUnitCoverage(CoverageReport coverage, MeshPartitionUnit unit)
+    {
+        var selected = unit.datasets?.ToDictionary(dataset => dataset.id, dataset => dataset.gridCodes,
+            StringComparer.Ordinal) ?? new Dictionary<string, string[]>(StringComparer.Ordinal);
+        return new CoverageReport
+        {
+            datasets = coverage.datasets.Where(dataset => selected.ContainsKey(dataset.id)).Select(dataset => new DatasetCoverage
+            {
+                id = dataset.id,
+                title = dataset.title,
+                gridCodes = selected[dataset.id].ToList()
+            }).ToList()
+        };
+    }
+
     /// <summary>Configures explicit shadow casting and receiving roles for an inspection Scene.</summary>
     internal static (int casters, int receivers) ConfigureInspectionShadows(UnityEngine.SceneManagement.Scene targetScene)
     {
@@ -383,7 +427,7 @@ public static class EnvironmentCostAnalyzer
     }
 
     private static List<EdgeResult> AnalyzeOsmEdges(string osmPath, GeoReference geoReference, int[] analysisHours,
-        Action<int, int> progress,
+        Action<int, int> progress, Func<double, double, bool> ownsSample,
         out int osmWayCount, out int sourceSegmentCount, out long sampleCount, out long validSampleCount,
         out long noGroundSampleCount)
     {
@@ -451,6 +495,7 @@ public static class EnvironmentCostAnalyzer
                     var latitude = Lerp(fromLatitude.Value, toLatitude.Value, ratio);
                     var longitude = Lerp(fromLongitude.Value, toLongitude.Value, ratio);
                     if (DistanceMeters(CenterLatitude, CenterLongitude, latitude, longitude) > RadiusMeters) continue;
+                    if (ownsSample != null && !ownsSample(latitude, longitude)) continue;
                     inCoverage++;
                     sampleCount++;
 
@@ -497,7 +542,8 @@ public static class EnvironmentCostAnalyzer
                         shadeRatio = shadeRatio,
                         solarExposureSeconds = shadeRatio.HasValue
                             ? HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(walkingSeconds, shadeRatio.Value)
-                            : null
+                            : null,
+                        shadeSampleCount = activeMeshUnit == null ? (int?)null : shadeCounts[hour]
                     };
                 }).ToArray();
 
@@ -553,7 +599,7 @@ public static class EnvironmentCostAnalyzer
         }
     }
 
-    private static string CalculateAnalysisKey(CoverageReport coverage, string coveragePath, string osmPath)
+    private static string CalculateAnalysisKey(CoverageReport buildingCoverage, CoverageReport groundCoverage, string coveragePath, string osmPath)
     {
         var input = new StringBuilder();
         input.AppendLine("environment-cost-analysis-key-0.2");
@@ -567,11 +613,21 @@ public static class EnvironmentCostAnalyzer
         input.AppendLine(runConfig.sampleSpacingMeters.ToString("R", CultureInfo.InvariantCulture));
         input.AppendLine(runConfig.pedestrianHeightMeters.ToString("R", CultureInfo.InvariantCulture));
         input.AppendLine(runConfig.walkingSpeedMetersPerSecond.ToString("R", CultureInfo.InvariantCulture));
+        input.AppendLine(activeMeshUnit?.id ?? "monolithic");
         input.AppendLine(FileSha256(coveragePath));
         input.AppendLine(FileSha256(osmPath));
+        AppendCoverageKey(input, "building", buildingCoverage);
+        AppendCoverageKey(input, "ground", groundCoverage);
+        return Sha256(input.ToString());
+    }
+
+    private static void AppendCoverageKey(StringBuilder input, string role, CoverageReport coverage)
+    {
+        input.AppendLine(role);
         foreach (var dataset in coverage.datasets.OrderBy(item => item.id, StringComparer.Ordinal))
         {
             input.AppendLine(dataset.id);
+            input.AppendLine(string.Join(",", dataset.gridCodes.OrderBy(code => code, StringComparer.Ordinal)));
             var root = runConfig.DatasetRootFor(dataset.id);
             if (!Directory.Exists(root))
             {
@@ -586,7 +642,6 @@ public static class EnvironmentCostAnalyzer
                     .Append(info.Length).Append('|').Append(info.LastWriteTimeUtc.Ticks).AppendLine();
             }
         }
-        return Sha256(input.ToString());
     }
 
     private static HourlyCacheBundle LoadHourlyCache(string cacheDirectory, string analysisKey, int[] hours)
@@ -711,9 +766,9 @@ public static class EnvironmentCostAnalyzer
         }
     }
 
-    private static void ValidateCompleteResult(List<EdgeResult> edges, int[] expectedHours)
+    private static void ValidateCompleteResult(List<EdgeResult> edges, int[] expectedHours, bool allowEmpty)
     {
-        if (edges.Count == 0) throw new InvalidOperationException("No target road edges were generated.");
+        if (edges.Count == 0 && !allowEmpty) throw new InvalidOperationException("No target road edges were generated.");
         if (edges.Select(edge => edge.id).Distinct(StringComparer.Ordinal).Count() != edges.Count)
             throw new InvalidOperationException("Road edge IDs are not unique.");
         foreach (var edge in edges)
@@ -872,9 +927,10 @@ public static class EnvironmentCostAnalyzer
     [Serializable] private sealed class DatasetCoverage { public string id; public string title; public List<string> gridCodes; }
     [Serializable] private sealed class SourceMetadata { public string[] plateauDatasetIds; public string plateauSdkVersion; public string unityVersion; public string osmSource; public string osmDownloadedAt; }
     [Serializable] private sealed class AnalysisSettings { public string date; public string timezone; public int[] hours; public double sampleSpacingMeters; public double pedestrianHeightMeters; public double walkingSpeedMetersPerSecond; public string[] obstaclePackages; public string[] groundPackages; }
-    [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; public List<EdgeResult> edges; }
+    [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public MeshPartitionResult meshPartition; public List<EdgeResult> edges; }
     [Serializable] private sealed class EdgeResult { public string id; public long osmWayId; public long? fromNodeId; public long? toNodeId; public string highway; public double[][] coordinates; public double lengthMeters; public double walkingSeconds; public int sampleCount; public int validSampleCount; public int noGroundSampleCount; public HourlyCost[] hourly; }
-    [Serializable] private sealed class HourlyCost { public int hour; public string timestamp; public string status; public string exclusionReason; public double sunElevationDegrees; public double? shadeRatio; public double? solarExposureSeconds; }
+    [Serializable] private sealed class HourlyCost { public int hour; public string timestamp; public string status; public string exclusionReason; public double sunElevationDegrees; public double? shadeRatio; public double? solarExposureSeconds; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public int? shadeSampleCount; }
+    [Serializable] private sealed class MeshPartitionResult { public string unitId; public string coreGridCode; public string ownershipRule; }
     [Serializable] internal sealed class DatasetImportReport { public string datasetId; public string title; public int thirdMeshCount; public double importSeconds; public int importedColliderCount; }
     [Serializable] private sealed class AnalysisSummary { public string schemaVersion; public string status; public string generatedAt; public string areaId; public double[] center; public double radiusMeters; public List<DatasetImportReport> datasets; public int uniqueThirdMeshes; public int buildingColliderCount; public int roadColliderCount; public int osmWayCount; public int sourceSegmentCount; public int analyzedEdgeCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public double analysisSeconds; public double totalSeconds; public long peakWorkingSetBytes; public long outputBytes; public string outputPath; public string analysisKey; public string resultFingerprintSha256; public bool cacheEnabled; public bool cacheBaseHit; public int cacheHourlyHitCount; public int cacheHourlyMissCount; public double cacheReadSeconds; public double cacheWriteSeconds; public bool importSkipped; }
     [Serializable] private sealed class BaseEdgeCache { public string schemaVersion; public string analysisKey; public int osmWayCount; public int sourceSegmentCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public List<EdgeResult> edges; }

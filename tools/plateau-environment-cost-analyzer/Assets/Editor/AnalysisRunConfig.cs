@@ -29,6 +29,7 @@ public sealed class AnalysisRunConfig
     public string cacheDirectoryPath;
     public string stateOutputPath;
     public string cancellationRequestPath;
+    public MeshPartitionSettings meshPartition;
 
     [JsonIgnore] public string repositoryRoot;
 
@@ -66,6 +67,7 @@ public sealed class AnalysisRunConfig
     [JsonIgnore] public string StateOutputPath => ResolvePath(stateOutputPath);
     [JsonIgnore] public string CancellationRequestPath => ResolvePath(cancellationRequestPath);
     [JsonIgnore] public bool ForceRecalculate => HasCommandLineFlag("-forceRecalculate");
+    [JsonIgnore] public string SelectedMeshUnitId => FindCommandLineValue("-meshUnit");
 
     public string DatasetRootFor(string datasetId)
     {
@@ -108,6 +110,15 @@ public sealed class AnalysisRunConfig
         {
             throw new InvalidOperationException($"input/output paths are required: {configPath}");
         }
+        if (meshPartition == null) return;
+        if (string.IsNullOrWhiteSpace(meshPartition.planOutputPath) ||
+            string.IsNullOrWhiteSpace(meshPartition.unitOutputDirectory) ||
+            string.IsNullOrWhiteSpace(meshPartition.unitStateDirectory) ||
+            string.IsNullOrWhiteSpace(meshPartition.unitCacheDirectory) ||
+            meshPartition.shadowBufferMeters < 0.0)
+        {
+            throw new InvalidOperationException($"meshPartition settings are invalid: {configPath}");
+        }
     }
 
     private static string FindCommandLineValue(string name)
@@ -136,4 +147,15 @@ public sealed class AnalysisRunConfig
     }
 
     private static string ResolvePath(string root, string path) => Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(root, path));
+}
+
+/// <summary>Optional paths and boundary buffer used by mesh-partitioned batch analysis.</summary>
+[Serializable]
+public sealed class MeshPartitionSettings
+{
+    public string planOutputPath;
+    public string unitOutputDirectory;
+    public string unitStateDirectory;
+    public string unitCacheDirectory;
+    public double shadowBufferMeters;
 }
