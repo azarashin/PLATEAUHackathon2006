@@ -434,20 +434,24 @@ public static class EnvironmentCostAnalyzer
 
     private static void CreateTreeFacility(Transform parent, EnvironmentCostPolicyFacility facility)
     {
-        var trunkHeight = Math.Max(1.0, facility.heightMeters * 0.35);
+        var trunkHeight = Math.Max(1.0, facility.heightMeters * 0.55);
         var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         trunk.name = "trunk";
         trunk.layer = BuildingLayer;
         trunk.transform.SetParent(parent, false);
         trunk.transform.localPosition = Vector3.up * (float)(trunkHeight / 2.0);
-        trunk.transform.localScale = new Vector3((float)(facility.radiusMeters * 0.25), (float)(trunkHeight / 2.0), (float)(facility.radiusMeters * 0.25));
+        trunk.transform.localScale = new Vector3((float)(facility.radiusMeters * 0.12), (float)(trunkHeight / 2.0), (float)(facility.radiusMeters * 0.12));
 
         var canopy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         canopy.name = "canopy";
         canopy.layer = BuildingLayer;
         canopy.transform.SetParent(parent, false);
-        canopy.transform.localPosition = Vector3.up * (float)(trunkHeight + facility.radiusMeters * 0.55);
-        canopy.transform.localScale = Vector3.one * (float)(facility.radiusMeters * 2.0);
+        var canopyVerticalRadius = Math.Min(facility.radiusMeters * 0.7, Math.Max(0.5, facility.heightMeters * 0.3));
+        canopy.transform.localPosition = Vector3.up * (float)(facility.heightMeters - canopyVerticalRadius);
+        canopy.transform.localScale = new Vector3(
+            (float)(facility.radiusMeters * 2.0),
+            (float)(canopyVerticalRadius * 2.0),
+            (float)(facility.radiusMeters * 2.0));
     }
 
     private static void CreateShadeFacility(Transform parent, EnvironmentCostPolicyFacility facility)

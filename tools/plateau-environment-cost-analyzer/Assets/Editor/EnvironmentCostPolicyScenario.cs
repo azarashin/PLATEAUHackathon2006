@@ -74,7 +74,8 @@ public sealed class EnvironmentCostPolicyFacility
     public double latitude;
     public double longitude;
     public double heightMeters = 6.0;
-    public double radiusMeters = 3.0;
+    // Typical street-tree canopy radius. The displayed/occluding canopy is an ellipsoid, not a sphere.
+    public double radiusMeters = 1.8;
     public double widthMeters = 4.0;
     public double depthMeters = 4.0;
 

@@ -6,7 +6,7 @@ Issue #15 は、建物影の基準解析を保持したまま、街路樹また�
 
 ## 配置・移動・削除
 
-Unityで検証用Sceneを開き、**PLATEAU > Environment Cost > Policy Scenario** を選ぶ。`Add tree`または`Add artificial shade`で設備を追加し、緯度・経度・高さ・寸法を編集して移動／変更する。`Delete facility`で削除し、`Save`でJSONへ保存する。`Preview in Scene`は同じCollider形状をSceneへ表示するため、見た目の影と解析時Raycastの遮蔽物は同一である。
+Unityで検証用Sceneを開き、**PLATEAU > Environment Cost > Policy Scenario** を選ぶ。`Add tree`または`Add artificial shade`で設備を追加し、緯度・経度・高さ・寸法を編集して移動／変更する。街路樹の既定値は高さ6 m・樹冠半径1.8 mで、樹冠は球ではなく横長の楕円体である。`Delete facility`で削除し、`Save`でJSONへ保存する。`Preview in Scene`は同じCollider形状をSceneへ表示するため、見た目の影と解析時Raycastの遮蔽物は同一である。
 
 ## 実行
 
