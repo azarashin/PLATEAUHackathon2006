@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "environment-cost-policy-scenario-0.1",
+  "id": "saitama-citygml-vegetation",
+  "recalculationScope": "all",
+  "facilities": []
+}
