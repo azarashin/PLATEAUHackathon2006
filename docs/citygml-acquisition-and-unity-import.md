@@ -56,6 +56,12 @@ CityGMLの準備済み地域を自動生成する場合は、Unity Editor と Un
 
 この処理はPLATEAU SDK for Unity 4.3.0の `CityImporter` APIを使い、選定済みメッシュから `bldg`、`tran`、`dem` を利用可能なLODのうちLOD1以下で読み込みます。建物には `Building`（layer 8）、道路には `Road`（layer 9）、地形には `Terrain`（layer 10）の `MeshCollider` を付与します。完了ログ `ENVIRONMENT_COST_INSPECTION_SCENE_READY` の建物・道路・地形Collider数がすべて0より大きいことを確認します。建物と地形は明示的に影を投影し、道路は影を受けます。実行時カメラとWindows Playerの確認は [環境コスト Inspection Scene のDEM・影・実行時確認](environment-cost-inspection-runtime.md) を参照してください。
 
+### 検証Sceneのメッシュ粒度とPLATEAU属性
+
+この検証Sceneは、日陰判定用の軽量な表示・Raycast用途に最適化している。インポート時にPLATEAU SDKへ `MeshGranularity.PerCityModelArea` を指定するため、同一のCityGMLファイル（CityModel Area）に含まれる複数建物は、LOD配下の `group1`、`group2` などの統合Meshとして表示される。これは本ツールがインポート後に建物を結合・削除した結果ではなく、SDKのインポート設定によるものである。したがって、都市全体が一つのMeshになるわけではないが、個別建物を一つずつMeshとして選択できる粒度でもない。
+
+また `DoSetAttrInfo = false` により、建物ごとのPLATEAU属性情報・CityObject関連コンポーネントは付与しない。一方、`DoSetMeshCollider = true` として各統合MeshにColliderを付け、パッケージ種別から `Building`、`Road`、`Terrain` レイヤーを割り当てる。これによりLOD1建物形状を遮蔽物として使う日陰Raycastは行えるが、個別建物のPLATEAU属性を閲覧・編集する用途にはこの検証Sceneを使わない。属性確認が必要な場合は、属性情報を有効にし個別地物粒度で読み込む別のPLATEAU SDKインポートを用いる。
+
 座標系は設定ファイルの `coordinateZoneId` をPLATEAU SDKの `GeoReference` へ渡します。京都・舞鶴は平面直角座標系第VI系（zone 6、EPSG:6674）、藤沢・さいたまは第IX系（zone 9、EPSG:6677）です。Scene上で建物と道路が同一地点に重なり、極端に離れないことを確認します。
 
 ## このフェーズの成果物
