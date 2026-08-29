@@ -88,15 +88,19 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             }
         }
         if (!placeMode) return;
-        if (TryGroundRaycast(out var groundHit)) AddFacility(groundHit.point);
-        else status = "No Road or Terrain collider was hit. Click an unobstructed road or ground surface.";
+        if (TryGroundPosition(out var groundPosition, out var hasGroundCollider))
+        {
+            AddFacility(groundPosition);
+            if (!hasGroundCollider) status = "No Road/Terrain collider was found; placed on the local ground reference plane (Y=0). Verify and adjust the position if needed.";
+        }
+        else status = "The map click could not be projected onto the ground reference plane.";
     }
 
     private void MoveSelectedToRoad()
     {
-        if (selected == null || !TryGroundRaycast(out var hit)) return;
-        if (!ValidatePosition(hit.point, selected, out var issue)) { status = issue; return; }
-        selected.localPosition = hit.point;
+        if (selected == null || !TryGroundPosition(out var groundPosition, out _)) return;
+        if (!ValidatePosition(groundPosition, selected, out var issue)) { status = issue; return; }
+        selected.localPosition = groundPosition;
         UpdateGeoCoordinate(selected);
         RenderScenario();
         lastValidSelected = CloneFacility(selected);
@@ -111,13 +115,28 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         return Physics.Raycast(camera.ScreenPointToRay(Input.mousePosition), out hit, 5000f, 1 << BuildingLayer, QueryTriggerInteraction.Ignore);
     }
 
-    private bool TryGroundRaycast(out RaycastHit hit)
+    private bool TryGroundPosition(out Vector3 point, out bool hasGroundCollider)
     {
-        hit = default;
+        point = default;
+        hasGroundCollider = false;
         var camera = Camera.main;
         if (camera == null) return false;
         var mask = (1 << RoadLayer) | (1 << TerrainLayer);
-        return Physics.Raycast(camera.ScreenPointToRay(Input.mousePosition), out hit, 5000f, mask, QueryTriggerInteraction.Ignore);
+        var ray = camera.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out var hit, 5000f, mask, QueryTriggerInteraction.Ignore))
+        {
+            point = hit.point;
+            hasGroundCollider = true;
+            return true;
+        }
+
+        // Some existing inspection Scenes contain a partial Road collider inventory even though
+        // the CityGML road imagery is visible.  Keep those Scenes editable by using the same
+        // local Y=0 fallback as the original Editor policy-facility generator.
+        var groundPlane = new Plane(Vector3.up, Vector3.zero);
+        if (!groundPlane.Raycast(ray, out var distance) || distance > 5000f) return false;
+        point = ray.GetPoint(distance);
+        return true;
     }
 
     private bool ValidatePosition(Vector3 position, EnvironmentCostRuntimePolicyFacility excluded, out string issue)
@@ -127,14 +146,15 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (horizontal.magnitude > metadata.RadiusMeters) { issue = "Placement is outside the packaged analysis extent."; return false; }
         var groundStart = new Vector3(position.x, 1000f, position.z);
         var groundMask = (1 << RoadLayer) | (1 << TerrainLayer);
-        if (!Physics.Raycast(groundStart, Vector3.down, out var ground, 2000f, groundMask, QueryTriggerInteraction.Ignore))
-        {
-            issue = "Placement is not on a Road or Terrain surface.";
-            return false;
-        }
-        if (Mathf.Abs(ground.point.y - position.y) > 0.25f)
+        var hasGround = Physics.Raycast(groundStart, Vector3.down, out var ground, 2000f, groundMask, QueryTriggerInteraction.Ignore);
+        if (hasGround && Mathf.Abs(ground.point.y - position.y) > 0.25f)
         {
             issue = "Placement is off the ground surface. Use the displayed ground height or click the map.";
+            return false;
+        }
+        if (!hasGround && Mathf.Abs(position.y) > 0.25f)
+        {
+            issue = "This Scene has no Road/Terrain collider at the edited position; use local ground reference Y=0 or click the map.";
             return false;
         }
         foreach (var facility in scenario.facilities)
