@@ -151,7 +151,8 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
                 status = $"Importing {dataset.title ?? dataset.id} ({++imported}/{coverage.datasets.Count})…";
                 Repaint();
                 var sourceRoot = EnvironmentCostAnalyzer.FindLocalDatasetRoot(config, dataset.id);
-                await EnvironmentCostAnalyzer.ImportDataset(config, dataset.id, dataset.title, sourceRoot, gridCodes, referencePoint, includeRelief: true);
+                await EnvironmentCostAnalyzer.ImportDataset(config, dataset.id, dataset.title, sourceRoot, gridCodes, referencePoint,
+                    includeRelief: true, includeVegetation: config.includeCityGmlVegetation);
             }
             ThrowIfCancellationRequested();
 
