@@ -58,9 +58,9 @@ CityGMLの準備済み地域を自動生成する場合は、Unity Editor と Un
 
 ### 検証Sceneのメッシュ粒度とPLATEAU属性
 
-この検証Sceneは、日陰判定用の軽量な表示・Raycast用途に最適化している。インポート時にPLATEAU SDKへ `MeshGranularity.PerCityModelArea` を指定するため、同一のCityGMLファイル（CityModel Area）に含まれる複数建物は、LOD配下の `group1`、`group2` などの統合Meshとして表示される。これは本ツールがインポート後に建物を結合・削除した結果ではなく、SDKのインポート設定によるものである。したがって、都市全体が一つのMeshになるわけではないが、個別建物を一つずつMeshとして選択できる粒度でもない。
+この検証Sceneは、日陰判定用の軽量な表示・Raycast用途に最適化している。インポート時にPLATEAU SDKへ `MeshGranularity.PerCityModelArea` を指定する。これはSDK UIの「モデル結合: 地域単位」と同一の粒度であり、同一のCityGMLファイル（CityModel Area）に含まれる複数建物は、LOD配下の `group1`、`group2` などの統合Meshとして表示される。これは本ツールがインポート後に建物を結合・削除した結果ではなく、SDKのインポート設定によるものである。したがって、都市全体が一つのMeshになるわけではないが、個別建物を一つずつMeshとして選択できる粒度でもない。
 
-また `DoSetAttrInfo = false` により、建物ごとのPLATEAU属性情報・CityObject関連コンポーネントは付与しない。一方、`DoSetMeshCollider = true` として各統合MeshにColliderを付け、パッケージ種別から `Building`、`Road`、`Terrain` レイヤーを割り当てる。これによりLOD1建物形状を遮蔽物として使う日陰Raycastは行えるが、個別建物のPLATEAU属性を閲覧・編集する用途にはこの検証Sceneを使わない。属性確認が必要な場合は、属性情報を有効にし個別地物粒度で読み込む別のPLATEAU SDKインポートを用いる。
+ただし、SDK UIで地域単位を選ぶ通常のインポートと結果のすべてが同じではない。本ツールは解析目的のため、LOD1のみ、テクスチャなし、属性情報なし（`DoSetAttrInfo = false`）を指定する。一方、`DoSetMeshCollider = true` として各統合MeshにColliderを付け、パッケージ種別から `Building`、`Road`、`Terrain` レイヤーを割り当てる。これによりLOD1建物形状を遮蔽物として使う日陰Raycastは行えるが、個別建物のPLATEAU属性を閲覧・編集する用途にはこの検証Sceneを使わない。属性確認が必要な場合は、属性情報を有効にし個別地物粒度で読み込む別のPLATEAU SDKインポートを用いる。
 
 座標系は設定ファイルの `coordinateZoneId` をPLATEAU SDKの `GeoReference` へ渡します。京都・舞鶴は平面直角座標系第VI系（zone 6、EPSG:6674）、藤沢・さいたまは第IX系（zone 9、EPSG:6677）です。Scene上で建物と道路が同一地点に重なり、極端に離れないことを確認します。
 
