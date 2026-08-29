@@ -18,22 +18,25 @@ public static class EnvironmentCostRuntimePolicyImpact
         var facilities = (changedFacilities ?? Array.Empty<EnvironmentCostRuntimePolicyFacility>()).Where(item => item != null).ToArray();
         if (facilities.Length == 0) return new HashSet<string>(input.edges.Select(edge => edge.id), StringComparer.Ordinal);
 
-        var sun = HourlyEnvironmentCostRules.CalculateSun(request.analysisDate, request.hours[0], input.center[1], input.center[0], input.timezone);
-        if (sun.elevationDegrees <= 0.0) return new HashSet<string>(StringComparer.Ordinal);
-        var tangent = Mathf.Max(0.01f, Mathf.Tan((float)(sun.elevationDegrees * Math.PI / 180.0)));
         var affected = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var edge in input.edges)
+        foreach (var hour in request.hours)
         {
-            var from = new Vector2(edge.from[0], edge.from[1]);
-            var to = new Vector2(edge.to[0], edge.to[1]);
-            foreach (var facility in facilities)
+            var sun = HourlyEnvironmentCostRules.CalculateSun(request.analysisDate, hour, input.center[1], input.center[0], input.timezone);
+            if (sun.elevationDegrees <= 0.0) continue;
+            var tangent = Mathf.Max(0.01f, Mathf.Tan((float)(sun.elevationDegrees * Math.PI / 180.0)));
+            foreach (var edge in input.edges)
             {
-                var footprint = facility.type == "tree" ? (float)facility.radiusMeters : Mathf.Max((float)facility.widthMeters, (float)facility.depthMeters) * .5f;
-                var shadowReach = footprint + (float)facility.heightMeters / tangent + input.sampleSpacingMeters;
-                if (DistanceToSegment(new Vector2(facility.localPosition.x, facility.localPosition.z), from, to) <= shadowReach)
+                var from = new Vector2(edge.from[0], edge.from[1]);
+                var to = new Vector2(edge.to[0], edge.to[1]);
+                foreach (var facility in facilities)
                 {
-                    affected.Add(edge.id);
-                    break;
+                    var footprint = facility.type == "tree" ? (float)facility.radiusMeters : Mathf.Max((float)facility.widthMeters, (float)facility.depthMeters) * .5f;
+                    var shadowReach = footprint + (float)facility.heightMeters / tangent + input.sampleSpacingMeters;
+                    if (DistanceToSegment(new Vector2(facility.localPosition.x, facility.localPosition.z), from, to) <= shadowReach)
+                    {
+                        affected.Add(edge.id);
+                        break;
+                    }
                 }
             }
         }

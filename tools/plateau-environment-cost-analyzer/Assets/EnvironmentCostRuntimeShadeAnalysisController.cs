@@ -50,8 +50,18 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
 
     public void RunSelectedHour()
     {
+        RunHours(new[] { selectedHour });
+    }
+
+    public void RunAllHours()
+    {
+        RunHours(Enumerable.Range(0, 24).ToArray());
+    }
+
+    private void RunHours(int[] hours)
+    {
         if (IsRunning || packageLoader == null || packageLoader.State != EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready || metadata == null) return;
-        activeRun = StartCoroutine(RunSelectedHourAsync(++runVersion));
+        activeRun = StartCoroutine(RunHoursAsync(++runVersion, hours));
     }
 
     public void CancelCurrentRun()
@@ -75,7 +85,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
         UnityEngine.Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_INVALIDATED scenario={scenarioId} full={requiresFullRecalculation} changedFacilities={changedFacilities.Count}");
     }
 
-    private IEnumerator RunSelectedHourAsync(int version)
+    private IEnumerator RunHoursAsync(int version, int[] hours)
     {
         cancellationRequested = false;
         try
@@ -86,14 +96,14 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
             input.Validate();
             var request = new EnvironmentCostRuntimeShadeAnalysisRequest
             {
-                analysisDate = DateTime.ParseExact(metadata.AnalysisDate, "yyyy-MM-dd", CultureInfo.InvariantCulture), hours = new[] { selectedHour }
+                analysisDate = DateTime.ParseExact(metadata.AnalysisDate, "yyyy-MM-dd", CultureInfo.InvariantCulture), hours = hours
             };
             request.Validate(input);
 
             var previousById = LatestResult?.edges?.ToDictionary(edge => edge.id, StringComparer.Ordinal);
             var canReusePrevious = !requiresFullRecalculation && LatestResult != null && !isLatestResultCurrent &&
-                LatestResult.status == "completed" && LatestResult.provenance != null && LatestResult.provenance.hours?.Length == 1 &&
-                LatestResult.provenance.hours[0] == selectedHour && previousById != null && previousById.Count == input.edges.Length;
+                LatestResult.status == "completed" && LatestResult.provenance != null && LatestResult.provenance.hours != null &&
+                LatestResult.provenance.hours.SequenceEqual(hours) && previousById != null && previousById.Count == input.edges.Length;
             var affectedIds = canReusePrevious
                 ? EnvironmentCostRuntimePolicyImpact.FindAffectedEdgeIds(input, request, changedFacilities)
                 : new HashSet<string>(input.edges.Select(edge => edge.id), StringComparer.Ordinal);
@@ -163,13 +173,16 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private void OnGUI()
     {
         if (!Application.isPlaying) return;
-        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 190f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 220f), GUI.skin.box);
         GUILayout.Label("日陰解析");
         selectedHour = Mathf.RoundToInt(GUILayout.HorizontalSlider(selectedHour, 0f, 23f));
         GUILayout.Label($"解析時刻: {selectedHour:00}:00");
         var originalEnabled = GUI.enabled;
         GUI.enabled = originalEnabled && !IsRunning && packageLoader != null && packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready;
-        if (GUILayout.Button(IsLatestResultCurrent ? "選択時刻の全道路解析を実行" : "選択時刻の解析を実行")) RunSelectedHour();
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("選択時刻を解析")) RunSelectedHour();
+        if (GUILayout.Button("全時刻を解析")) RunAllHours();
+        GUILayout.EndHorizontal();
         GUI.enabled = originalEnabled;
         if (IsRunning && GUILayout.Button("解析を取り消す")) CancelCurrentRun();
         GUILayout.Label(statusMessage);
