@@ -74,18 +74,14 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         // Selection intentionally tests only policy objects.  A CityGML building collider can be
         // in front of a visible road from an oblique camera angle, so it must not block placement.
-        if (TryPolicyRaycast(out var policyHit))
+        if (TryPolicyRaycast(out var policyHit, out var instance))
         {
-            var instance = policyHit.collider.GetComponentInParent<EnvironmentCostRuntimePolicyFacilityInstance>();
-            if (instance != null)
-            {
-                selected = instance.Facility;
-                lastValidSelected = CloneFacility(selected);
-                dragging = true;
-                placeMode = false;
-                status = $"Selected {selected.id}. Drag on a road to move; Delete removes it.";
-                return;
-            }
+            selected = instance.Facility;
+            lastValidSelected = CloneFacility(selected);
+            dragging = true;
+            placeMode = false;
+            status = $"Selected {selected.id}. Drag on a road to move; Delete removes it.";
+            return;
         }
         if (!placeMode) return;
         if (TryGroundPosition(out var groundPosition, out var hasGroundCollider))
@@ -107,12 +103,24 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         MarkDirty("Facility moved. Re-run analysis to refresh the in-memory result.");
     }
 
-    private bool TryPolicyRaycast(out RaycastHit hit)
+    private bool TryPolicyRaycast(out RaycastHit hit, out EnvironmentCostRuntimePolicyFacilityInstance instance)
     {
         hit = default;
+        instance = null;
         var camera = Camera.main;
         if (camera == null) return false;
-        return Physics.Raycast(camera.ScreenPointToRay(Input.mousePosition), out hit, 5000f, 1 << BuildingLayer, QueryTriggerInteraction.Ignore);
+        // The Building layer contains both CityGML buildings and policy primitives.  Do not let a
+        // static CityGML building count as a policy hit, nor hide a policy object behind it.
+        foreach (var candidate in Physics.RaycastAll(camera.ScreenPointToRay(Input.mousePosition), 5000f,
+                     1 << BuildingLayer, QueryTriggerInteraction.Ignore).OrderBy(candidate => candidate.distance))
+        {
+            var policyInstance = candidate.collider.GetComponentInParent<EnvironmentCostRuntimePolicyFacilityInstance>();
+            if (policyInstance == null) continue;
+            hit = candidate;
+            instance = policyInstance;
+            return true;
+        }
+        return false;
     }
 
     private bool TryGroundPosition(out Vector3 point, out bool hasGroundCollider)
@@ -174,8 +182,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         var facility = new EnvironmentCostRuntimePolicyFacility
         {
-            id = $"{selectedType}-{scenario.facilities.Count + 1:000}", type = selectedType, localPosition = position,
-            heightMeters = selectedType == "obstacle" ? 3.0 : 6.0, radiusMeters = 1.8, widthMeters = 4.0, depthMeters = 4.0
+            id = $"{selectedType}-{scenario.facilities.Count + 1:000}",
+            type = selectedType,
+            localPosition = position,
+            heightMeters = selectedType == "obstacle" ? 3.0 : 6.0,
+            radiusMeters = 1.8,
+            widthMeters = 4.0,
+            depthMeters = 4.0
         };
         if (!ValidatePosition(position, facility, out var issue)) { status = issue; return; }
         UpdateGeoCoordinate(facility);
@@ -201,8 +214,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         scenario = new EnvironmentCostRuntimePolicyScenario
         {
-            id = scenarioIdInput, displayName = displayNameInput, areaId = metadata.AreaId, coordinateZoneId = metadata.CoordinateZoneId,
-            centerLongitude = metadata.Longitude, centerLatitude = metadata.Latitude, cityPackageVersion = packageLoader.Manifest.version,
+            id = scenarioIdInput,
+            displayName = displayNameInput,
+            areaId = metadata.AreaId,
+            coordinateZoneId = metadata.CoordinateZoneId,
+            centerLongitude = metadata.Longitude,
+            centerLatitude = metadata.Latitude,
+            cityPackageVersion = packageLoader.Manifest.version,
             cityPackageManifestSha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(Path.Combine(packageLoader.PackageRootPath, "manifest.json"))
         };
         selected = null;
