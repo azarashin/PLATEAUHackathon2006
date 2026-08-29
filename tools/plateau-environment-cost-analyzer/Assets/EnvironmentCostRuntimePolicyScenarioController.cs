@@ -242,7 +242,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     private void CloneScenario()
     {
-        var clone = JsonConvert.DeserializeObject<EnvironmentCostRuntimePolicyScenario>(JsonConvert.SerializeObject(scenario));
+        var clone = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyScenario>(EnvironmentCostRuntimePolicyJson.Serialize(scenario));
         clone.id = scenario.id + "-copy";
         clone.displayName = scenario.displayName + " copy";
         clone.createdAtUtc = null;
@@ -332,7 +332,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     }
 
     private static EnvironmentCostRuntimePolicyFacility CloneFacility(EnvironmentCostRuntimePolicyFacility source)
-        => JsonConvert.DeserializeObject<EnvironmentCostRuntimePolicyFacility>(JsonConvert.SerializeObject(source));
+        => EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyFacility>(EnvironmentCostRuntimePolicyJson.Serialize(source));
 
     private void RestoreLastValidSelected()
     {

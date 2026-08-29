@@ -77,6 +77,11 @@ public static class HourlyEnvironmentCostSelfTests
             };
             runtimePolicy.Validate("self-test");
             if (string.IsNullOrWhiteSpace(runtimePolicy.Fingerprint())) throw new InvalidOperationException("Expected Runtime policy fingerprint.");
+            var runtimePolicyJson = EnvironmentCostRuntimePolicyJson.Serialize(runtimePolicy);
+            if (runtimePolicyJson.Contains("normalized")) throw new InvalidOperationException("Runtime policy JSON must serialize Vector3 as x/y/z fields only.");
+            var restoredRuntimePolicy = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyScenario>(runtimePolicyJson);
+            AssertNear(10.0, restoredRuntimePolicy.facilities[0].localPosition.x);
+            AssertNear(20.0, restoredRuntimePolicy.facilities[0].localPosition.z);
             AssertThrows<InvalidOperationException>(() => new EnvironmentCostRuntimePolicyScenario { id = "invalid", areaId = "self-test-city", facilities = new System.Collections.Generic.List<EnvironmentCostRuntimePolicyFacility> { new EnvironmentCostRuntimePolicyFacility { id = "bad", type = "tree", radiusMeters = 0.0 } } }.Validate("self-test"));
             var runtimePackage = new EnvironmentCostRuntimeCityPackageManifest
             {

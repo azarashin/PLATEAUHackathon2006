@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -47,21 +48,60 @@ public sealed class EnvironmentCostRuntimePolicyScenario
 
     public string Fingerprint()
     {
-        var stable = new
+        var stable = new RuntimePolicyFingerprint
         {
-            schemaVersion, id, areaId, coordinateZoneId, centerLongitude, centerLatitude, cityPackageVersion, cityPackageManifestSha256,
-            facilities = facilities.OrderBy(item => item.id, StringComparer.Ordinal).Select(item => new
+            schemaVersion = schemaVersion,
+            id = id,
+            areaId = areaId,
+            coordinateZoneId = coordinateZoneId,
+            centerLongitude = centerLongitude,
+            centerLatitude = centerLatitude,
+            cityPackageVersion = cityPackageVersion,
+            cityPackageManifestSha256 = cityPackageManifestSha256,
+            facilities = facilities.OrderBy(item => item.id, StringComparer.Ordinal).Select(item => new RuntimePolicyFingerprintFacility
             {
-                item.id, item.type, item.localPosition, item.latitude, item.longitude, item.heightMeters,
-                item.radiusMeters, item.widthMeters, item.depthMeters, item.rotationDegrees
-            })
+                id = item.id, type = item.type, localX = item.localPosition.x, localY = item.localPosition.y, localZ = item.localPosition.z,
+                latitude = item.latitude, longitude = item.longitude, heightMeters = item.heightMeters,
+                radiusMeters = item.radiusMeters, widthMeters = item.widthMeters, depthMeters = item.depthMeters, rotationDegrees = item.rotationDegrees
+            }).ToList()
         };
         using var sha = SHA256.Create();
-        return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(stable, Formatting.None))))
+        return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(EnvironmentCostRuntimePolicyJson.Serialize(stable))))
             .Replace("-", string.Empty).ToLowerInvariant();
     }
 
     private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+    [Serializable]
+    private sealed class RuntimePolicyFingerprint
+    {
+        public string schemaVersion;
+        public string id;
+        public string areaId;
+        public int coordinateZoneId;
+        public double centerLongitude;
+        public double centerLatitude;
+        public string cityPackageVersion;
+        public string cityPackageManifestSha256;
+        public List<RuntimePolicyFingerprintFacility> facilities;
+    }
+
+    [Serializable]
+    private sealed class RuntimePolicyFingerprintFacility
+    {
+        public string id;
+        public string type;
+        public float localX;
+        public float localY;
+        public float localZ;
+        public double latitude;
+        public double longitude;
+        public double heightMeters;
+        public double radiusMeters;
+        public double widthMeters;
+        public double depthMeters;
+        public float rotationDegrees;
+    }
 }
 
 [Serializable]
@@ -109,13 +149,13 @@ public static class EnvironmentCostRuntimePolicyScenarioStore
         var path = GetPath(scenario.areaId, scenario.id);
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         var temporary = path + ".partial";
-        File.WriteAllText(temporary, JsonConvert.SerializeObject(scenario, Formatting.Indented), new UTF8Encoding(false));
+        File.WriteAllText(temporary, EnvironmentCostRuntimePolicyJson.Serialize(scenario, Formatting.Indented), new UTF8Encoding(false));
         if (File.Exists(path)) File.Replace(temporary, path, null); else File.Move(temporary, path);
     }
 
     public static EnvironmentCostRuntimePolicyScenario Load(string path)
     {
-        var scenario = JsonConvert.DeserializeObject<EnvironmentCostRuntimePolicyScenario>(File.ReadAllText(path))
+        var scenario = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyScenario>(File.ReadAllText(path))
             ?? throw new InvalidOperationException("Runtime policy scenario could not be parsed.");
         scenario.Validate(path);
         return scenario;
@@ -131,5 +171,45 @@ public static class EnvironmentCostRuntimePolicyScenarioStore
     {
         var invalid = Path.GetInvalidFileNameChars();
         return new string(value.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
+    }
+}
+
+/// <summary>Newtonsoft settings that serialize Unity vectors as x/y/z fields, never their derived properties.</summary>
+public static class EnvironmentCostRuntimePolicyJson
+{
+    private static readonly JsonSerializerSettings Settings = CreateSettings();
+
+    private static JsonSerializerSettings CreateSettings()
+    {
+        var settings = new JsonSerializerSettings();
+        settings.Converters.Add(new Vector3JsonConverter());
+        return settings;
+    }
+
+    public static string Serialize(object value, Formatting formatting = Formatting.None)
+        => JsonConvert.SerializeObject(value, formatting, Settings);
+
+    public static T Deserialize<T>(string json)
+        => JsonConvert.DeserializeObject<T>(json, Settings);
+
+    private sealed class Vector3JsonConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType) => objectType == typeof(Vector3);
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            var vector = (Vector3)value;
+            writer.WriteStartObject();
+            writer.WritePropertyName("x"); writer.WriteValue(vector.x);
+            writer.WritePropertyName("y"); writer.WriteValue(vector.y);
+            writer.WritePropertyName("z"); writer.WriteValue(vector.z);
+            writer.WriteEndObject();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            var value = JObject.Load(reader);
+            return new Vector3(value.Value<float?>("x") ?? 0f, value.Value<float?>("y") ?? 0f, value.Value<float?>("z") ?? 0f);
+        }
     }
 }
