@@ -64,11 +64,15 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     private void Update()
     {
-        if (scenario == null || IsPointerOverPanel()) return;
-        if (Input.GetMouseButtonDown(0)) BeginMapInteraction();
-        if (dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
-        if (dragging && Input.GetMouseButtonUp(0)) dragging = false;
-        if (selected != null && (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))) DeleteSelected();
+        if (scenario == null) return;
+        var editingUi = GUIUtility.keyboardControl != 0;
+        if (!editingUi && !IsPointerOverPanel())
+        {
+            if (Input.GetMouseButtonDown(0)) BeginMapInteraction();
+            if (dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
+            if (dragging && Input.GetMouseButtonUp(0)) dragging = false;
+        }
+        if (!editingUi && selected != null && (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))) DeleteSelected();
     }
 
     private void BeginMapInteraction()
