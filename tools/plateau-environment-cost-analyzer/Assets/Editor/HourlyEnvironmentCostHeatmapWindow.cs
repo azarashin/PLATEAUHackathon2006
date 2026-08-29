@@ -25,8 +25,8 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
     private bool drawSelectedEdgeSamples = true;
     private SampleInspection lastInspection;
 
-    [MenuItem("PLATEAU/Environment Cost/Hourly Heatmap")]
-    public static void Open() => GetWindow<HourlyEnvironmentCostHeatmapWindow>("Hourly Cost Heatmap");
+    [MenuItem("PLATEAU/環境コスト/時刻別ヒートマップ")]
+    public static void Open() => GetWindow<HourlyEnvironmentCostHeatmapWindow>("時刻別コストヒートマップ");
 
     private void OnEnable() => SceneView.duringSceneGui += DrawScene;
     private void OnDisable() => SceneView.duringSceneGui -= DrawScene;
@@ -68,7 +68,7 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
         var selectedEdge = document.edges[selectedEdgeIndex];
         var selectedHourly = selectedEdge.hourly.First(value => value.hour == hours[selectedHourIndex]);
         EditorGUILayout.LabelField("選択辺", string.IsNullOrWhiteSpace(selectedEdge.id) ? $"#{selectedEdgeIndex + 1}" : selectedEdge.id);
-        EditorGUILayout.LabelField("保存済み解析値", $"{selectedHourly.status}, 日陰率 {FormatRatio(selectedHourly.shadeRatio)}, サンプル {selectedEdge.validSampleCount}/{selectedEdge.sampleCount}（道路面未照合: {selectedEdge.noGroundSampleCount}）");
+        EditorGUILayout.LabelField("保存済み解析値", $"{HourlyStatusLabel(selectedHourly.status)}、日陰率 {FormatRatio(selectedHourly.shadeRatio)}、サンプル {selectedEdge.validSampleCount}/{selectedEdge.sampleCount}（道路面未照合: {selectedEdge.noGroundSampleCount}）");
         drawSelectedEdgeSamples = EditorGUILayout.Toggle("選択辺のサンプルを描画", drawSelectedEdgeSamples);
         sampleDrawLimit = EditorGUILayout.IntSlider("最大サンプル描画数", sampleDrawLimit, 10, 1000);
         var sceneSettingsChanged = EditorGUI.EndChangeCheck();
@@ -87,7 +87,7 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
         }
         var slices = document.edges.Select(edge => edge.hourly.First(value => value.hour == hours[selectedHourIndex])).ToArray();
         EditorGUILayout.LabelField("表示辺", $"{Math.Min(displayLimit, document.edges.Count):N0}/{document.edges.Count:N0}");
-        EditorGUILayout.LabelField("available / partial / missing", $"{slices.Count(value => value.status == "available"):N0} / {slices.Count(value => value.status == "partial"):N0} / {slices.Count(value => value.status == "missing"):N0}");
+        EditorGUILayout.LabelField("利用可能 / 一部欠測 / 欠測", $"{slices.Count(value => value.status == "available"):N0} / {slices.Count(value => value.status == "partial"):N0} / {slices.Count(value => value.status == "missing"):N0}");
     }
 
     private void Load(string path)
@@ -111,6 +111,14 @@ public sealed class HourlyEnvironmentCostHeatmapWindow : EditorWindow
         SceneView.RepaintAll();
         Repaint();
     }
+
+    private static string HourlyStatusLabel(string status) => status switch
+    {
+        "available" => "利用可能",
+        "partial" => "一部欠測",
+        "missing" => "欠測",
+        _ => string.IsNullOrWhiteSpace(status) ? "未設定" : status
+    };
 
     private void FocusSelectedEdge()
     {

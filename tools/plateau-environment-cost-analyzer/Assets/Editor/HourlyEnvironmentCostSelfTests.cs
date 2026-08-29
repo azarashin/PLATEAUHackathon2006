@@ -66,6 +66,23 @@ public static class HourlyEnvironmentCostSelfTests
             scenario.Validate("self-test");
             if (string.IsNullOrWhiteSpace(scenario.Fingerprint())) throw new InvalidOperationException("Expected scenario fingerprint.");
             AssertThrows<InvalidOperationException>(() => new EnvironmentCostPolicyScenario { id = "invalid", recalculationScope = "affected" }.Validate("self-test"));
+            var runtimePolicy = new EnvironmentCostRuntimePolicyScenario
+            {
+                id = "runtime-policy-self-test", areaId = "self-test-city", coordinateZoneId = 9,
+                facilities = new System.Collections.Generic.List<EnvironmentCostRuntimePolicyFacility>
+                {
+                    new EnvironmentCostRuntimePolicyFacility { id = "tree-1", type = "tree", localPosition = new Vector3(10f, 0f, 20f) },
+                    new EnvironmentCostRuntimePolicyFacility { id = "obstacle-1", type = "obstacle", localPosition = new Vector3(30f, 0f, 40f), heightMeters = 3.0, widthMeters = 2.0, depthMeters = 2.0 }
+                }
+            };
+            runtimePolicy.Validate("self-test");
+            if (string.IsNullOrWhiteSpace(runtimePolicy.Fingerprint())) throw new InvalidOperationException("Expected Runtime policy fingerprint.");
+            var runtimePolicyJson = EnvironmentCostRuntimePolicyJson.Serialize(runtimePolicy);
+            if (runtimePolicyJson.Contains("normalized")) throw new InvalidOperationException("Runtime policy JSON must serialize Vector3 as x/y/z fields only.");
+            var restoredRuntimePolicy = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyScenario>(runtimePolicyJson);
+            AssertNear(10.0, restoredRuntimePolicy.facilities[0].localPosition.x);
+            AssertNear(20.0, restoredRuntimePolicy.facilities[0].localPosition.z);
+            AssertThrows<InvalidOperationException>(() => new EnvironmentCostRuntimePolicyScenario { id = "invalid", areaId = "self-test-city", facilities = new System.Collections.Generic.List<EnvironmentCostRuntimePolicyFacility> { new EnvironmentCostRuntimePolicyFacility { id = "bad", type = "tree", radiusMeters = 0.0 } } }.Validate("self-test"));
             var runtimePackage = new EnvironmentCostRuntimeCityPackageManifest
             {
                 schemaVersion = "environment-cost-runtime-city-package-0.1",

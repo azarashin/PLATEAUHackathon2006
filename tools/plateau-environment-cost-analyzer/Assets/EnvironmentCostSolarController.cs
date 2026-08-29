@@ -58,7 +58,7 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
             ApplySun();
         }
 
-        GUILayout.Label($"時刻: {localHour:00.00} {metadata?.Timezone ?? "local"}");
+        GUILayout.Label($"時刻: {localHour:00.00} {metadata?.Timezone ?? "未設定"}");
         var updatedHour = GUILayout.HorizontalSlider(localHour, firstHour, lastHour);
         if (!Mathf.Approximately(updatedHour, localHour))
         {
@@ -67,7 +67,7 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
         }
 
         if (!string.IsNullOrWhiteSpace(validationMessage)) GUILayout.Label(validationMessage);
-        else if (currentSun.elevationDegrees <= 0.0) GUILayout.Label("夜間: Directional Lightを無効化（解析用の日陰値にはしません）");
+        else if (currentSun.elevationDegrees <= 0.0) GUILayout.Label("夜間: ディレクショナルライトを無効化（解析用の日陰値にはしません）");
         else GUILayout.Label($"方位: {currentSun.azimuthDegrees:F1}°  高度: {currentSun.elevationDegrees:F1}°");
         GUILayout.Label($"影の可視化範囲: カメラから約{shadowDistanceMeters:F0} m");
         GUILayout.EndArea();

@@ -9,7 +9,7 @@ public static class EnvironmentCostInspectionBuild
 {
     private const string SceneDirectory = "Assets/Scenes/EnvironmentCostInspection/";
 
-    [MenuItem("PLATEAU/Environment Cost/Build Inspection Player (Windows)")]
+    [MenuItem("PLATEAU/環境コスト/検証用 Player をビルド（Windows）")]
     public static void BuildWindowsPlayer()
     {
         var scenePath = EditorSceneManager.GetActiveScene().path;
