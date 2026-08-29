@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using PLATEAU.Geometries;
+using PLATEAU.Native;
 using UnityEditor;
 using UnityEngine;
 
@@ -56,6 +58,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         {
             var files = new List<EnvironmentCostRuntimeCityPackageFile>();
             CopyToPackage(baselinePath, stagingRoot, "baseline-environment-cost.json", "baseline-environment-cost", files);
+            CreateRuntimeShadeInput(baselinePath, analysis, stagingRoot, files);
             var roadDirectory = Path.GetDirectoryName(roadManifestPath) ?? throw new InvalidOperationException("Road bundle directory is missing.");
             var roadManifest = JObject.Parse(File.ReadAllText(roadManifestPath));
             CopyToPackage(roadManifestPath, stagingRoot, "road-network/manifest.json", "road-network-manifest", files);
@@ -136,6 +139,76 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException($"Road bundle manifest is missing {tokenPath}.");
         CopyToPackage(Path.Combine(sourceRoot, name), targetRoot, $"road-network/{name}", $"road-network-{kind}", files);
     }
+
+    private static void CreateRuntimeShadeInput(string baselinePath, AnalysisRunConfig analysis, string targetRoot,
+        List<EnvironmentCostRuntimeCityPackageFile> files)
+    {
+        var source = JObject.Parse(File.ReadAllText(baselinePath));
+        ValidateBaselineForRuntimeInput(source, analysis);
+        var sourceEdges = source["edges"] as JArray ?? throw new InvalidOperationException("Baseline environment cost has no edges.");
+        using var worldReference = GeoReference.Create(new PlateauVector3d(0.0, 0.0, 0.0), 1.0f, CoordinateSystem.EUN, analysis.coordinateZoneId);
+        var referencePoint = worldReference.Project(new GeoCoordinate(analysis.CenterLatitude, analysis.CenterLongitude, 0.0));
+        using var localReference = GeoReference.Create(referencePoint, 1.0f, CoordinateSystem.EUN, analysis.coordinateZoneId);
+        var edges = new List<EnvironmentCostRuntimeShadeInputEdge>(sourceEdges.Count);
+        foreach (var sourceEdge in sourceEdges.OfType<JObject>())
+        {
+            var coordinates = sourceEdge["coordinates"] as JArray;
+            if (coordinates == null || coordinates.Count != 2) throw new InvalidOperationException("Baseline edge has invalid coordinates.");
+            edges.Add(new EnvironmentCostRuntimeShadeInputEdge
+            {
+                id = (string)sourceEdge["id"] ?? throw new InvalidOperationException("Baseline edge has no id."),
+                from = ToLocalPoint(localReference, coordinates[0] as JArray),
+                to = ToLocalPoint(localReference, coordinates[1] as JArray),
+                lengthMeters = (double?)sourceEdge["lengthMeters"] ?? throw new InvalidOperationException("Baseline edge has no length."),
+                walkingSeconds = (double?)sourceEdge["walkingSeconds"] ?? throw new InvalidOperationException("Baseline edge has no walking time.")
+            });
+        }
+        var input = new EnvironmentCostRuntimeShadeAnalysisInput
+        {
+            schemaVersion = "environment-cost-runtime-shade-input-0.1", areaId = analysis.areaId, center = analysis.center,
+            coordinateZoneId = analysis.coordinateZoneId, radiusMeters = (float)analysis.radiusMeters, analysisDate = analysis.date, timezone = analysis.timezone,
+            sampleSpacingMeters = (float)analysis.sampleSpacingMeters, pedestrianHeightMeters = (float)analysis.pedestrianHeightMeters,
+            edges = edges.ToArray()
+        };
+        input.Validate();
+        var relativePath = "runtime-shade-input.json";
+        var target = Path.Combine(targetRoot, relativePath);
+        File.WriteAllText(target, JsonUtility.ToJson(input));
+        files.Add(new EnvironmentCostRuntimeCityPackageFile
+        {
+            kind = "runtime-shade-input", relativePath = relativePath, bytes = new FileInfo(target).Length,
+            sha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(target)
+        });
+    }
+
+    private static float[] ToLocalPoint(GeoReference reference, JArray coordinate)
+    {
+        if (coordinate == null || coordinate.Count != 2) throw new InvalidOperationException("Baseline coordinate is invalid.");
+        var longitude = (double?)coordinate[0] ?? throw new InvalidOperationException("Baseline longitude is invalid.");
+        var latitude = (double?)coordinate[1] ?? throw new InvalidOperationException("Baseline latitude is invalid.");
+        var projected = reference.Project(new GeoCoordinate(latitude, longitude, 0.0));
+        return new[] { (float)projected.X, (float)projected.Z };
+    }
+
+    private static void ValidateBaselineForRuntimeInput(JObject baseline, AnalysisRunConfig analysis)
+    {
+        if (!string.Equals((string)baseline["schemaVersion"], "environment-cost-analysis-0.2", StringComparison.Ordinal) ||
+            !string.Equals((string)baseline["status"], "completed", StringComparison.Ordinal) ||
+            !string.Equals((string)baseline["areaId"], analysis.areaId, StringComparison.Ordinal) ||
+            (int?)baseline["coordinateZoneId"] != analysis.coordinateZoneId || !Near((double?)baseline["radiusMeters"], analysis.radiusMeters))
+            throw new InvalidOperationException("Baseline environment cost does not match the runtime analysis configuration.");
+        var center = baseline["center"] as JArray;
+        var settings = baseline["settings"] as JObject;
+        if (center == null || center.Count != 2 || settings == null || !Near((double?)center[0], analysis.CenterLongitude) ||
+            !Near((double?)center[1], analysis.CenterLatitude) || !string.Equals((string)settings["date"], analysis.date, StringComparison.Ordinal) ||
+            !string.Equals((string)settings["timezone"], analysis.timezone, StringComparison.Ordinal) ||
+            !Near((double?)settings["sampleSpacingMeters"], analysis.sampleSpacingMeters) ||
+            !Near((double?)settings["pedestrianHeightMeters"], analysis.pedestrianHeightMeters) ||
+            !Near((double?)settings["walkingSpeedMetersPerSecond"], analysis.walkingSpeedMetersPerSecond))
+            throw new InvalidOperationException("Baseline environment cost metadata or settings do not match the runtime analysis configuration.");
+    }
+
+    private static bool Near(double? actual, double expected) => actual.HasValue && Math.Abs(actual.Value - expected) <= 0.000001;
 
     private static void CopyToPackage(string source, string targetRoot, string relativePath, string kind,
         List<EnvironmentCostRuntimeCityPackageFile> files)

@@ -263,6 +263,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             config.radiusMeters, config.date, config.timezone);
         var packageLoader = root.AddComponent<EnvironmentCostRuntimeCityPackageLoader>();
         packageLoader.Configure("EnvironmentCostCities");
+        root.AddComponent<EnvironmentCostRuntimeShadeAnalysisController>();
         var solarController = root.AddComponent<EnvironmentCostSolarController>();
         solarController.Configure(metadata, sun, config.hours);
     }
