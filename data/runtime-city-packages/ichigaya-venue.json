@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "environment-cost-runtime-city-package-config-0.1",
+  "areaId": "ichigaya-venue",
+  "displayName": "市ヶ谷",
+  "version": "2026.08.29",
+  "analysisConfigPath": "data/analysis-configs/ichigaya-venue.json",
+  "roadNetworkBundlePath": "data/generated/localHackathon2026Summer/manifest.json",
+  "baselineEnvironmentCostPath": "data/generated/ichigaya-venue-environment-cost.json",
+  "packageRelativePath": "EnvironmentCostCities/ichigaya-venue"
+}

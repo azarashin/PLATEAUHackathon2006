@@ -66,6 +66,21 @@ public static class HourlyEnvironmentCostSelfTests
             scenario.Validate("self-test");
             if (string.IsNullOrWhiteSpace(scenario.Fingerprint())) throw new InvalidOperationException("Expected scenario fingerprint.");
             AssertThrows<InvalidOperationException>(() => new EnvironmentCostPolicyScenario { id = "invalid", recalculationScope = "affected" }.Validate("self-test"));
+            var runtimePackage = new EnvironmentCostRuntimeCityPackageManifest
+            {
+                schemaVersion = "environment-cost-runtime-city-package-0.1",
+                areaId = "self-test-city",
+                version = "1.0.0",
+                coordinateZoneId = 9,
+                center = new[] { 139.0, 35.0 },
+                radiusMeters = 100.0,
+                inspectionSceneAssetPath = "Assets/Scenes/EnvironmentCostInspection/self-test-city.unity",
+                scene = new EnvironmentCostRuntimeCityPackageScene { requiredLayers = new[] { new EnvironmentCostRuntimeCityPackageLayer { name = "Road", layer = 9, role = "walkable-surface" } } },
+                files = new[] { new EnvironmentCostRuntimeCityPackageFile { relativePath = "road-network/topology.json", bytes = 1, sha256 = new string('a', 64) } }
+            };
+            runtimePackage.ValidateStructure();
+            AssertEqual(true, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("road-network/topology.json"));
+            AssertEqual(false, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("../outside.json"));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
