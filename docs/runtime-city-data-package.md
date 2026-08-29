@@ -67,7 +67,7 @@ flowchart TD
   R4 -->|施策別 server bundle<br/>manifest + topology + cost slices| S1 --> S2 --> V1
 ```
 
-`EnvironmentCostRuntimeCityPackageLoader` が扱う都市パッケージと、経路計算サーバが扱う server bundle は役割が異なる。前者は Player が都市を安全に開くための入力、後者は経路 API が施策別の経路を返すための入力である。Runtime が出力する施策・再計算結果は、最終的には `environment-cost-server-bundle-1.0` 形式へ変換して経路計算サーバへ配備する。この変換・配備は #61〜#64 で実装する連携であり、#60 はその入力都市データを保証する段階である。
+`EnvironmentCostRuntimeCityPackageLoader` が扱う都市パッケージと、経路計算サーバが扱う server bundle は役割が異なる。前者は Player が都市を安全に開くための入力、後者は経路 API が施策別の経路を返すための入力である。Runtime が出力する施策・再計算結果は、最終的には `environment-cost-server-bundle-1.0` 形式へ変換して経路計算サーバへ配備する。この変換・配備は MVP 後・低優先度の #65 で扱い、#60 はその入力都市データを保証する段階である。
 
 ### 1. Unity Editor で実行バイナリを生成するときに必要なもの
 
@@ -109,7 +109,7 @@ flowchart TD
 
 **#60 時点**で永続的に生成するのは、ロード可否とエラー理由を Console／画面に出す状態だけである。都市パッケージ自体はビルド担当者が生成する配布データであり、Runtime の使用者が生成・上書きするものではない。
 
-**#61〜#64 完了後**は、次のデータを Runtime 側で保存する設計にする。元の基準データを上書きせず、入力と結果を監査可能な別データとして扱う。施策シナリオと再計算結果からは、経路計算サーバ用の `environment-cost-server-bundle-1.0` を生成し、サーバへ配備する。
+**#61〜#64 完了後**は、次のデータを Runtime 側で保存する設計にする。元の基準データを上書きせず、入力と結果を監査可能な別データとして扱う。施策シナリオと再計算結果を経路計算サーバ用の `environment-cost-server-bundle-1.0` へ変換して配備する直接連携は、MVP 後・低優先度の #65 で扱う。
 
 | Runtime が保存する予定のデータ | 内容 |
 | --- | --- |
