@@ -18,7 +18,7 @@ Runtime 配布版では Unity Editor、AssetDatabase、PLATEAU SDK のインポ�
 この初期版の Runtime は、**都市の固定データを検証して読み込む基盤**である。都市計画担当者が Runtime 画面で植樹・日よけ・障害物を編集し、再計算する機能は #61〜#64 で追加する。そのため、現時点の実行バイナリの使用者に JSON を記述させることはない。
 
 ```mermaid
-flowchart LR
+flowchart TD
   subgraph A[作成担当者 / Unity Editor]
     A1[CityGML から生成済みの Inspection Scene<br/>表示 Mesh + Raycast Collider]
     A2[道路ネットワーク bundle<br/>topology + 時刻別コスト]
@@ -41,7 +41,17 @@ flowchart LR
   subgraph R[実行バイナリ / Runtime]
     R1[EnvironmentCostRuntimeCityPackageLoader<br/>地域・CRS・範囲・Collider・SHA-256 を検証]
     R2[現時点: 都市を表示し、検証状態を表示]
-    R3[将来: 施策・計算結果・監査記録を保存]
+    R3[将来: 施策・再計算結果・監査記録を保存]
+    R4[将来: server bundle を生成・エクスポート]
+  end
+
+  subgraph S[経路計算サーバ]
+    S1[環境コスト server bundle を検証・ロード]
+    S2[経路 API<br/>最短・バランス・日陰優先を返す]
+  end
+
+  subgraph V[Web Viewer / 利用者]
+    V1[地図・経路・A/B 比較を表示]
   end
 
   A1 --> B
@@ -53,8 +63,11 @@ flowchart LR
   D1 --> U1
   D2 --> U1
   U1 --> R1 --> R2
-  U2 -. #61〜#64 .-> R3
+  U2 -. #61〜#63 .-> R3 --> R4
+  R4 -->|施策別 server bundle<br/>manifest + topology + cost slices| S1 --> S2 --> V1
 ```
+
+`EnvironmentCostRuntimeCityPackageLoader` が扱う都市パッケージと、経路計算サーバが扱う server bundle は役割が異なる。前者は Player が都市を安全に開くための入力、後者は経路 API が施策別の経路を返すための入力である。Runtime が出力する施策・再計算結果は、最終的には `environment-cost-server-bundle-1.0` 形式へ変換して経路計算サーバへ配備する。この変換・配備は #61〜#64 で実装する連携であり、#60 はその入力都市データを保証する段階である。
 
 ### 1. Unity Editor で実行バイナリを生成するときに必要なもの
 
@@ -96,7 +109,7 @@ flowchart LR
 
 **#60 時点**で永続的に生成するのは、ロード可否とエラー理由を Console／画面に出す状態だけである。都市パッケージ自体はビルド担当者が生成する配布データであり、Runtime の使用者が生成・上書きするものではない。
 
-**#61〜#64 完了後**は、次のデータを Runtime 側で保存する設計にする。元の基準データを上書きせず、入力と結果を監査可能な別データとして扱う。
+**#61〜#64 完了後**は、次のデータを Runtime 側で保存する設計にする。元の基準データを上書きせず、入力と結果を監査可能な別データとして扱う。施策シナリオと再計算結果からは、経路計算サーバ用の `environment-cost-server-bundle-1.0` を生成し、サーバへ配備する。
 
 | Runtime が保存する予定のデータ | 内容 |
 | --- | --- |
@@ -104,6 +117,7 @@ flowchart LR
 | 再計算結果 | 影響範囲、進捗、成功／中断／失敗、生成時刻、入力・出力 fingerprint |
 | A/B 比較結果 | 基準案と比較案の指定、経路・日陰率・環境コストの差分 |
 | 監査記録 | 使用した都市パッケージ manifest、検証結果、計算条件 |
+| 経路計算サーバ用 bundle | 施策別の manifest、道路 topology、時刻別 cost slices。サーバの `ROUTE_SCENARIO_BUNDLES` から参照する |
 
 ## 生成
 
