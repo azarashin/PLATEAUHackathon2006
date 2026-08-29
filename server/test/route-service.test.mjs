@@ -50,6 +50,18 @@ test('three profiles select shortest, balanced, and shaded paths', () => {
   assert.equal('costsByTimestamp' in result, false)
 })
 
+test('scenario comparison returns baseline and policy with one fixed condition set', () => {
+  const area = service.areas.get('route-server-fixture')
+  const baseline = area.scenarios.get('baseline')
+  area.scenarios.set('policy-fixture', { ...baseline, scenario: { id: 'policy-fixture', label: '施策テスト', fingerprintSha256: 'a'.repeat(64), generatedAt: baseline.scenario.generatedAt } })
+  const result = service.compareScenarios({ ...request(), baselineScenarioId: 'baseline', policyScenarioId: 'policy-fixture' })
+  assert.equal(result.schemaVersion, 'scenario-route-comparison-1.0')
+  assert.equal(result.baseline.scenario.id, 'baseline')
+  assert.equal(result.policy.scenario.id, 'policy-fixture')
+  assert.deepEqual(result.baseline.snapped, result.policy.snapped)
+  assert.equal(result.baseline.timestamp, result.policy.timestamp)
+})
+
 test('road edge details match the formal cost slice and aggregate to route KPIs', () => {
   const compared = service.compare(request())
   for (const route of compared.routes) {

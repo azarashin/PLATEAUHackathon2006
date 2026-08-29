@@ -6,6 +6,7 @@ import {
   formatDuration,
   formatShadeRatio,
   identicalRouteGroups,
+  parseScenarioRouteComparison,
   parseRouteResponse,
   profilesForShadeFactor,
 } from '../src/route-domain.ts'
@@ -34,6 +35,7 @@ function responseDocument() {
     schemaVersion: 'route-response-1.0',
     areaId: 'ichigaya-venue',
     timestamp: '2025-08-01T12:00:00+09:00',
+    scenario: { id: 'baseline', label: '現状', fingerprintSha256: null, generatedAt: '2025-08-01T00:00:00Z' },
     presentation: { kpiLabels: { unknownWalkingSeconds: '不明な歩行時間' } },
     snapped: {
       start: { snappedCoordinate: [139.73, 35.69], distanceMeters: 4.2 },
@@ -52,6 +54,14 @@ test('正式な3経路応答を解析して未丸めKPIを保持する', () => {
   assert.equal(parsed.routes.length, 3)
   assert.equal(parsed.routes[1]?.kpis.walkingSeconds, 230)
   assert.equal(parsed.presentation.kpiLabels.unknownWalkingSeconds, '不明な歩行時間')
+})
+
+test('施策比較は同一の地域・日時・スナップ起終点だけを受け入れる', () => {
+  const baseline = responseDocument()
+  const policy = responseDocument()
+  policy.scenario = { id: 'ichigaya-demo-shade', label: '施策: ichigaya-demo-shade', fingerprintSha256: 'a'.repeat(64), generatedAt: '2025-08-02T00:00:00Z' }
+  const parsed = parseScenarioRouteComparison({ schemaVersion: 'scenario-route-comparison-1.0', areaId: baseline.areaId, timestamp: baseline.timestamp, baseline, policy })
+  assert.equal(parsed.policy.scenario.id, 'ichigaya-demo-shade')
 })
 
 test('日陰優先度から既定3プロファイルを生成する', () => {

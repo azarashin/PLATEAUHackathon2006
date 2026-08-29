@@ -32,12 +32,21 @@ export interface RouteResponse {
   schemaVersion: 'route-response-1.0'
   areaId: string
   timestamp: string
+  scenario: { id: string; label: string; fingerprintSha256: string | null; generatedAt: string }
   presentation: { kpiLabels: { unknownWalkingSeconds: string } }
   snapped: {
     start: { snappedCoordinate: RouteCoordinate; distanceMeters: number }
     end: { snappedCoordinate: RouteCoordinate; distanceMeters: number }
   }
   routes: CalculatedRoute[]
+}
+
+export interface ScenarioRouteComparison {
+  schemaVersion: 'scenario-route-comparison-1.0'
+  areaId: string
+  timestamp: string
+  baseline: RouteResponse
+  policy: RouteResponse
 }
 
 export const DEFAULT_SHADE_FACTOR = 2
@@ -117,6 +126,9 @@ export function parseRouteResponse(value: unknown): RouteResponse {
   if (!isRecord(value) || value.schemaVersion !== 'route-response-1.0' || typeof value.areaId !== 'string' || typeof value.timestamp !== 'string') {
     throw new Error('経路サーバーの応答形式が不正です。')
   }
+  if (!isRecord(value.scenario) || typeof value.scenario.id !== 'string' || typeof value.scenario.label !== 'string' || (value.scenario.fingerprintSha256 !== null && typeof value.scenario.fingerprintSha256 !== 'string') || typeof value.scenario.generatedAt !== 'string') {
+    throw new Error('シナリオ識別情報が不正です。')
+  }
   if (!isRecord(value.presentation) || !isRecord(value.presentation.kpiLabels) || typeof value.presentation.kpiLabels.unknownWalkingSeconds !== 'string') {
     throw new Error('KPI表示情報が不正です。')
   }
@@ -129,6 +141,7 @@ export function parseRouteResponse(value: unknown): RouteResponse {
     schemaVersion: 'route-response-1.0',
     areaId: value.areaId,
     timestamp: value.timestamp,
+    scenario: { id: value.scenario.id, label: value.scenario.label, fingerprintSha256: value.scenario.fingerprintSha256, generatedAt: value.scenario.generatedAt },
     presentation: { kpiLabels: { unknownWalkingSeconds: value.presentation.kpiLabels.unknownWalkingSeconds } },
     snapped: {
       start: { snappedCoordinate: coordinate(value.snapped.start.snappedCoordinate, '出発地'), distanceMeters: nonNegative(value.snapped.start.distanceMeters, '出発地のスナップ距離') },
@@ -136,6 +149,20 @@ export function parseRouteResponse(value: unknown): RouteResponse {
     },
     routes,
   }
+}
+
+export function parseScenarioRouteComparison(value: unknown): ScenarioRouteComparison {
+  if (!isRecord(value) || value.schemaVersion !== 'scenario-route-comparison-1.0' || typeof value.areaId !== 'string' || typeof value.timestamp !== 'string') {
+    throw new Error('施策比較レスポンスが不正です。')
+  }
+  const baseline = parseRouteResponse(value.baseline)
+  const policy = parseRouteResponse(value.policy)
+  if (baseline.areaId !== value.areaId || policy.areaId !== value.areaId || baseline.timestamp !== value.timestamp || policy.timestamp !== value.timestamp) {
+    throw new Error('施策比較の地域または日時が一致しません。')
+  }
+  if (baseline.scenario.id === policy.scenario.id) throw new Error('比較するシナリオが同一です。')
+  if (JSON.stringify(baseline.snapped) !== JSON.stringify(policy.snapped)) throw new Error('施策比較の起終点スナップが一致しません。')
+  return { schemaVersion: 'scenario-route-comparison-1.0', areaId: value.areaId, timestamp: value.timestamp, baseline, policy }
 }
 
 export function profilesForShadeFactor(value: number): RouteProfile[] {

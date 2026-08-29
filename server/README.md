@@ -1,5 +1,7 @@
 # Environment Cost Route Server
 
+施策前後の同一条件比較は [都市施策 A/B 比較](../docs/policy-scenario-ab-comparison.md) を参照。
+
 #9のサーバーバンドルを起動時に検証・読込し、道路スナップ、最短・バランス・日陰優先経路、GeoJSON、KPIを`POST /api/v1/routes`で返します。`GET /api/v1/road-edges`は地図の表示範囲だけについて、道路辺ごとの日陰解析値と探索コスト根拠を返します。道路ネットワーク全体はブラウザへ配信しません。
 
 ## Fixtureで起動

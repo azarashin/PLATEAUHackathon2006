@@ -52,6 +52,15 @@
         "defaultTimestamp": { "type": "string", "format": "date-time" }
       }
     },
+    "policyScenario": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "fingerprintSha256"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fingerprintSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "costFormula": {
       "type": "object", "additionalProperties": false,
       "required": ["shadeRatioUnit", "solarExposureSecondsUnit", "solarExposureSeconds", "missingValuePolicy"],
