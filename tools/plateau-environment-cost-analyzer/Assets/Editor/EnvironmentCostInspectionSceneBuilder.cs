@@ -264,6 +264,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         var packageLoader = root.AddComponent<EnvironmentCostRuntimeCityPackageLoader>();
         packageLoader.Configure("EnvironmentCostCities");
         root.AddComponent<EnvironmentCostRuntimeShadeAnalysisController>();
+        root.AddComponent<EnvironmentCostRuntimePolicyScenarioController>();
         var solarController = root.AddComponent<EnvironmentCostSolarController>();
         solarController.Configure(metadata, sun, config.hours);
     }
