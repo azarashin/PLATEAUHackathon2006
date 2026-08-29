@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "environment-cost-policy-scenario-0.1",
+  "id": "ichigaya-demo-shade",
+  "recalculationScope": "all",
+  "facilities": [
+    {
+      "id": "shade-ichigaya-center",
+      "type": "shade",
+      "latitude": 35.6906957,
+      "longitude": 139.7358423,
+      "heightMeters": 4.0,
+      "widthMeters": 40.0,
+      "depthMeters": 40.0
+    }
+  ]
+}

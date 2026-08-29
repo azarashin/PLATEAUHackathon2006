@@ -55,6 +55,17 @@ public static class HourlyEnvironmentCostSelfTests
             var meshUnit = new MeshPartitionUnit { minLatitude = 35.0, minLongitude = 139.0, maxLatitude = 36.0, maxLongitude = 140.0 };
             AssertEqual(true, MeshPartitionPlanner.Owns(meshUnit, 35.0, 139.0));
             AssertEqual(false, MeshPartitionPlanner.Owns(meshUnit, 36.0, 139.5));
+            var scenario = new EnvironmentCostPolicyScenario
+            {
+                id = "self-test-scenario",
+                facilities = new System.Collections.Generic.List<EnvironmentCostPolicyFacility>
+                {
+                    new EnvironmentCostPolicyFacility { id = "tree-1", type = "tree", latitude = 35.0, longitude = 139.0 }
+                }
+            };
+            scenario.Validate("self-test");
+            if (string.IsNullOrWhiteSpace(scenario.Fingerprint())) throw new InvalidOperationException("Expected scenario fingerprint.");
+            AssertThrows<InvalidOperationException>(() => new EnvironmentCostPolicyScenario { id = "invalid", recalculationScope = "affected" }.Validate("self-test"));
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "environment-cost-analysis-config-0.2",
+  "areaId": "ichigaya-venue",
+  "center": [139.736043, 35.690470],
+  "radiusMeters": 4000,
+  "coordinateZoneId": 9,
+  "date": "2025-08-01",
+  "timezone": "Asia/Tokyo",
+  "hours": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "sampleSpacingMeters": 25,
+  "pedestrianHeightMeters": 1.5,
+  "walkingSpeedMetersPerSecond": 1.4,
+  "candidateDatasetIds": ["13101", "13102", "13103", "13104", "13105", "13106", "13113"],
+  "datasetRoots": {
+    "13101": "data/raw/plateau/13101-2025",
+    "13102": "data/raw/plateau/13102-2025",
+    "13103": "data/raw/plateau/13103-2025",
+    "13104": "data/raw/plateau/13104-2025",
+    "13105": "data/raw/plateau/13105-2025",
+    "13106": "data/raw/plateau/13106-2025",
+    "13113": "data/raw/plateau/13113-2025"
+  },
+  "osmInputPath": "data/raw/ichigaya-osm-highways-with-nodes.json",
+  "coverageOutputPath": "data/raw/ichigaya-venue-mesh-coverage.json",
+  "environmentCostOutputPath": "data/generated/ichigaya-venue-policy-demo-environment-cost.json",
+  "summaryOutputPath": "data/raw/ichigaya-venue-policy-demo-analysis-summary.json",
+  "cacheDirectoryPath": "data/raw/environment-cost-cache/ichigaya-venue-policy-demo",
+  "stateOutputPath": "data/raw/ichigaya-venue-policy-demo-analysis-state.json",
+  "cancellationRequestPath": "data/raw/ichigaya-venue-policy-demo-analysis.cancel",
+  "policyScenarioInputPath": "data/policy-scenarios/ichigaya-demo-shade.json"
+}

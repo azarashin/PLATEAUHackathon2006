@@ -29,6 +29,7 @@ public sealed class AnalysisRunConfig
     public string cacheDirectoryPath;
     public string stateOutputPath;
     public string cancellationRequestPath;
+    public string policyScenarioInputPath;
     public MeshPartitionSettings meshPartition;
 
     [JsonIgnore] public string repositoryRoot;
