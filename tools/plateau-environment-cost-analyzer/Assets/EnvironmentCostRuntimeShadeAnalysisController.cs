@@ -25,6 +25,8 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private int totalEdges;
     private int recalculatedEdges;
     private string activeScope;
+    private double lastElapsedSeconds = -1.0;
+    private string lastCompletedScope;
 
     public EnvironmentCostRuntimeShadeAnalysisResult LatestResult { get; private set; }
     public bool IsRunning => activeRun != null;
@@ -144,6 +146,8 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
             isLatestResultCurrent = true;
             changedFacilities.Clear();
             requiresFullRecalculation = false;
+            lastElapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+            lastCompletedScope = activeScope;
             statusMessage = $"日陰解析が完了しました: {activeScope}、{recalculatedEdges:N0}/{totalEdges:N0} 辺、{stopwatch.Elapsed.TotalSeconds:F1}秒。証跡: {savedPath}";
             UnityEngine.Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_READY area={metadata.AreaId} hour={selectedHour} scope={activeScope} edges={totalEdges} recalculated={recalculatedEdges} seconds={stopwatch.Elapsed.TotalSeconds:F3} fingerprint={result.provenance.resultFingerprintSha256}");
         }
@@ -173,7 +177,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private void OnGUI()
     {
         if (!Application.isPlaying) return;
-        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 220f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 250f), GUI.skin.box);
         GUILayout.Label("日陰解析");
         selectedHour = Mathf.RoundToInt(GUILayout.HorizontalSlider(selectedHour, 0f, 23f));
         GUILayout.Label($"解析時刻: {selectedHour:00}:00");
@@ -185,6 +189,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
         GUILayout.EndHorizontal();
         GUI.enabled = originalEnabled;
         if (IsRunning && GUILayout.Button("解析を取り消す")) CancelCurrentRun();
+        if (lastElapsedSeconds >= 0.0) GUILayout.Label($"前回の解析時間: {lastElapsedSeconds:F1}秒（{lastCompletedScope}）");
         GUILayout.Label(statusMessage);
         GUILayout.EndArea();
     }
