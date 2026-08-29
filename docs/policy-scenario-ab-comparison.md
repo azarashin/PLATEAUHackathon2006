@@ -24,4 +24,24 @@ npm --prefix server start
 
 Viewer で市ヶ谷デモ条件を選択し、起終点を指定して計算する。`比較する施策` は `ichigaya-demo-shade` を選ぶ。結果には双方の scenario ID、生成時刻、フィンガープリント先頭が表示され、道路別根拠は施策後バンドルを示す。
 
+## 複数施策を読み込む設定
+
+`ROUTE_SCENARIO_BUNDLES` は、`manifestPath` と `scenarioId` を持つ **1件以上の JSON 配列**である。要素数は2件に限定されない。同じ地域について、現状と複数の施策案を同時に読み込める。
+
+```powershell
+$env:ROUTE_SCENARIO_BUNDLES = '[
+  {"manifestPath":"../data/generated/ichigaya-baseline-route-bundle/manifest.json","scenarioId":"baseline"},
+  {"manifestPath":"../data/generated/ichigaya-policy-a-route-bundle/manifest.json","scenarioId":"ichigaya-policy-a"},
+  {"manifestPath":"../data/generated/ichigaya-policy-b-route-bundle/manifest.json","scenarioId":"ichigaya-policy-b"}
+]'
+```
+
+- 1件: 単一シナリオの通常経路案内
+- 2件: `baseline` と1施策案の A/B 比較
+- 3件以上: `baseline` と案A・案Bなどの複数施策を同時に読込
+
+同じ `areaId` 内で複数施策を比較対象にする場合、各バンドルの `roadGraphFingerprintSha256`、対象中心・半径、基準日・タイムゾーン・利用可能時刻集合が一致しなければ、サーバーは起動時に拒否する。`POST /api/v1/scenario-comparisons` は、読込済み配列から `baselineScenarioId` と `policyScenarioId` を1つずつ指定して比較する。
+
+現Viewerは `ichigaya-demo-shade` の1案を固定選択する実装であり、上記の案A・案Bを画面から選ぶ機能は未実装である。複数案を読み込んでも、Viewer側の施策一覧・選択UIを追加するまで画面で切替はできない。
+
 `ROUTE_BUNDLE_MANIFESTS` は既存の単一（現状）運用との後方互換用である。A/B 比較には `ROUTE_SCENARIO_BUNDLES` を使う。
