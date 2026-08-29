@@ -414,7 +414,14 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         scroll = GUILayout.BeginScrollView(scroll);
         GUILayout.Label("施策シナリオエディター");
         GUILayout.Label(dirty ? "未保存の変更あり" : "保存済み");
-        scenarioIdInput = GUILayout.TextField(scenarioIdInput); displayNameInput = GUILayout.TextField(displayNameInput); authorInput = GUILayout.TextField(authorInput); memoInput = GUILayout.TextArea(memoInput, GUILayout.MinHeight(36));
+        GUILayout.Label("シナリオ ID");
+        scenarioIdInput = GUILayout.TextField(scenarioIdInput);
+        GUILayout.Label("表示名");
+        displayNameInput = GUILayout.TextField(displayNameInput);
+        GUILayout.Label("担当者名");
+        authorInput = GUILayout.TextField(authorInput);
+        GUILayout.Label("根拠メモ");
+        memoInput = GUILayout.TextArea(memoInput, GUILayout.MinHeight(36));
         GUILayout.BeginHorizontal(); foreach (var type in new[] { "tree", "shade", "obstacle" }) if (GUILayout.Toggle(selectedType == type, FacilityTypeLabel(type), "Button")) selectedType = type; GUILayout.EndHorizontal();
         placeMode = GUILayout.Toggle(placeMode, "選択した種別を道路・地表のクリックで配置", "Button");
         if (selected != null)
