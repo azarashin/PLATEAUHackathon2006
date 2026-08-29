@@ -8,19 +8,22 @@ public sealed class EnvironmentCostInspectionFlyCamera : MonoBehaviour
 
     private float yaw;
     private float pitch;
+    private EnvironmentCostRuntimeShadeAnalysisController shadeAnalysis;
 
     private void Awake()
     {
         var angles = transform.eulerAngles;
         yaw = angles.y;
         pitch = angles.x;
+        shadeAnalysis = FindFirstObjectByType<EnvironmentCostRuntimeShadeAnalysisController>();
     }
 
     private void Update()
     {
         // IMGUI text fields retain a keyboard control while the user is editing them.
         // Do not also interpret A/D/W/S/Q/E as fly-camera input in that state.
-        if (!Application.isPlaying || GUIUtility.keyboardControl != 0) return;
+        shadeAnalysis ??= FindFirstObjectByType<EnvironmentCostRuntimeShadeAnalysisController>();
+        if (!Application.isPlaying || GUIUtility.keyboardControl != 0 || shadeAnalysis?.IsRunning == true) return;
         var speed = movementMetersPerSecond * (Input.GetKey(KeyCode.LeftShift) ? 3f : 1f) * Time.deltaTime;
         var movement = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
         if (Input.GetKey(KeyCode.E)) movement.y += 1f;

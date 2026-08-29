@@ -18,6 +18,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     [SerializeField, TextArea] private string statusMessage = "都市データパッケージの確認を待機しています。";
 
     private readonly List<EnvironmentCostRuntimePolicyFacility> changedFacilities = new List<EnvironmentCostRuntimePolicyFacility>();
+    private readonly List<Camera> suspendedSceneCameras = new List<Camera>();
     private Coroutine activeRun;
     private bool cancellationRequested;
     private bool requiresFullRecalculation;
@@ -65,6 +66,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private void RunHours(int[] hours)
     {
         if (IsRunning || packageLoader == null || packageLoader.State != EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready || metadata == null) return;
+        SuspendSceneRendering();
         activeRun = StartCoroutine(RunHoursAsync(++runVersion, hours));
     }
 
@@ -166,8 +168,27 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
         }
         finally
         {
+            ResumeSceneRendering();
             activeRun = null;
         }
+    }
+
+    private void SuspendSceneRendering()
+    {
+        suspendedSceneCameras.Clear();
+        foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            if (!camera.enabled || camera.GetComponent<EnvironmentCostInspectionFlyCamera>() == null) continue;
+            camera.enabled = false;
+            suspendedSceneCameras.Add(camera);
+        }
+    }
+
+    private void ResumeSceneRendering()
+    {
+        foreach (var camera in suspendedSceneCameras)
+            if (camera != null) camera.enabled = true;
+        suspendedSceneCameras.Clear();
     }
 
     private void ApplyProvenance(EnvironmentCostRuntimeShadeAnalysisResult result, string scope, int edgeCount, int recalculatedCount)
@@ -201,6 +222,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
         if (GUILayout.Button("全時刻を解析")) RunAllHours();
         GUILayout.EndHorizontal();
         GUI.enabled = originalEnabled;
+        if (IsRunning) GUILayout.Label("解析中は3D表示とカメラ操作を一時停止しています。");
         if (IsRunning && GUILayout.Button("解析を取り消す")) CancelCurrentRun();
         if (lastElapsedSeconds >= 0.0) GUILayout.Label($"前回の解析時間: {lastElapsedSeconds:F1}秒（{lastCompletedScope}）");
         GUILayout.Label(statusMessage);
