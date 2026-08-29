@@ -25,10 +25,10 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private bool dirty;
     private EnvironmentCostRuntimePolicyFacility lastValidSelected;
     private Camera interactionCamera;
-    private string status = "Loading Runtime policy editor…";
+    private string status = "施策シナリオエディターを読み込み中です…";
     private string selectedType = "tree";
     private string scenarioIdInput = "runtime-scenario";
-    private string displayNameInput = "New scenario";
+    private string displayNameInput = "新しいシナリオ";
     private string authorInput = "";
     private string memoInput = "";
     private Vector2 scroll;
@@ -55,11 +55,11 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         while (packageLoader != null && (packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.NotStarted || packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Loading)) yield return null;
         if (metadata == null || packageLoader == null || packageLoader.State != EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready)
         {
-            status = "Runtime policy editor requires a verified city package and inspection metadata.";
+            status = "施策シナリオエディターには検証済みの都市データパッケージと検証シーン情報が必要です。";
             yield break;
         }
         CreateNewScenario();
-        status = "Select a type, then place it on a road. Click an existing policy object to select and drag it.";
+        status = "種別を選び、道路または地表をクリックして配置します。既存の施策はクリックして選択し、ドラッグで移動できます。";
     }
 
     private void Update()
@@ -81,16 +81,16 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             lastValidSelected = CloneFacility(selected);
             dragging = true;
             placeMode = false;
-            status = $"Selected {selected.id}. Drag on a road to move; Delete removes it.";
+            status = $"「{selected.id}」を選択しました。道路または地表へドラッグして移動し、Delete キーで削除できます。";
             return;
         }
         if (!placeMode) return;
         if (TryGroundPosition(out var groundPosition, out var hasGroundCollider))
         {
             if (AddFacility(groundPosition) && !hasGroundCollider)
-                status = "No Road/Terrain collider was found; placed on the local ground reference plane (Y=0). Verify and adjust the position if needed.";
+                status = "道路・地表 collider が見つからないため、ローカル地表基準面（Y=0）へ配置しました。必要に応じて位置を確認・調整してください。";
         }
-        else status = "The map click could not be projected onto the ground reference plane.";
+        else status = "クリック位置を地表基準面へ投影できませんでした。";
     }
 
     private void MoveSelectedToRoad()
@@ -101,7 +101,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         UpdateGeoCoordinate(selected);
         RenderScenario();
         lastValidSelected = CloneFacility(selected);
-        MarkDirty("Facility moved. Re-run analysis to refresh the in-memory result.");
+        MarkDirty("施策を移動しました。結果を更新するには日陰解析を再実行してください。");
     }
 
     private bool TryPolicyRaycast(out RaycastHit hit, out EnvironmentCostRuntimePolicyFacilityInstance instance)
@@ -153,7 +153,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (interactionCamera != null && interactionCamera.isActiveAndEnabled) return interactionCamera;
         interactionCamera = Camera.main;
         if (interactionCamera == null) interactionCamera = FindFirstObjectByType<Camera>();
-        if (interactionCamera == null) status = "No active Camera is available for map interaction.";
+        if (interactionCamera == null) status = "地図操作に使用できるカメラがありません。";
         return interactionCamera;
     }
 
@@ -161,18 +161,18 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         issue = null;
         var horizontal = new Vector2(position.x, position.z);
-        if (horizontal.magnitude > metadata.RadiusMeters) { issue = "Placement is outside the packaged analysis extent."; return false; }
+        if (horizontal.magnitude > metadata.RadiusMeters) { issue = "配置位置が都市データパッケージの解析範囲外です。"; return false; }
         var groundStart = new Vector3(position.x, 1000f, position.z);
         var groundMask = (1 << RoadLayer) | (1 << TerrainLayer);
         var hasGround = Physics.Raycast(groundStart, Vector3.down, out var ground, 2000f, groundMask, QueryTriggerInteraction.Ignore);
         if (hasGround && Mathf.Abs(ground.point.y - position.y) > 0.25f)
         {
-            issue = "Placement is off the ground surface. Use the displayed ground height or click the map.";
+            issue = "配置位置が地表面から離れています。表示された地表高を入力するか、地図をクリックしてください。";
             return false;
         }
         if (!hasGround && Mathf.Abs(position.y) > 0.25f)
         {
-            issue = "This Scene has no Road/Terrain collider at the edited position; use local ground reference Y=0 or click the map.";
+            issue = "編集位置に道路・地表 collider がありません。ローカル地表基準面 Y=0 を使うか、地図をクリックしてください。";
             return false;
         }
         foreach (var facility in scenario.facilities)
@@ -181,7 +181,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             var radius = FacilityFootprintRadius(facility) + FacilityFootprintRadius(excluded);
             if (Vector2.Distance(horizontal, new Vector2(facility.localPosition.x, facility.localPosition.z)) < radius)
             {
-                issue = "Placement overlaps another policy facility. Move it further away.";
+                issue = "配置位置が他の施策と重なっています。離れた位置へ移動してください。";
                 return false;
             }
         }
@@ -206,7 +206,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         selected = facility;
         lastValidSelected = CloneFacility(facility);
         RenderScenario();
-        MarkDirty($"Added {facility.type} {facility.id}. Drag it or edit its values below.");
+        MarkDirty($"{FacilityTypeLabel(facility.type)}「{facility.id}」を追加しました。ドラッグまたは下の項目で編集できます。");
         return true;
     }
 
@@ -218,7 +218,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         selected = null;
         lastValidSelected = null;
         RenderScenario();
-        MarkDirty($"Deleted {id}.");
+        MarkDirty($"「{id}」を削除しました。");
     }
 
     private void CreateNewScenario()
@@ -244,7 +244,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         var clone = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyScenario>(EnvironmentCostRuntimePolicyJson.Serialize(scenario));
         clone.id = scenario.id + "-copy";
-        clone.displayName = scenario.displayName + " copy";
+        clone.displayName = scenario.displayName + "（コピー）";
         clone.createdAtUtc = null;
         clone.updatedAtUtc = null;
         scenario = clone;
@@ -253,7 +253,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         selected = null;
         lastValidSelected = null;
         RenderScenario();
-        MarkDirty("Scenario cloned. Give it an ID and save it.");
+        MarkDirty("シナリオを複製しました。IDを入力して保存してください。");
     }
 
     private void SaveScenario()
@@ -263,10 +263,10 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             ApplyHeaderInputs();
             EnvironmentCostRuntimePolicyScenarioStore.Save(scenario);
             dirty = false;
-            status = $"Saved {scenario.id} ({scenario.facilities.Count} facilities) to {EnvironmentCostRuntimePolicyScenarioStore.GetPath(scenario.areaId, scenario.id)}";
+            status = $"「{scenario.id}」を保存しました（{scenario.facilities.Count}件）。保存先: {EnvironmentCostRuntimePolicyScenarioStore.GetPath(scenario.areaId, scenario.id)}";
             Debug.Log($"ENVIRONMENT_COST_RUNTIME_POLICY_SCENARIO_SAVED area={scenario.areaId} id={scenario.id} facilities={scenario.facilities.Count} fingerprint={scenario.Fingerprint()}");
         }
-        catch (Exception exception) { status = $"Save failed: {exception.Message}"; Debug.LogException(exception); }
+        catch (Exception exception) { status = $"保存に失敗しました: {exception.Message}"; Debug.LogException(exception); }
     }
 
     private void LoadScenario(string path)
@@ -277,9 +277,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             ValidateLoadedScenarioPackage(loaded);
             scenario = loaded;
             scenarioIdInput = scenario.id; displayNameInput = scenario.displayName; authorInput = scenario.author; memoInput = scenario.evidenceMemo;
-            selected = null; lastValidSelected = null; dirty = false; RenderScenario(); status = $"Loaded {scenario.id}.";
+            selected = null; lastValidSelected = null; dirty = false; RenderScenario(); status = $"「{scenario.id}」を読み込みました。";
         }
-        catch (Exception exception) { status = $"Load failed: {exception.Message}"; Debug.LogException(exception); }
+        catch (Exception exception) { status = $"読込に失敗しました: {exception.Message}"; Debug.LogException(exception); }
     }
 
     private void ImportLegacyScenario()
@@ -287,9 +287,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         try
         {
             var path = Path.Combine(Application.persistentDataPath, "EnvironmentCostScenarios", "import-policy-scenario.json");
-            if (!File.Exists(path)) throw new FileNotFoundException("Put an existing 0.1 policy JSON at", path);
-            var legacy = JsonConvert.DeserializeObject<LegacyPolicyScenario>(File.ReadAllText(path)) ?? throw new InvalidOperationException("Legacy policy JSON could not be parsed.");
-            if (legacy.schemaVersion != "environment-cost-policy-scenario-0.1") throw new InvalidOperationException("Only policy scenario schema 0.1 can be imported.");
+            if (!File.Exists(path)) throw new FileNotFoundException("既存形式の 0.1 ポリシー JSON を次の場所へ置いてください", path);
+            var legacy = JsonConvert.DeserializeObject<LegacyPolicyScenario>(File.ReadAllText(path)) ?? throw new InvalidOperationException("既存形式のポリシー JSON を読み取れませんでした。");
+            if (legacy.schemaVersion != "environment-cost-policy-scenario-0.1") throw new InvalidOperationException("取り込めるのはポリシーシナリオのスキーマ 0.1 のみです。");
             CreateNewScenario(); scenario.id = legacy.id; scenario.displayName = legacy.id;
             var skipped = 0;
             foreach (var item in legacy.facilities ?? Array.Empty<LegacyPolicyFacility>())
@@ -310,9 +310,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
                 }
                 scenario.facilities.Add(facility);
             }
-            scenarioIdInput = scenario.id; displayNameInput = scenario.displayName; RenderScenario(); MarkDirty($"Imported {scenario.facilities.Count} legacy facilities; skipped {skipped} invalid or unsupported facilities. Save as a Runtime scenario.");
+            scenarioIdInput = scenario.id; displayNameInput = scenario.displayName; RenderScenario(); MarkDirty($"既存形式の施策を{scenario.facilities.Count}件取り込みました。無効または未対応の施策は{skipped}件省略しました。Runtime シナリオとして保存してください。");
         }
-        catch (Exception exception) { status = $"Import failed: {exception.Message}"; }
+        catch (Exception exception) { status = $"取込に失敗しました: {exception.Message}"; }
     }
 
     private void ApplyHeaderInputs()
@@ -322,13 +322,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     private void ValidateLoadedScenarioPackage(EnvironmentCostRuntimePolicyScenario loaded)
     {
-        var manifestPath = Path.Combine(packageLoader.PackageRootPath ?? throw new InvalidOperationException("Verified package root is unavailable."), "manifest.json");
+        var manifestPath = Path.Combine(packageLoader.PackageRootPath ?? throw new InvalidOperationException("検証済みの都市データパッケージのルートが利用できません。"), "manifest.json");
         var manifestSha = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(manifestPath);
         if (loaded.areaId != metadata.AreaId || loaded.coordinateZoneId != metadata.CoordinateZoneId ||
             Math.Abs(loaded.centerLongitude - metadata.Longitude) > 0.000001 || Math.Abs(loaded.centerLatitude - metadata.Latitude) > 0.000001 ||
             !string.Equals(loaded.cityPackageVersion, packageLoader.Manifest.version, StringComparison.Ordinal) ||
             !string.Equals(loaded.cityPackageManifestSha256, manifestSha, StringComparison.Ordinal))
-            throw new InvalidOperationException("Scenario was saved for a different city package or coordinate reference and cannot be loaded into this scene.");
+            throw new InvalidOperationException("このシナリオは異なる都市データパッケージまたは座標系で保存されているため、このシーンには読み込めません。");
     }
 
     private static EnvironmentCostRuntimePolicyFacility CloneFacility(EnvironmentCostRuntimePolicyFacility source)
@@ -403,6 +403,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     private static float FacilityFootprintRadius(EnvironmentCostRuntimePolicyFacility facility) => facility == null ? 0f : facility.type == "tree" ? (float)facility.radiusMeters : Mathf.Max((float)facility.widthMeters, (float)facility.depthMeters) * .5f;
     private static bool IsGroundLayer(int layer) => layer == RoadLayer || layer == TerrainLayer;
+    private static string FacilityTypeLabel(string type) => type == "tree" ? "樹木" : type == "shade" ? "日よけ" : "障害物";
     private bool IsPointerOverPanel() => Input.mousePosition.x < 490f && Input.mousePosition.y < 760f;
     private void MarkDirty(string message) { dirty = true; status = message; shadeAnalysis?.InvalidateForPolicyChange(scenario.id); }
 
@@ -411,22 +412,22 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (!Application.isPlaying || scenario == null) return;
         GUILayout.BeginArea(new Rect(16, 324, 460, Mathf.Min(Screen.height - 340, 620)), GUI.skin.box);
         scroll = GUILayout.BeginScrollView(scroll);
-        GUILayout.Label("Runtime Policy Scenario Editor");
-        GUILayout.Label(dirty ? "Unsaved changes" : "Saved state");
+        GUILayout.Label("施策シナリオエディター");
+        GUILayout.Label(dirty ? "未保存の変更あり" : "保存済み");
         scenarioIdInput = GUILayout.TextField(scenarioIdInput); displayNameInput = GUILayout.TextField(displayNameInput); authorInput = GUILayout.TextField(authorInput); memoInput = GUILayout.TextArea(memoInput, GUILayout.MinHeight(36));
-        GUILayout.BeginHorizontal(); foreach (var type in new[] { "tree", "shade", "obstacle" }) if (GUILayout.Toggle(selectedType == type, type, "Button")) selectedType = type; GUILayout.EndHorizontal();
-        placeMode = GUILayout.Toggle(placeMode, "Place selected type by clicking Road / Terrain", "Button");
+        GUILayout.BeginHorizontal(); foreach (var type in new[] { "tree", "shade", "obstacle" }) if (GUILayout.Toggle(selectedType == type, FacilityTypeLabel(type), "Button")) selectedType = type; GUILayout.EndHorizontal();
+        placeMode = GUILayout.Toggle(placeMode, "選択した種別を道路・地表のクリックで配置", "Button");
         if (selected != null)
         {
-            GUILayout.Label($"Selected: {selected.id} ({selected.type})");
-            selected.localPosition.x = FloatField("Local X m", selected.localPosition.x);
-            selected.localPosition.y = FloatField("Ground Y m", selected.localPosition.y);
-            selected.localPosition.z = FloatField("Local Z m", selected.localPosition.z);
-            selected.heightMeters = DoubleField("Height m", selected.heightMeters);
-            if (selected.type == "tree") selected.radiusMeters = DoubleField("Canopy radius m", selected.radiusMeters); else { selected.widthMeters = DoubleField("Width m", selected.widthMeters); selected.depthMeters = DoubleField("Depth m", selected.depthMeters); }
-            selected.rotationDegrees = FloatField("Direction deg", selected.rotationDegrees);
-            GUILayout.Label($"WGS84: {selected.latitude:F6}, {selected.longitude:F6}");
-            if (GUILayout.Button("Apply selected position / dimensions"))
+            GUILayout.Label($"選択中: {selected.id}（{FacilityTypeLabel(selected.type)}）");
+            selected.localPosition.x = FloatField("ローカル X（m）", selected.localPosition.x);
+            selected.localPosition.y = FloatField("地表 Y（m）", selected.localPosition.y);
+            selected.localPosition.z = FloatField("ローカル Z（m）", selected.localPosition.z);
+            selected.heightMeters = DoubleField("高さ（m）", selected.heightMeters);
+            if (selected.type == "tree") selected.radiusMeters = DoubleField("樹冠半径（m）", selected.radiusMeters); else { selected.widthMeters = DoubleField("幅（m）", selected.widthMeters); selected.depthMeters = DoubleField("奥行き（m）", selected.depthMeters); }
+            selected.rotationDegrees = FloatField("向き（度）", selected.rotationDegrees);
+            GUILayout.Label($"WGS84 座標: 緯度 {selected.latitude:F6}、経度 {selected.longitude:F6}");
+            if (GUILayout.Button("位置・寸法を反映"))
             {
                 try
                 {
@@ -435,15 +436,15 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
                     UpdateGeoCoordinate(selected);
                     RenderScenario();
                     lastValidSelected = CloneFacility(selected);
-                    MarkDirty("Position and dimensions updated.");
+                    MarkDirty("位置・寸法を更新しました。");
                 }
                 catch (Exception e) { RestoreLastValidSelected(); status = e.Message; }
             }
-            if (GUILayout.Button("Delete selected")) DeleteSelected();
+            if (GUILayout.Button("選択した施策を削除")) DeleteSelected();
         }
-        GUILayout.BeginHorizontal(); if (GUILayout.Button("Save")) SaveScenario(); if (GUILayout.Button("Clone A/B")) CloneScenario(); if (GUILayout.Button("New")) CreateNewScenario(); GUILayout.EndHorizontal();
-        if (GUILayout.Button("Import existing 0.1 JSON from persistentDataPath")) ImportLegacyScenario();
-        foreach (var path in EnvironmentCostRuntimePolicyScenarioStore.List(metadata.AreaId)) if (GUILayout.Button("Load " + Path.GetFileNameWithoutExtension(path))) LoadScenario(path);
+        GUILayout.BeginHorizontal(); if (GUILayout.Button("保存")) SaveScenario(); if (GUILayout.Button("A/B 比較用に複製")) CloneScenario(); if (GUILayout.Button("新規作成")) CreateNewScenario(); GUILayout.EndHorizontal();
+        if (GUILayout.Button("既存 0.1 JSON を persistentDataPath から取り込む")) ImportLegacyScenario();
+        foreach (var path in EnvironmentCostRuntimePolicyScenarioStore.List(metadata.AreaId)) if (GUILayout.Button("読み込む: " + Path.GetFileNameWithoutExtension(path))) LoadScenario(path);
         GUILayout.Label(status, GUILayout.ExpandHeight(true));
         GUILayout.EndScrollView(); GUILayout.EndArea();
     }

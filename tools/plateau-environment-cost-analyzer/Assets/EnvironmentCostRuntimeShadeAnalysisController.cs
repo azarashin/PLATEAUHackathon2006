@@ -11,7 +11,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     [SerializeField] private EnvironmentCostRuntimeCityPackageLoader packageLoader;
     [SerializeField] private EnvironmentCostInspectionMetadata metadata;
     [SerializeField] private int selectedHour = 12;
-    [SerializeField, TextArea] private string statusMessage = "Runtime shade analysis is waiting for the city package.";
+    [SerializeField, TextArea] private string statusMessage = "都市データパッケージの確認を待機しています。";
 
     public EnvironmentCostRuntimeShadeAnalysisResult LatestResult { get; private set; }
 
@@ -25,12 +25,12 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
                                          packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Loading)) yield return null;
         if (packageLoader == null || metadata == null)
         {
-            statusMessage = "Runtime shade analysis requires city package and inspection metadata components.";
+            statusMessage = "日陰解析には都市データパッケージと検証シーン情報が必要です。";
             yield break;
         }
         statusMessage = packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready
-            ? "Runtime shade analysis is ready. Select an hour and run it."
-            : $"Runtime shade analysis is unavailable: {packageLoader.StatusMessage}";
+            ? "日陰解析の準備ができました。時刻を選択して実行してください。"
+            : $"日陰解析を利用できません: {packageLoader.StatusMessage}";
     }
 
     public void RunSelectedHour()
@@ -48,12 +48,12 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
                 analysisDate = date, hours = new[] { selectedHour }
             });
             stopwatch.Stop();
-            statusMessage = $"Runtime shade analysis completed: {LatestResult.edges.Count:N0} edges at {selectedHour:00}:00 in {stopwatch.Elapsed.TotalSeconds:F1}s.";
+            statusMessage = $"日陰解析が完了しました: {selectedHour:00}:00、{LatestResult.edges.Count:N0}辺、{stopwatch.Elapsed.TotalSeconds:F1}秒。";
             UnityEngine.Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_READY area={metadata.AreaId} hour={selectedHour} edges={LatestResult.edges.Count} seconds={stopwatch.Elapsed.TotalSeconds:F3}");
         }
         catch (Exception exception)
         {
-            statusMessage = $"Runtime shade analysis failed: {exception.Message}";
+            statusMessage = $"日陰解析に失敗しました: {exception.Message}";
             UnityEngine.Debug.LogException(exception);
             UnityEngine.Debug.LogError("ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_FAILED");
         }
@@ -64,7 +64,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     {
         if (LatestResult == null) return;
         LatestResult = null;
-        statusMessage = $"Policy scenario '{scenarioId}' changed. Run the analysis again to refresh the result.";
+        statusMessage = $"施策シナリオ「{scenarioId}」を変更しました。結果を更新するには日陰解析を再実行してください。";
         UnityEngine.Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_INVALIDATED scenario={scenarioId}");
     }
 
@@ -72,12 +72,12 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     {
         if (!Application.isPlaying) return;
         GUILayout.BeginArea(new Rect(16f, 198f, 430f, 116f), GUI.skin.box);
-        GUILayout.Label("Runtime Shade Analysis");
+        GUILayout.Label("日陰解析");
         selectedHour = Mathf.RoundToInt(GUILayout.HorizontalSlider(selectedHour, 0f, 23f));
-        GUILayout.Label($"Analysis hour: {selectedHour:00}:00");
+        GUILayout.Label($"解析時刻: {selectedHour:00}:00");
         var originalEnabled = GUI.enabled;
         GUI.enabled = originalEnabled && packageLoader != null && packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready;
-        if (GUILayout.Button("Run full-road analysis for selected hour")) RunSelectedHour();
+        if (GUILayout.Button("選択時刻の全道路解析を実行")) RunSelectedHour();
         GUI.enabled = originalEnabled;
         GUILayout.Label(statusMessage);
         GUILayout.EndArea();

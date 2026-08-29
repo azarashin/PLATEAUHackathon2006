@@ -13,59 +13,59 @@ public sealed class EnvironmentCostPolicyScenarioWindow : EditorWindow
     private EnvironmentCostPolicyScenario scenario = new EnvironmentCostPolicyScenario { id = "ichigaya-demo-shade" };
     private Vector2 scroll;
 
-    [MenuItem("PLATEAU/Environment Cost/Policy Scenario")]
-    public static void Open() => GetWindow<EnvironmentCostPolicyScenarioWindow>("Policy Scenario");
+    [MenuItem("PLATEAU/環境コスト/施策シナリオ")]
+    public static void Open() => GetWindow<EnvironmentCostPolicyScenarioWindow>("施策シナリオ");
 
     private void OnGUI()
     {
         scenario ??= new EnvironmentCostPolicyScenario();
         scenario.facilities ??= new System.Collections.Generic.List<EnvironmentCostPolicyFacility>();
         EditorGUILayout.HelpBox("街路樹・人工シェードの位置を編集し、シナリオJSONとして保存します。座標を変更すると設備を移動できます。現在は安全のため、シナリオ変更後は全範囲を再計算します。", MessageType.Info);
-        configPath = EditorGUILayout.TextField("Analysis config", configPath);
-        scenarioPath = EditorGUILayout.TextField("Scenario JSON", scenarioPath);
+        configPath = EditorGUILayout.TextField("解析設定", configPath);
+        scenarioPath = EditorGUILayout.TextField("シナリオ JSON", scenarioPath);
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Load")) LoadScenario();
-            if (GUILayout.Button("Save")) SaveScenario();
-            if (GUILayout.Button("Preview in Scene")) PreviewScenario();
+            if (GUILayout.Button("読み込む")) LoadScenario();
+            if (GUILayout.Button("保存")) SaveScenario();
+            if (GUILayout.Button("Scene でプレビュー")) PreviewScenario();
         }
 
-        scenario.id = EditorGUILayout.TextField("Scenario ID", scenario.id);
-        EditorGUILayout.LabelField("Recalculation scope", "all (scenario change invalidates all hourly cache)");
+        scenario.id = EditorGUILayout.TextField("シナリオ ID", scenario.id);
+        EditorGUILayout.LabelField("再計算範囲", "全範囲（シナリオ変更時は時刻別キャッシュをすべて無効化）");
         scroll = EditorGUILayout.BeginScrollView(scroll);
         for (var index = 0; index < scenario.facilities.Count; index++)
         {
             var facility = scenario.facilities[index];
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField($"Facility {index + 1}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"施策 {index + 1}", EditorStyles.boldLabel);
             facility.id = EditorGUILayout.TextField("ID", facility.id);
-            var selectedType = EditorGUILayout.Popup("Type", facility.type == "shade" ? 1 : 0, new[] { "Tree", "Artificial shade" }) == 0 ? "tree" : "shade";
+            var selectedType = EditorGUILayout.Popup("種別", facility.type == "shade" ? 1 : 0, new[] { "樹木", "人工日よけ" }) == 0 ? "tree" : "shade";
             if (selectedType != facility.type)
             {
                 facility.type = selectedType;
                 GUIUtility.ExitGUI();
             }
-            facility.latitude = EditorGUILayout.DoubleField("Latitude", facility.latitude);
-            facility.longitude = EditorGUILayout.DoubleField("Longitude", facility.longitude);
-            facility.heightMeters = EditorGUILayout.DoubleField("Height (m)", facility.heightMeters);
-            if (facility.type == "tree") facility.radiusMeters = EditorGUILayout.DoubleField("Canopy radius (m)", facility.radiusMeters);
+            facility.latitude = EditorGUILayout.DoubleField("緯度", facility.latitude);
+            facility.longitude = EditorGUILayout.DoubleField("経度", facility.longitude);
+            facility.heightMeters = EditorGUILayout.DoubleField("高さ（m）", facility.heightMeters);
+            if (facility.type == "tree") facility.radiusMeters = EditorGUILayout.DoubleField("樹冠半径（m）", facility.radiusMeters);
             else
             {
-                facility.widthMeters = EditorGUILayout.DoubleField("Width (m)", facility.widthMeters);
-                facility.depthMeters = EditorGUILayout.DoubleField("Depth (m)", facility.depthMeters);
+                facility.widthMeters = EditorGUILayout.DoubleField("幅（m）", facility.widthMeters);
+                facility.depthMeters = EditorGUILayout.DoubleField("奥行き（m）", facility.depthMeters);
             }
-            if (GUILayout.Button("Delete facility")) { scenario.facilities.RemoveAt(index); GUIUtility.ExitGUI(); }
+            if (GUILayout.Button("この施策を削除")) { scenario.facilities.RemoveAt(index); GUIUtility.ExitGUI(); }
             EditorGUILayout.EndVertical();
         }
         EditorGUILayout.EndScrollView();
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Add tree"))
+            if (GUILayout.Button("樹木を追加"))
             {
                 scenario.facilities.Add(NewFacility("tree"));
                 GUIUtility.ExitGUI();
             }
-            if (GUILayout.Button("Add artificial shade"))
+            if (GUILayout.Button("人工日よけを追加"))
             {
                 scenario.facilities.Add(NewFacility("shade"));
                 GUIUtility.ExitGUI();
@@ -94,7 +94,7 @@ public sealed class EnvironmentCostPolicyScenarioWindow : EditorWindow
                 : new EnvironmentCostPolicyScenario { id = Path.GetFileNameWithoutExtension(path) };
             scenario.Validate(path);
         }
-        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("Load failed; see Console.")); }
+        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("読み込みに失敗しました。Console を確認してください。")); }
     }
 
     private void SaveScenario()
@@ -103,9 +103,9 @@ public sealed class EnvironmentCostPolicyScenarioWindow : EditorWindow
         {
             var config = AnalysisRunConfig.LoadForEditor(configPath);
             scenario.Save(config.ResolvePath(scenarioPath));
-            ShowNotification(new GUIContent("Scenario saved."));
+            ShowNotification(new GUIContent("シナリオを保存しました。"));
         }
-        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("Save failed; see Console.")); }
+        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("保存に失敗しました。Console を確認してください。")); }
     }
 
     private void PreviewScenario()
@@ -124,8 +124,8 @@ public sealed class EnvironmentCostPolicyScenarioWindow : EditorWindow
             using var localReference = GeoReference.Create(referencePoint, 1.0f, CoordinateSystem.EUN, config.coordinateZoneId);
             EnvironmentCostAnalyzer.CreateScenarioFacilities(scenario, localReference);
             Physics.SyncTransforms();
-            ShowNotification(new GUIContent("Scenario preview updated."));
+            ShowNotification(new GUIContent("Scene のプレビューを更新しました。"));
         }
-        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("Preview failed; see Console.")); }
+        catch (Exception exception) { Debug.LogException(exception); ShowNotification(new GUIContent("プレビューに失敗しました。Console を確認してください。")); }
     }
 }

@@ -24,12 +24,12 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
     private static EnvironmentCostInspectionSceneBuilder batchRunner;
     private static Task<bool> batchTask;
     private string configPath = "data/analysis-configs/ichigaya-venue.json";
-    private string status = "Choose a validated analysis config to create a local inspection Scene.";
+    private string status = "検証済みの解析設定を選択して、ローカル検証用 Scene を作成します。";
     private bool isRunning;
     private bool cancelRequested;
 
-    [MenuItem("PLATEAU/Environment Cost/Create Inspection Scene")]
-    public static void Open() => GetWindow<EnvironmentCostInspectionSceneBuilder>("Environment Cost Inspection");
+    [MenuItem("PLATEAU/環境コスト/検証用 Scene を作成")]
+    public static void Open() => GetWindow<EnvironmentCostInspectionSceneBuilder>("環境コスト検証");
 
     /// <summary>Creates one city inspection Scene from -analysisConfig in Unity batch mode.</summary>
     public static void Run()
@@ -58,29 +58,29 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("Environment Cost Inspection Scene", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("環境コスト検証用 Scene", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Creates a local, ignored Scene from the config and coverage report. CityGML Building, Road, and Relief (DEM) meshes up to LOD1 are imported; " +
-            "colliders are assigned to Building (layer 8), Road (layer 9), and Terrain (layer 10). Existing Scenes are not modified.", MessageType.Info);
+            "解析設定とカバレッジレポートからローカル専用の Scene を作成します。CityGML の建築物・道路・地形（DEM）メッシュを LOD1 まで取り込み、" +
+            "Building（レイヤー 8）、Road（レイヤー 9）、Terrain（レイヤー 10）へ collider を割り当てます。既存の Scene は変更しません。", MessageType.Info);
 
         using (new EditorGUI.DisabledScope(isRunning))
         {
-            configPath = EditorGUILayout.TextField("Analysis config", configPath);
-            if (GUILayout.Button("Choose analysis config"))
+            configPath = EditorGUILayout.TextField("解析設定", configPath);
+            if (GUILayout.Button("解析設定を選択"))
             {
-                var selected = EditorUtility.OpenFilePanel("Analysis config", DefaultConfigDirectory(), "json");
+                var selected = EditorUtility.OpenFilePanel("解析設定", DefaultConfigDirectory(), "json");
                 if (!string.IsNullOrWhiteSpace(selected)) configPath = selected;
             }
-            if (GUILayout.Button("Create inspection Scene")) _ = CreateInspectionSceneAsync();
+            if (GUILayout.Button("検証用 Scene を作成")) _ = CreateInspectionSceneAsync();
         }
-        if (isRunning && GUILayout.Button("Request cancellation"))
+        if (isRunning && GUILayout.Button("中止を要求"))
         {
             cancelRequested = true;
-            status = "Cancellation requested. The current CityGML import will finish before cleanup.";
+            status = "中止を要求しました。現在の CityGML 取込が終わってから後片付けを行います。";
         }
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", status, EditorStyles.wordWrappedLabel);
-        EditorGUILayout.LabelField("Output", $"{SceneAssetDirectory}/<areaId>.unity");
+        EditorGUILayout.LabelField("状態", status, EditorStyles.wordWrappedLabel);
+        EditorGUILayout.LabelField("出力先", $"{SceneAssetDirectory}/<areaId>.unity");
     }
 
     private static void ExitBatchWhenComplete()
@@ -117,17 +117,17 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
 
             if (File.Exists(outputPath) && isBatchMode)
                 throw new InvalidOperationException($"Inspection Scene already exists and batch mode will not overwrite it: {sceneAssetPath}");
-            if (File.Exists(outputPath) && !EditorUtility.DisplayDialog("Replace inspection Scene?",
-                    $"The existing local inspection Scene for '{config.areaId}' will be replaced:\n{sceneAssetPath}\n\n" +
-                    "It is generated and ignored by Git. Scenes for other areas are not changed.", "Replace", "Cancel"))
+            if (File.Exists(outputPath) && !EditorUtility.DisplayDialog("検証用 Scene を置き換えますか？",
+                    $"「{config.areaId}」の既存ローカル検証用 Scene を置き換えます:\n{sceneAssetPath}\n\n" +
+                    "この Scene は生成物で Git の管理対象外です。他地域の Scene は変更しません。", "置き換える", "キャンセル"))
             {
-                status = "Creation cancelled before any Scene was changed.";
+                status = "Scene を変更する前に作成を中止しました。";
                 return false;
             }
 
             if (!isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
-                status = "Creation cancelled because the current Scene was not saved.";
+                status = "現在の Scene が保存されなかったため、作成を中止しました。";
                 return false;
             }
 
@@ -148,7 +148,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
                 ThrowIfCancellationRequested();
                 var gridCodes = MeshCoverageAnalyzer.NormalizeGridCodes(dataset.gridCodes).ToArray();
                 if (gridCodes.Length == 0) continue;
-                status = $"Importing {dataset.title ?? dataset.id} ({++imported}/{coverage.datasets.Count})…";
+                status = $"{dataset.title ?? dataset.id} を取り込み中（{++imported}/{coverage.datasets.Count}）…";
                 Repaint();
                 var sourceRoot = EnvironmentCostAnalyzer.FindLocalDatasetRoot(config, dataset.id);
                 await EnvironmentCostAnalyzer.ImportDataset(config, dataset.id, dataset.title, sourceRoot, gridCodes, referencePoint,
@@ -167,21 +167,21 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException("Scene directory is missing."));
             EditorSceneManager.SaveScene(inspectionScene, sceneAssetPath, false);
             AssetDatabase.Refresh();
-            status = $"Created {sceneAssetPath}: Building={layers.building:N0}, Road={layers.road:N0}, Terrain={layers.terrain:N0}, shadow casters={shadows.casters:N0}.";
+            status = $"作成しました: {sceneAssetPath}（Building={layers.building:N0}、Road={layers.road:N0}、Terrain={layers.terrain:N0}、影を落とすオブジェクト={shadows.casters:N0}）";
             Debug.Log($"ENVIRONMENT_COST_INSPECTION_SCENE_READY area={config.areaId} buildingColliders={layers.building} roadColliders={layers.road} terrainColliders={layers.terrain} shadowCasters={shadows.casters} shadowReceivers={shadows.receivers} scene={sceneAssetPath}");
             Selection.activeGameObject = root;
             return true;
         }
         catch (OperationCanceledException)
         {
-            status = "Cancelled. The partial inspection Scene was closed without saving.";
+            status = "中止しました。途中まで作成した検証用 Scene は保存せず閉じました。";
             Debug.LogWarning("ENVIRONMENT_COST_INSPECTION_SCENE_CANCELLED");
             CleanupPartialScene(inspectionScene, sceneCreated);
             return false;
         }
         catch (Exception exception)
         {
-            status = $"Failed: {exception.Message}";
+            status = $"失敗しました: {exception.Message}";
             Debug.LogException(exception);
             CleanupPartialScene(inspectionScene, sceneCreated);
             return false;

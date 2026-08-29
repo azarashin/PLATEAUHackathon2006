@@ -15,7 +15,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
     private const string ConfigSchema = "environment-cost-runtime-city-package-config-0.1";
     private const string PackageSchema = "environment-cost-runtime-city-package-0.1";
 
-    [MenuItem("PLATEAU/Environment Cost/Create Runtime City Package")]
+    [MenuItem("PLATEAU/環境コスト/Runtime 都市データパッケージを作成")]
     public static void CreateIchigayaPackageFromMenu()
     {
         Create(RuntimeCityPackageConfig.Load("data/runtime-city-packages/ichigaya-venue.json"));
