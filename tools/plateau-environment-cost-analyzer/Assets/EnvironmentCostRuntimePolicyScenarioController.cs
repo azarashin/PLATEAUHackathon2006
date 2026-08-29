@@ -423,7 +423,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private void OnGUI()
     {
         if (!Application.isPlaying || scenario == null) return;
-        GUILayout.BeginArea(new Rect(16, 350, 460, Mathf.Min(Screen.height - 366, 620)), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16, 416, 460, Mathf.Min(Screen.height - 432, 620)), GUI.skin.box);
         scroll = GUILayout.BeginScrollView(scroll);
         GUILayout.Label("施策シナリオエディター");
         GUILayout.Label(dirty ? "未保存の変更あり" : "保存済み");

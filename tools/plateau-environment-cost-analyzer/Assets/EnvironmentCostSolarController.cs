@@ -45,7 +45,7 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
         if (!Application.isPlaying) return;
 
         const float width = 340f;
-        GUILayout.BeginArea(new Rect(16f, 16f, width, 172f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16f, 16f, width, 190f), GUI.skin.box);
         GUILayout.Label("太陽・影の確認", GUI.skin.label);
         GUILayout.Label($"地域: {metadata?.AreaId ?? "未設定"}  タイムゾーン: {metadata?.Timezone ?? "未設定"}");
         GUILayout.BeginHorizontal();

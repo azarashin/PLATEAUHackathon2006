@@ -163,7 +163,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private void OnGUI()
     {
         if (!Application.isPlaying) return;
-        GUILayout.BeginArea(new Rect(16f, 198f, 430f, 142f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 190f), GUI.skin.box);
         GUILayout.Label("日陰解析");
         selectedHour = Mathf.RoundToInt(GUILayout.HorizontalSlider(selectedHour, 0f, 23f));
         GUILayout.Label($"解析時刻: {selectedHour:00}:00");
