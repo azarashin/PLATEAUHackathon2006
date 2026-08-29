@@ -101,11 +101,12 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         if (selected == null || !TryGroundPosition(out var groundPosition, out _)) return;
         if (!ValidatePosition(groundPosition, selected, out var issue)) { status = issue; return; }
+        var previous = CloneFacility(lastValidSelected ?? selected);
         selected.localPosition = groundPosition;
         UpdateGeoCoordinate(selected);
         RenderScenario();
         lastValidSelected = CloneFacility(selected);
-        MarkDirty("施策を移動しました。結果を更新するには日陰解析を再実行してください。");
+        MarkDirty("施策を移動しました。結果を更新するには日陰解析を再実行してください。", previous, selected);
     }
 
     private bool TryPolicyRaycast(out RaycastHit hit, out EnvironmentCostRuntimePolicyFacilityInstance instance)
@@ -210,19 +211,20 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         selected = facility;
         lastValidSelected = CloneFacility(facility);
         RenderScenario();
-        MarkDirty($"{FacilityTypeLabel(facility.type)}「{facility.id}」を追加しました。ドラッグまたは下の項目で編集できます。");
+        MarkDirty($"{FacilityTypeLabel(facility.type)}「{facility.id}」を追加しました。ドラッグまたは下の項目で編集できます。", null, facility);
         return true;
     }
 
     private void DeleteSelected()
     {
         if (selected == null) return;
+        var previous = CloneFacility(selected);
         var id = selected.id;
         scenario.facilities.Remove(selected);
         selected = null;
         lastValidSelected = null;
         RenderScenario();
-        MarkDirty($"「{id}」を削除しました。");
+        MarkDirty($"「{id}」を削除しました。", previous, null);
     }
 
     private void CreateNewScenario()
@@ -242,6 +244,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         lastValidSelected = null;
         dirty = false;
         RenderScenario();
+        shadeAnalysis?.InvalidateForPolicyChange(scenario.id, forceFullRecalculation: true);
     }
 
     private void CloneScenario()
@@ -281,7 +284,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             ValidateLoadedScenarioPackage(loaded);
             scenario = loaded;
             scenarioIdInput = scenario.id; displayNameInput = scenario.displayName; authorInput = scenario.author; memoInput = scenario.evidenceMemo;
-            selected = null; lastValidSelected = null; dirty = false; RenderScenario(); status = $"「{scenario.id}」を読み込みました。";
+            selected = null; lastValidSelected = null; dirty = false; RenderScenario(); shadeAnalysis?.InvalidateForPolicyChange(scenario.id, forceFullRecalculation: true); status = $"「{scenario.id}」を読み込みました。";
         }
         catch (Exception exception) { status = $"読込に失敗しました: {exception.Message}"; Debug.LogException(exception); }
     }
@@ -409,12 +412,18 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private static bool IsGroundLayer(int layer) => layer == RoadLayer || layer == TerrainLayer;
     private static string FacilityTypeLabel(string type) => type == "tree" ? "樹木" : type == "shade" ? "日よけ" : "障害物";
     private bool IsPointerOverPanel() => Input.mousePosition.x < 490f && Input.mousePosition.y < 760f;
-    private void MarkDirty(string message) { dirty = true; status = message; shadeAnalysis?.InvalidateForPolicyChange(scenario.id); }
+    private void MarkDirty(string message, EnvironmentCostRuntimePolicyFacility previous = null,
+        EnvironmentCostRuntimePolicyFacility current = null)
+    {
+        dirty = true;
+        status = message;
+        shadeAnalysis?.InvalidateForPolicyChange(scenario.id, previous, current);
+    }
 
     private void OnGUI()
     {
         if (!Application.isPlaying || scenario == null) return;
-        GUILayout.BeginArea(new Rect(16, 324, 460, Mathf.Min(Screen.height - 340, 620)), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(16, 350, 460, Mathf.Min(Screen.height - 366, 620)), GUI.skin.box);
         scroll = GUILayout.BeginScrollView(scroll);
         GUILayout.Label("施策シナリオエディター");
         GUILayout.Label(dirty ? "未保存の変更あり" : "保存済み");
@@ -442,12 +451,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             {
                 try
                 {
+                    var previous = CloneFacility(lastValidSelected ?? selected);
                     selected.Validate(selected.id);
                     if (!ValidatePosition(selected.localPosition, selected, out var issue)) throw new InvalidOperationException(issue);
                     UpdateGeoCoordinate(selected);
                     RenderScenario();
                     lastValidSelected = CloneFacility(selected);
-                    MarkDirty("位置・寸法を更新しました。");
+                    MarkDirty("位置・寸法を更新しました。", previous, selected);
                 }
                 catch (Exception e) { RestoreLastValidSelected(); status = e.Message; }
             }

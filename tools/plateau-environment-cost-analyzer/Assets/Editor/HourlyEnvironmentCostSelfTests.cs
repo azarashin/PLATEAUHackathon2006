@@ -102,8 +102,26 @@ public static class HourlyEnvironmentCostSelfTests
             {
                 schemaVersion = "environment-cost-runtime-shade-input-0.1", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
-                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "edge-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
+                edges = new[]
+                {
+                    new EnvironmentCostRuntimeShadeInputEdge { id = "edge-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, lengthMeters = 10.0, walkingSeconds = 10.0 },
+                    new EnvironmentCostRuntimeShadeInputEdge { id = "edge-far", from = new[] { 80f, 80f }, to = new[] { 90f, 80f }, lengthMeters = 10.0, walkingSeconds = 10.0 }
+                }
             };
+            var affectedEdges = EnvironmentCostRuntimePolicyImpact.FindAffectedEdgeIds(runtimeShadeInput,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } },
+                new[] { new EnvironmentCostRuntimePolicyFacility { id = "changed-tree", type = "tree", localPosition = new Vector3(5f, 0f, 0f) } });
+            AssertEqual(true, affectedEdges.Contains("edge-1"));
+            AssertEqual(false, affectedEdges.Contains("edge-far"));
+            var runtimeEvidence = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(runtimeShadeInput,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
+            runtimeEvidence.provenance.scenarioId = "runtime-policy-self-test";
+            runtimeEvidence.provenance.policyFingerprintSha256 = runtimePolicy.Fingerprint();
+            runtimeEvidence.provenance.recalculationScope = "局所再計算";
+            runtimeEvidence.provenance.totalEdgeCount = runtimeShadeInput.edges.Length;
+            runtimeEvidence.provenance.recalculatedEdgeCount = affectedEdges.Count;
+            if (string.IsNullOrWhiteSpace(EnvironmentCostRuntimeShadeResultStore.CalculateSha256(runtimeEvidence)))
+                throw new InvalidOperationException("Expected Runtime shade evidence fingerprint.");
             var runtimeShadeResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             AssertEqual("completed", runtimeShadeResult.status);
