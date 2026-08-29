@@ -31,6 +31,9 @@
 /tools/plateau-environment-cost-analyzer/[Ll]ogs/
 /tools/plateau-environment-cost-analyzer/[Uu]ser[Ss]ettings/
 /tools/plateau-environment-cost-analyzer/Assets/Scenes/EnvironmentCostInspection/
+/tools/plateau-environment-cost-analyzer/Assets/StreamingAssets/EnvironmentCostCities/
+/tools/plateau-environment-cost-analyzer/Assets/StreamingAssets/EnvironmentCostCities.meta
+/tools/plateau-environment-cost-analyzer/Assets/StreamingAssets.meta
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1

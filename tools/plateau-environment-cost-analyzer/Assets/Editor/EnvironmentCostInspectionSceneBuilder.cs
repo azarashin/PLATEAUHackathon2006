@@ -261,6 +261,8 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         var metadata = root.AddComponent<EnvironmentCostInspectionMetadata>();
         metadata.Configure(config.areaId, config.coordinateZoneId, config.CenterLongitude, config.CenterLatitude,
             config.radiusMeters, config.date, config.timezone);
+        var packageLoader = root.AddComponent<EnvironmentCostRuntimeCityPackageLoader>();
+        packageLoader.Configure("EnvironmentCostCities");
         var solarController = root.AddComponent<EnvironmentCostSolarController>();
         solarController.Configure(metadata, sun, config.hours);
     }
