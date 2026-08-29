@@ -17,6 +17,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private EnvironmentCostInspectionMetadata metadata;
     private EnvironmentCostRuntimeCityPackageLoader packageLoader;
     private EnvironmentCostRuntimeShadeAnalysisController shadeAnalysis;
+    // Generated road edges define the Runtime calculation/output coverage. This is distinct
+    // from metadata.RadiusMeters, which limits the source analysis rather than authoring.
+    private EnvironmentCostRuntimeShadeAnalysisInput outputCoverage;
     private EnvironmentCostRuntimePolicyScenario scenario;
     private EnvironmentCostRuntimePolicyFacility selected;
     private Transform scenarioRoot;
@@ -58,6 +61,18 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             status = "施策シナリオエディターには検証済みの都市データパッケージと検証シーン情報が必要です。";
             yield break;
         }
+        try
+        {
+            var coveragePath = Path.Combine(packageLoader.PackageRootPath, "runtime-shade-input.json");
+            outputCoverage = JsonUtility.FromJson<EnvironmentCostRuntimeShadeAnalysisInput>(File.ReadAllText(coveragePath));
+            if (outputCoverage == null) throw new InvalidOperationException("Runtime road-network coverage could not be read.");
+            outputCoverage.Validate();
+        }
+        catch (Exception exception)
+        {
+            status = $"Runtime policy editing is unavailable because road-network coverage could not be read: {exception.Message}";
+            yield break;
+        }
         CreateNewScenario();
         status = "種別を選び、道路または地表をクリックして配置します。既存の施策はクリックして選択し、ドラッグで移動できます。";
     }
@@ -89,17 +104,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             return;
         }
         if (!placeMode) return;
-        if (TryGroundPosition(out var groundPosition, out var hasGroundCollider))
-        {
-            if (AddFacility(groundPosition) && !hasGroundCollider)
-                status = "道路・地表 collider が見つからないため、ローカル地表基準面（Y=0）へ配置しました。必要に応じて位置を確認・調整してください。";
-        }
-        else status = "クリック位置を地表基準面へ投影できませんでした。";
+        if (TryGroundPosition(out var groundPosition)) AddFacility(groundPosition);
+        else status = "クリック位置を道路または地表 collider へ投影できませんでした。";
     }
 
     private void MoveSelectedToRoad()
     {
-        if (selected == null || !TryGroundPosition(out var groundPosition, out _)) return;
+        if (selected == null || !TryGroundPosition(out var groundPosition)) return;
         if (!ValidatePosition(groundPosition, selected, out var issue)) { status = issue; return; }
         var previous = CloneFacility(lastValidSelected ?? selected);
         selected.localPosition = groundPosition;
@@ -129,10 +140,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         return false;
     }
 
-    private bool TryGroundPosition(out Vector3 point, out bool hasGroundCollider)
+    private bool TryGroundPosition(out Vector3 point)
     {
         point = default;
-        hasGroundCollider = false;
         var camera = ResolveInteractionCamera();
         if (camera == null) return false;
         var mask = (1 << RoadLayer) | (1 << TerrainLayer);
@@ -140,17 +150,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (Physics.Raycast(ray, out var hit, 5000f, mask, QueryTriggerInteraction.Ignore))
         {
             point = hit.point;
-            hasGroundCollider = true;
             return true;
         }
-
-        // Some existing inspection Scenes contain a partial Road collider inventory even though
-        // the CityGML road imagery is visible.  Keep those Scenes editable by using the same
-        // local Y=0 fallback as the original Editor policy-facility generator.
-        var groundPlane = new Plane(Vector3.up, Vector3.zero);
-        if (!groundPlane.Raycast(ray, out var distance) || distance > 5000f) return false;
-        point = ray.GetPoint(distance);
-        return true;
+        return false;
     }
 
     private Camera ResolveInteractionCamera()
@@ -166,7 +168,6 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         issue = null;
         var horizontal = new Vector2(position.x, position.z);
-        if (horizontal.magnitude > metadata.RadiusMeters) { issue = "配置位置が都市データパッケージの解析範囲外です。"; return false; }
         var groundStart = new Vector3(position.x, 1000f, position.z);
         var groundMask = (1 << RoadLayer) | (1 << TerrainLayer);
         var hasGround = Physics.Raycast(groundStart, Vector3.down, out var ground, 2000f, groundMask, QueryTriggerInteraction.Ignore);
@@ -178,6 +179,12 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (!hasGround && Mathf.Abs(position.y) > 0.25f)
         {
             issue = "編集位置に道路・地表 collider がありません。ローカル地表基準面 Y=0 を使うか、地図をクリックしてください。";
+            return false;
+        }
+        if (outputCoverage == null || !EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(outputCoverage,
+                DateTime.ParseExact(metadata.AnalysisDate, "yyyy-MM-dd", CultureInfo.InvariantCulture), excluded))
+        {
+            issue = "配置位置は生成済み道路ネットワークの計算対象外です。解析へ反映するには、この地点を含む道路ネットワークと環境コストを生成してください。";
             return false;
         }
         foreach (var facility in scenario.facilities)

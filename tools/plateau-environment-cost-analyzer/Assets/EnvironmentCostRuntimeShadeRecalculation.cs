@@ -28,6 +28,9 @@ public static class EnvironmentCostRuntimePolicyImpact
             {
                 var from = new Vector2(edge.from[0], edge.from[1]);
                 var to = new Vector2(edge.to[0], edge.to[1]);
+                // Runtime analysis samples only the part of an edge inside the source analysis
+                // extent. A wholly excluded edge is not output coverage.
+                if (DistanceToSegment(Vector2.zero, from, to) > input.radiusMeters) continue;
                 foreach (var facility in facilities)
                 {
                     var footprint = facility.type == "tree" ? (float)facility.radiusMeters : Mathf.Max((float)facility.widthMeters, (float)facility.depthMeters) * .5f;
@@ -41,6 +44,23 @@ public static class EnvironmentCostRuntimePolicyImpact
             }
         }
         return affected;
+    }
+
+    /// <summary>
+    /// Tests the generated Runtime road-edge inventory rather than a fixed circular authoring
+    /// boundary. All daylight hours are considered so a valid placement is not tied to the
+    /// currently selected analysis hour.
+    /// </summary>
+    public static bool HasPotentiallyAffectedEdge(EnvironmentCostRuntimeShadeAnalysisInput input, DateTime analysisDate,
+        EnvironmentCostRuntimePolicyFacility facility)
+    {
+        if (input == null) throw new ArgumentNullException(nameof(input));
+        if (facility == null) throw new ArgumentNullException(nameof(facility));
+        return FindAffectedEdgeIds(input, new EnvironmentCostRuntimeShadeAnalysisRequest
+        {
+            analysisDate = analysisDate,
+            hours = Enumerable.Range(0, 24).ToArray()
+        }, new[] { facility }).Count > 0;
     }
 
     private static float DistanceToSegment(Vector2 point, Vector2 from, Vector2 to)

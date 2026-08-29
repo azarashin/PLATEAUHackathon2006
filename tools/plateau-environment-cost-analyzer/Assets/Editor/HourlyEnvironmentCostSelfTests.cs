@@ -113,6 +113,10 @@ public static class HourlyEnvironmentCostSelfTests
                 new[] { new EnvironmentCostRuntimePolicyFacility { id = "changed-tree", type = "tree", localPosition = new Vector3(5f, 0f, 0f) } });
             AssertEqual(true, affectedEdges.Contains("edge-1"));
             AssertEqual(false, affectedEdges.Contains("edge-far"));
+            AssertEqual(true, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
+                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "near-output", type = "tree", localPosition = new Vector3(5f, 0f, 0f) }));
+            AssertEqual(false, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
+                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(85f, 0f, 80f) }));
             var runtimeEvidence = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             runtimeEvidence.provenance.scenarioId = "runtime-policy-self-test";
