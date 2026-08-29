@@ -242,6 +242,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
     {
         var bounds = CalculateRenderableBounds(scene);
         var cameraObject = new GameObject("Environment Cost Runtime Camera");
+        cameraObject.tag = "MainCamera";
         SceneManager.MoveGameObjectToScene(cameraObject, scene);
         var camera = cameraObject.AddComponent<Camera>();
         cameraObject.AddComponent<AudioListener>();

@@ -24,6 +24,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private bool dragging;
     private bool dirty;
     private EnvironmentCostRuntimePolicyFacility lastValidSelected;
+    private Camera interactionCamera;
     private string status = "Loading Runtime policy editor…";
     private string selectedType = "tree";
     private string scenarioIdInput = "runtime-scenario";
@@ -86,8 +87,8 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (!placeMode) return;
         if (TryGroundPosition(out var groundPosition, out var hasGroundCollider))
         {
-            AddFacility(groundPosition);
-            if (!hasGroundCollider) status = "No Road/Terrain collider was found; placed on the local ground reference plane (Y=0). Verify and adjust the position if needed.";
+            if (AddFacility(groundPosition) && !hasGroundCollider)
+                status = "No Road/Terrain collider was found; placed on the local ground reference plane (Y=0). Verify and adjust the position if needed.";
         }
         else status = "The map click could not be projected onto the ground reference plane.";
     }
@@ -107,7 +108,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         hit = default;
         instance = null;
-        var camera = Camera.main;
+        var camera = ResolveInteractionCamera();
         if (camera == null) return false;
         // The Building layer contains both CityGML buildings and policy primitives.  Do not let a
         // static CityGML building count as a policy hit, nor hide a policy object behind it.
@@ -127,7 +128,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         point = default;
         hasGroundCollider = false;
-        var camera = Camera.main;
+        var camera = ResolveInteractionCamera();
         if (camera == null) return false;
         var mask = (1 << RoadLayer) | (1 << TerrainLayer);
         var ray = camera.ScreenPointToRay(Input.mousePosition);
@@ -145,6 +146,15 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         if (!groundPlane.Raycast(ray, out var distance) || distance > 5000f) return false;
         point = ray.GetPoint(distance);
         return true;
+    }
+
+    private Camera ResolveInteractionCamera()
+    {
+        if (interactionCamera != null && interactionCamera.isActiveAndEnabled) return interactionCamera;
+        interactionCamera = Camera.main;
+        if (interactionCamera == null) interactionCamera = FindFirstObjectByType<Camera>();
+        if (interactionCamera == null) status = "No active Camera is available for map interaction.";
+        return interactionCamera;
     }
 
     private bool ValidatePosition(Vector3 position, EnvironmentCostRuntimePolicyFacility excluded, out string issue)
@@ -178,7 +188,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         return true;
     }
 
-    private void AddFacility(Vector3 position)
+    private bool AddFacility(Vector3 position)
     {
         var facility = new EnvironmentCostRuntimePolicyFacility
         {
@@ -190,13 +200,14 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             widthMeters = 4.0,
             depthMeters = 4.0
         };
-        if (!ValidatePosition(position, facility, out var issue)) { status = issue; return; }
+        if (!ValidatePosition(position, facility, out var issue)) { status = issue; return false; }
         UpdateGeoCoordinate(facility);
         scenario.facilities.Add(facility);
         selected = facility;
         lastValidSelected = CloneFacility(facility);
         RenderScenario();
         MarkDirty($"Added {facility.type} {facility.id}. Drag it or edit its values below.");
+        return true;
     }
 
     private void DeleteSelected()
