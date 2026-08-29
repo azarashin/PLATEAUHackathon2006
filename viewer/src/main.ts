@@ -19,12 +19,13 @@ import {
   formatDuration,
   formatShadeRatio,
   identicalRouteGroups,
-  parseRouteResponse,
+  parseScenarioRouteComparison,
   profilesForShadeFactor,
   routesInDisplayOrder,
   type CalculatedRoute,
   type RouteProfileId,
   type RouteResponse,
+  type ScenarioRouteComparison,
 } from './route-domain.ts'
 import {
   parseRoadEdgeResponse,
@@ -95,6 +96,7 @@ interface AccuracyPolygon {
 const routeApiUrl = import.meta.env.VITE_ROUTE_API_URL ?? `${import.meta.env.BASE_URL}api/v1/routes`
 const roadEdgeApiUrl = import.meta.env.VITE_ROAD_EDGE_API_URL
   ?? routeApiUrl.replace(/\/routes$/, '/road-edges')
+const scenarioComparisonApiUrl = routeApiUrl.replace(/\/routes$/, '/scenario-comparisons')
 setWorkerUrl(import.meta.env.DEV
   ? '/node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'
   : `${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`)
@@ -146,7 +148,10 @@ let endMarker: Marker | null = null
 let locationMarker: Marker | null = null
 let routeRequestSequence = 0
 let routeResponse: RouteResponse | null = null
+let baselineRouteResponse: RouteResponse | null = null
+let scenarioComparison: ScenarioRouteComparison | null = null
 let selectedRouteProfile: RouteProfileId = 'balanced'
+let selectedPolicyScenarioId = 'ichigaya-demo-shade'
 let shadeFactor = DEFAULT_SHADE_FACTOR
 let roadEdgeRequestSequence = 0
 let roadEdgeResponse: RoadEdgeResponse | null = null
@@ -450,6 +455,9 @@ function renderShell(): void {
             </div>
             <div class="condition-row">
               <label>計算済み日時<select id="timestamp-select"></select></label>
+            </div>
+            <div class="condition-row">
+              <label>比較する施策<select id="policy-scenario-select"><option value="ichigaya-demo-shade">日陰施設追加（ichigaya-demo-shade）</option></select></label>
             </div>
             <label class="factor-control">日陰優先度
               <span><input id="shade-factor" type="range" min="0" max="4" step="0.25" value="${DEFAULT_SHADE_FACTOR}"><output id="shade-factor-value">${DEFAULT_SHADE_FACTOR.toFixed(2)}</output></span>
@@ -843,6 +851,7 @@ async function requestRoadEdges(): Promise<void> {
     url.searchParams.set('timestamp', timestamp)
     url.searchParams.set('bbox', bbox.join(','))
     url.searchParams.set('solarAvoidanceFactor', String(shadeFactor))
+    url.searchParams.set('scenarioId', selectedPolicyScenarioId)
     let response: Response
     try {
       response = await fetch(url)
@@ -884,14 +893,21 @@ async function requestRoadEdges(): Promise<void> {
 function routeGeoJson(response: RouteResponse) {
   return {
     type: 'FeatureCollection' as const,
-    features: response.routes.filter((route) => visibleRouteProfiles.has(route.profile.id)).map((route) => ({
+    features: [
+      ...response.routes.filter((route) => visibleRouteProfiles.has(route.profile.id)).map((route) => ({
       type: 'Feature' as const,
       properties: {
         profileId: route.profile.id,
         selected: route.profile.id === selectedRouteProfile,
       },
       geometry: route.geometry,
-    })),
+      })),
+      ...baselineRouteResponse?.routes.filter((route) => route.profile.id === selectedRouteProfile).map((route) => ({
+        type: 'Feature' as const,
+        properties: { profileId: 'baseline', selected: false, baseline: true },
+        geometry: route.geometry,
+      })) ?? [],
+    ],
   }
 }
 
@@ -907,6 +923,7 @@ function updateRouteMap(fitToRoutes = false): void {
       'shortest', routePresentations.shortest.color,
       'balanced', routePresentations.balanced.color,
       'shade', routePresentations.shade.color,
+      'baseline', '#f59e0b',
       '#64748b',
     ]
     map.addLayer({
@@ -1008,7 +1025,15 @@ function renderRouteComparison(fitToRoutes = false): void {
       updateRouteMap()
     }))
   }
-  if (summary) summary.textContent = `${routePresentations[selected.profile.id].label}: ${comparisonSummary(selected, shortest)}`
+  if (summary) {
+    const baseline = baselineRouteResponse && routesInDisplayOrder(baselineRouteResponse.routes).find((route) => route.profile.id === selectedRouteProfile)
+    const scenarioLabel = routeResponse.scenario.fingerprintSha256 ?? 'legacy-baseline'
+    const generated = scenarioComparison ? `生成 ${scenarioComparison.baseline.scenario.generatedAt} / ${scenarioComparison.policy.scenario.generatedAt}` : ''
+    const policySummary = `${routePresentations[selected.profile.id].label}: ${comparisonSummary(selected, shortest)}`
+    summary.textContent = baseline
+      ? `現状（${baselineRouteResponse?.scenario.id}）→ ${routeResponse.scenario.label}（${routeResponse.scenario.id}）: 日陰率 ${formatShadeRatio(baseline.kpis.observedShadeRatio)} → ${formatShadeRatio(selected.kpis.observedShadeRatio)}、日向時間 ${formatDuration(baseline.kpis.solarExposureSeconds)} → ${formatDuration(selected.kpis.solarExposureSeconds)}、歩行時間 ${formatDuration(baseline.kpis.walkingSeconds)} → ${formatDuration(selected.kpis.walkingSeconds)}。${policySummary}。${generated}、施策フィンガープリント ${scenarioLabel.slice(0, 12)}…`
+      : policySummary
+  }
   if (resultLabel) {
     resultLabel.textContent = '実計算結果'
     resultLabel.classList.add('preview-label--active')
@@ -1023,6 +1048,8 @@ function renderRouteComparison(fitToRoutes = false): void {
 
 function clearCalculatedRoutes(): void {
   routeResponse = null
+  baselineRouteResponse = null
+  scenarioComparison = null
   const source = map?.getSource('calculated-routes') as GeoJSONSource | undefined
   source?.setData({ type: 'FeatureCollection', features: [] })
   renderRouteComparison()
@@ -1202,7 +1229,7 @@ async function requestRoutes(): Promise<void> {
   try {
     let response: Response
     try {
-      response = await fetch(routeApiUrl, {
+      response = await fetch(scenarioComparisonApiUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -1211,6 +1238,8 @@ async function requestRoutes(): Promise<void> {
           start: startCoordinate,
           end: endCoordinate,
           profiles: profilesForShadeFactor(shadeFactor),
+          baselineScenarioId: 'baseline',
+          policyScenarioId: selectedPolicyScenarioId,
         }),
       })
     } catch {
@@ -1228,7 +1257,9 @@ async function requestRoutes(): Promise<void> {
       const code = typeof error.code === 'string' ? error.code : 'LOAD_ERROR'
       throw new Error(routeErrorMessage(code))
     }
-    routeResponse = parseRouteResponse(responseDocument)
+    scenarioComparison = parseScenarioRouteComparison(responseDocument)
+    baselineRouteResponse = scenarioComparison.baseline
+    routeResponse = scenarioComparison.policy
     startCoordinate = routeResponse.snapped.start.snappedCoordinate
     endCoordinate = routeResponse.snapped.end.snappedCoordinate
     updateEndpointUi()
@@ -1295,6 +1326,13 @@ function bindLocationControls(mapInstance: MapLibreMap): void {
     shadeFactor = Number(factorInput.value)
     invalidateRoute('日陰優先度を変更したため、3経路を再計算します。')
     clearRoadEdges('日陰優先度を変更したため、道路辺の探索コストを更新しています。')
+    void requestRoadEdges()
+    void requestRoutes()
+  })
+  document.querySelector<HTMLSelectElement>('#policy-scenario-select')?.addEventListener('change', (event) => {
+    selectedPolicyScenarioId = (event.currentTarget as HTMLSelectElement).value
+    invalidateRoute('比較する施策を変更したため、同一条件で再計算します。')
+    clearRoadEdges('比較する施策を変更したため、道路別の根拠を更新します。')
     void requestRoadEdges()
     void requestRoutes()
   })

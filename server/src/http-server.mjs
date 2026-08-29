@@ -46,10 +46,11 @@ export function createRouteHttpServer(routeService, options = {}) {
         return
       }
       const isRouteEndpoint = url.pathname === '/api/v1/routes'
+      const isScenarioComparisonEndpoint = url.pathname === '/api/v1/scenario-comparisons'
       const isRoadEdgeEndpoint = url.pathname === '/api/v1/road-edges'
-      if (request.method === 'OPTIONS' && (isRouteEndpoint || isRoadEdgeEndpoint)) {
+      if (request.method === 'OPTIONS' && (isRouteEndpoint || isScenarioComparisonEndpoint || isRoadEdgeEndpoint)) {
         response.writeHead(204, {
-          'access-control-allow-methods': `${isRouteEndpoint ? 'POST' : 'GET'}, OPTIONS`,
+          'access-control-allow-methods': `${isRouteEndpoint || isScenarioComparisonEndpoint ? 'POST' : 'GET'}, OPTIONS`,
           'access-control-allow-headers': 'content-type',
           'access-control-max-age': '600',
           ...(corsOrigin ? { 'access-control-allow-origin': corsOrigin, vary: 'Origin' } : {}),
@@ -57,11 +58,12 @@ export function createRouteHttpServer(routeService, options = {}) {
         response.end()
         return
       }
-      if (!isRouteEndpoint && !isRoadEdgeEndpoint) throw new RouteError('NOT_FOUND', 'The requested endpoint does not exist.', 404)
+      if (!isRouteEndpoint && !isScenarioComparisonEndpoint && !isRoadEdgeEndpoint) throw new RouteError('NOT_FOUND', 'The requested endpoint does not exist.', 404)
       let result
-      if (isRouteEndpoint) {
+      if (isRouteEndpoint || isScenarioComparisonEndpoint) {
         if (request.method !== 'POST') throw new RouteError('METHOD_NOT_ALLOWED', 'Use POST for route requests.', 405)
-        result = routeService.compare(await readJsonBody(request, maximumBodyBytes))
+        const body = await readJsonBody(request, maximumBodyBytes)
+        result = isScenarioComparisonEndpoint ? routeService.compareScenarios(body) : routeService.compare(body)
       } else {
         if (request.method !== 'GET') throw new RouteError('METHOD_NOT_ALLOWED', 'Use GET for road edge requests.', 405)
         const bbox = url.searchParams.get('bbox')?.split(',').map(Number)
@@ -71,6 +73,7 @@ export function createRouteHttpServer(routeService, options = {}) {
           timestamp: url.searchParams.get('timestamp'),
           bbox,
           solarAvoidanceFactor: factor === null ? null : Number(factor),
+          scenarioId: url.searchParams.get('scenarioId') ?? undefined,
         })
       }
       sendJson(response, 200, { requestId, ...result }, corsOrigin)

@@ -105,7 +105,9 @@ routeCostSeconds = walkingSeconds + environmentalCostSeconds
 
 `ROUTE_BUNDLE_MANIFESTS`に1件以上のmanifestを指定する。manifest、topology、cost sliceのサイズ・SHA-256・内容フィンガープリント・参照・値域を検証できた場合だけlistenを開始する。ファイルはリクエストごとに再読込しない。
 
-`ROUTE_TIMESTAMPS`を指定すると必要時刻だけ、未指定なら全時刻を型付き配列へ読み込む。複数地域はmanifestパスをカンマ区切りで指定する。同じ`areaId`の重複は起動失敗とする。
+`ROUTE_TIMESTAMPS`を指定すると必要時刻だけ、未指定なら全時刻を型付き配列へ読み込む。`ROUTE_BUNDLE_MANIFESTS`では複数地域をmanifestパスのカンマ区切りで指定する。同じ`areaId`の重複はこの旧形式では起動失敗とする。
+
+同じ地域について現状・案A・案Bなどの複数施策を読み込む場合は、`ROUTE_SCENARIO_BUNDLES` を使う。これは1件以上の `{ "manifestPath", "scenarioId" }` JSON配列であり、同じ`areaId`の複数要素を許可する。ただし比較対象は道路グラフ指紋、対象範囲、日時条件が一致しなければならない。詳細は[都市施策 A/B 比較](policy-scenario-ab-comparison.md)を参照。
 
 本番ではViewerと別のsystemdサービス・環境変数ファイルで起動する。`PORT`は既定値3000から変更でき、
 Nginxの`proxy_pass`と一致させる。環境ファイル、systemdユニット、同一サブパスでの公開例は

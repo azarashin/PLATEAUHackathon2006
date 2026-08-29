@@ -70,6 +70,16 @@ function validateInputCompatibility(graph, environment) {
   return environmentSummary
 }
 
+function policyScenarioMetadata(environment) {
+  const scenario = environment.scenario
+  if (!scenario || typeof scenario.id !== 'string' || scenario.id === 'baseline') {
+    return { id: 'baseline', label: '現状', fingerprintSha256: environment.resultFingerprintSha256 }
+  }
+  invariant(/^[a-z][a-z0-9-]{0,31}$/.test(scenario.id), 'environment scenario id is invalid')
+  invariant(typeof scenario.fingerprintSha256 === 'string' && /^[0-9a-f]{64}$/.test(scenario.fingerprintSha256), 'environment scenario fingerprint is invalid')
+  return { id: scenario.id, label: `施策: ${scenario.id}`, fingerprintSha256: scenario.fingerprintSha256 }
+}
+
 function normalizedPhysicalEdges(graph) {
   const physical = new Map()
   for (const edge of [...graph.edges].sort((left, right) => left.id.localeCompare(right.id))) {
@@ -295,6 +305,7 @@ export function buildServerBundleDocuments(graph, environment, options = {}) {
         availableTimestamps: timestamps,
         defaultTimestamp: timestamps[Math.floor((timestamps.length - 1) / 2)],
       },
+      policyScenario: policyScenarioMetadata(environment),
       costFormula: {
         shadeRatioUnit: 'ratio',
         solarExposureSecondsUnit: 's',

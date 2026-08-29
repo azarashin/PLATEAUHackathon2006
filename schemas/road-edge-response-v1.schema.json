@@ -4,13 +4,23 @@
   "title": "Road edge response v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requestId", "schemaVersion", "type", "areaId", "timestamp", "bbox", "solarAvoidanceFactor", "missingCostPolicy", "features", "diagnostics"],
+  "required": ["requestId", "schemaVersion", "type", "areaId", "timestamp", "scenario", "bbox", "solarAvoidanceFactor", "missingCostPolicy", "features", "diagnostics"],
   "properties": {
     "requestId": { "type": "string", "format": "uuid" },
     "schemaVersion": { "const": "road-edge-response-1.0" },
     "type": { "const": "FeatureCollection" },
     "areaId": { "type": "string", "minLength": 1 },
     "timestamp": { "type": "string", "format": "date-time" },
+    "scenario": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "fingerprintSha256", "generatedAt"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fingerprintSha256": { "anyOf": [{ "type": "string", "pattern": "^[0-9a-f]{64}$" }, { "type": "null" }] },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "bbox": {
       "type": "array", "minItems": 4, "maxItems": 4,
       "prefixItems": [
