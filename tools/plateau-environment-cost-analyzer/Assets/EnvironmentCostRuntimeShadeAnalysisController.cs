@@ -10,6 +10,8 @@ using UnityEngine;
 /// <summary>Runs full or conservative policy-impact recalculation without blocking the Player frame loop.</summary>
 public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviour
 {
+    private const double FrameBudgetMilliseconds = 12.0;
+    private const double ProgressRefreshSeconds = 0.2;
     [SerializeField] private EnvironmentCostRuntimeCityPackageLoader packageLoader;
     [SerializeField] private EnvironmentCostInspectionMetadata metadata;
     [SerializeField] private int selectedHour = 12;
@@ -114,6 +116,9 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
             recalculatedEdges = affectedIds.Count;
             completedEdges = 0;
             var stopwatch = Stopwatch.StartNew();
+            var frameStopwatch = Stopwatch.StartNew();
+            var lastProgressRefreshSeconds = 0.0;
+            var edgesInCurrentFrame = 0;
             var result = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(input, request);
             ApplyProvenance(result, activeScope, totalEdges, recalculatedEdges);
 
@@ -128,8 +133,16 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
                     ? EnvironmentCostRuntimeShadeAnalyzer.AnalyzeEdge(input, edge, request)
                     : previousById[edge.id]);
                 completedEdges++;
-                statusMessage = $"{activeScope}を実行中: {completedEdges:N0}/{totalEdges:N0} 辺（再計算 {recalculatedEdges:N0} 辺）";
+                edgesInCurrentFrame++;
+                if (stopwatch.Elapsed.TotalSeconds - lastProgressRefreshSeconds >= ProgressRefreshSeconds)
+                {
+                    statusMessage = $"{activeScope}を実行中: {completedEdges:N0}/{totalEdges:N0} 辺（再計算 {recalculatedEdges:N0} 辺、直近フレーム {edgesInCurrentFrame:N0} 辺）";
+                    lastProgressRefreshSeconds = stopwatch.Elapsed.TotalSeconds;
+                }
+                if (frameStopwatch.Elapsed.TotalMilliseconds < FrameBudgetMilliseconds) continue;
                 yield return null;
+                frameStopwatch.Restart();
+                edgesInCurrentFrame = 0;
             }
 
             stopwatch.Stop();
