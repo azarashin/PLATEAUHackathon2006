@@ -72,23 +72,29 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     private void BeginMapInteraction()
     {
-        if (!TryRaycast(out var hit)) return;
-        var instance = hit.collider.GetComponentInParent<EnvironmentCostRuntimePolicyFacilityInstance>();
-        if (instance != null)
+        // Selection intentionally tests only policy objects.  A CityGML building collider can be
+        // in front of a visible road from an oblique camera angle, so it must not block placement.
+        if (TryPolicyRaycast(out var policyHit))
         {
-            selected = instance.Facility;
-            lastValidSelected = CloneFacility(selected);
-            dragging = true;
-            placeMode = false;
-            status = $"Selected {selected.id}. Drag on a road to move; Delete removes it.";
-            return;
+            var instance = policyHit.collider.GetComponentInParent<EnvironmentCostRuntimePolicyFacilityInstance>();
+            if (instance != null)
+            {
+                selected = instance.Facility;
+                lastValidSelected = CloneFacility(selected);
+                dragging = true;
+                placeMode = false;
+                status = $"Selected {selected.id}. Drag on a road to move; Delete removes it.";
+                return;
+            }
         }
-        if (placeMode && IsGroundLayer(hit.collider.gameObject.layer)) AddFacility(hit.point);
+        if (!placeMode) return;
+        if (TryGroundRaycast(out var groundHit)) AddFacility(groundHit.point);
+        else status = "No Road or Terrain collider was hit. Click an unobstructed road or ground surface.";
     }
 
     private void MoveSelectedToRoad()
     {
-        if (selected == null || !TryRaycast(out var hit) || !IsGroundLayer(hit.collider.gameObject.layer)) return;
+        if (selected == null || !TryGroundRaycast(out var hit)) return;
         if (!ValidatePosition(hit.point, selected, out var issue)) { status = issue; return; }
         selected.localPosition = hit.point;
         UpdateGeoCoordinate(selected);
@@ -97,12 +103,20 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         MarkDirty("Facility moved. Re-run analysis to refresh the in-memory result.");
     }
 
-    private bool TryRaycast(out RaycastHit hit)
+    private bool TryPolicyRaycast(out RaycastHit hit)
     {
         hit = default;
         var camera = Camera.main;
         if (camera == null) return false;
-        var mask = (1 << RoadLayer) | (1 << TerrainLayer) | (1 << BuildingLayer);
+        return Physics.Raycast(camera.ScreenPointToRay(Input.mousePosition), out hit, 5000f, 1 << BuildingLayer, QueryTriggerInteraction.Ignore);
+    }
+
+    private bool TryGroundRaycast(out RaycastHit hit)
+    {
+        hit = default;
+        var camera = Camera.main;
+        if (camera == null) return false;
+        var mask = (1 << RoadLayer) | (1 << TerrainLayer);
         return Physics.Raycast(camera.ScreenPointToRay(Input.mousePosition), out hit, 5000f, mask, QueryTriggerInteraction.Ignore);
     }
 
