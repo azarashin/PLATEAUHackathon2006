@@ -446,7 +446,9 @@ public static class EnvironmentCostAnalyzer
         canopy.name = "canopy";
         canopy.layer = BuildingLayer;
         canopy.transform.SetParent(parent, false);
-        var canopyVerticalRadius = Math.Min(facility.radiusMeters * 0.7, Math.Max(0.5, facility.heightMeters * 0.3));
+        // A street-tree canopy is horizontally wider than tall. At the default 1.8 m
+        // horizontal radius this yields a 1.30 m vertical radius, constrained to 1.2–1.4 m.
+        var canopyVerticalRadius = Math.Clamp(facility.radiusMeters * 0.72, 1.2, 1.4);
         canopy.transform.localPosition = Vector3.up * (float)(facility.heightMeters - canopyVerticalRadius);
         canopy.transform.localScale = new Vector3(
             (float)(facility.radiusMeters * 2.0),
