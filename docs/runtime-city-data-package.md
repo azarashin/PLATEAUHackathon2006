@@ -65,9 +65,18 @@ flowchart TD
   U1 --> R1 --> R2
   U2 -. #61〜#63 .-> R3 --> R4
   R4 -->|施策別 server bundle<br/>manifest + topology + cost slices| S1 --> S2 --> V1
+
+  classDef data fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:1.5px;
+  classDef process fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.5px;
+  classDef actor fill:#f8fafc,stroke:#64748b,color:#1e293b,stroke-width:1px;
+  class A1,A2,A3,A4,D1,D2 data;
+  class P,B,R1,R2,R3,R4,S1,S2 process;
+  class U1,U2,V1 actor;
 ```
 
 `EnvironmentCostRuntimeCityPackageLoader` が扱う都市パッケージと、経路計算サーバが扱う server bundle は役割が異なる。前者は Player が都市を安全に開くための入力、後者は経路 API が施策別の経路を返すための入力である。Runtime が出力する施策・再計算結果は、最終的には `environment-cost-server-bundle-1.0` 形式へ変換して経路計算サーバへ配備する。この変換・配備は MVP 後・低優先度の #65 で扱い、#60 はその入力都市データを保証する段階である。
+
+図中の青はデータ、緑は処理、中立色は利用者または表示先を表す。
 
 ### 1. Unity Editor で実行バイナリを生成するときに必要なもの
 
