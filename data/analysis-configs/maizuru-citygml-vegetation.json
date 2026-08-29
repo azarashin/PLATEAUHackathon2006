@@ -1,0 +1,7 @@
+{
+  "schemaVersion":"environment-cost-analysis-config-0.2", "areaId":"maizuru", "center":[135.3946946,35.4685404], "radiusMeters":4000, "coordinateZoneId":6,
+  "date":"2025-08-01", "timezone":"Asia/Tokyo", "hours":[8,9,10,11,12,13,14,15,16,17], "sampleSpacingMeters":25, "pedestrianHeightMeters":1.5, "walkingSpeedMetersPerSecond":1.4,
+  "candidateDatasetIds":["26202"], "datasetRoots":{"26202":"data/raw/plateau/26202-maizuru-2025"}, "osmInputPath":"data/raw/osm/maizuru/highways-with-nodes.json", "coverageOutputPath":"data/raw/maizuru-mesh-coverage.json",
+  "environmentCostOutputPath":"data/generated/maizuru-citygml-vegetation-environment-cost.json", "summaryOutputPath":"data/raw/maizuru-citygml-vegetation-analysis-summary.json", "cacheDirectoryPath":"data/raw/environment-cost-cache/maizuru-citygml-vegetation", "stateOutputPath":"data/raw/maizuru-citygml-vegetation-analysis-state.json", "cancellationRequestPath":"data/raw/maizuru-citygml-vegetation-analysis.cancel",
+  "policyScenarioInputPath":"data/policy-scenarios/maizuru-citygml-vegetation-unavailable.json", "includeCityGmlVegetation":true
+}

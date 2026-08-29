@@ -30,6 +30,7 @@ public sealed class AnalysisRunConfig
     public string stateOutputPath;
     public string cancellationRequestPath;
     public string policyScenarioInputPath;
+    public bool includeCityGmlVegetation;
     public MeshPartitionSettings meshPartition;
 
     [JsonIgnore] public string repositoryRoot;

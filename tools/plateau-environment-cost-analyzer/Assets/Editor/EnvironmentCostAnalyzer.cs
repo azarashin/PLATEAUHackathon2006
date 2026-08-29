@@ -97,6 +97,7 @@ public static class EnvironmentCostAnalyzer
             var sampleCount = cache.sampleCount;
             var validSampleCount = cache.validSampleCount;
             var noGroundSampleCount = cache.noGroundSampleCount;
+            var vegetationColliderCount = -1;
 
             if (missingHours.Length > 0 || cache.baseEdges == null)
             {
@@ -116,7 +117,7 @@ public static class EnvironmentCostAnalyzer
                     if (gridCodes.Count == 0) continue;
                     var localDatasetRoot = FindLocalDatasetRoot(runConfig, dataset.id);
                     importReports.Add(await ImportDataset(runConfig, dataset.id, dataset.title, localDatasetRoot, gridCodes.ToArray(), referencePoint,
-                        includeBuildings: true, includeRoads: false));
+                        includeBuildings: true, includeRoads: false, includeVegetation: runConfig.includeCityGmlVegetation));
                 }
                 foreach (var dataset in groundCoverage.datasets)
                 {
@@ -129,6 +130,7 @@ public static class EnvironmentCostAnalyzer
                 }
 
                 layerCounts = AssignColliderLayers();
+                vegetationColliderCount = CountCollidersForPackage("veg");
                 CreateScenarioFacilities(activeScenario, localGeoReference);
                 Physics.SyncTransforms();
                 Debug.Log($"ENVIRONMENT_COST_IMPORT_SUMMARY area={runConfig.areaId} buildingColliders={layerCounts.building} roadColliders={layerCounts.road} otherColliders={layerCounts.other}");
@@ -202,8 +204,9 @@ public static class EnvironmentCostAnalyzer
                     sampleSpacingMeters = SampleSpacingMeters,
                     pedestrianHeightMeters = runConfig.pedestrianHeightMeters,
                     walkingSpeedMetersPerSecond = WalkingSpeedMetersPerSecond,
-                    obstaclePackages = new[] { "bldg" },
-                    groundPackages = new[] { "tran" }
+                    obstaclePackages = runConfig.includeCityGmlVegetation ? new[] { "bldg", "veg" } : new[] { "bldg" },
+                    groundPackages = new[] { "tran" },
+                    cityGmlVegetation = new CityGmlVegetationSettings { requested = runConfig.includeCityGmlVegetation, colliderCount = vegetationColliderCount, status = !runConfig.includeCityGmlVegetation ? "disabled" : vegetationColliderCount < 0 ? "not-inspected-cache-hit" : vegetationColliderCount > 0 ? "included" : "unavailable" }
                 },
                 meshPartition = activeMeshUnit == null ? null : new MeshPartitionResult
                 {
@@ -281,7 +284,7 @@ public static class EnvironmentCostAnalyzer
 
     internal static async Task<DatasetImportReport> ImportDataset(AnalysisRunConfig config, string datasetId, string title,
         string localDatasetRoot, string[] gridCodes, PlateauVector3d referencePoint, bool includeRelief = false,
-        bool includeBuildings = true, bool includeRoads = true)
+        bool includeBuildings = true, bool includeRoads = true, bool includeVegetation = false)
     {
         var stopwatch = Stopwatch.StartNew();
         var collidersBefore = UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None).Length;
@@ -301,11 +304,14 @@ public static class EnvironmentCostAnalyzer
             var packageConfig = packagePair.Value;
             var isSupportedPackage = (includeBuildings && package == PredefinedCityModelPackage.Building) ||
                 (includeRoads && package == PredefinedCityModelPackage.Road) ||
-                (includeRelief && package == PredefinedCityModelPackage.Relief);
+                (includeRelief && package == PredefinedCityModelPackage.Relief) ||
+                (includeVegetation && package == PredefinedCityModelPackage.Vegetation);
             packageConfig.ImportPackage = isSupportedPackage;
             if (!packageConfig.ImportPackage) continue;
 
-            var targetLod = Math.Min(1, packageConfig.LODRange.AvailableMaxLOD);
+            var targetLod = package == PredefinedCityModelPackage.Vegetation
+                ? Math.Min(3, packageConfig.LODRange.AvailableMaxLOD)
+                : Math.Min(1, packageConfig.LODRange.AvailableMaxLOD);
             packageConfig.LODRange = new LODRange(targetLod, targetLod, packageConfig.LODRange.AvailableMaxLOD);
             packageConfig.IncludeTexture = false;
             packageConfig.EnableTexturePacking = false;
@@ -361,7 +367,7 @@ public static class EnvironmentCostAnalyzer
         {
             if (targetScene.HasValue && collider.gameObject.scene != targetScene.Value) continue;
             var package = FindPackageFromHierarchy(collider.transform);
-            if (package == "bldg")
+            if (package == "bldg" || package == "veg")
             {
                 collider.gameObject.layer = BuildingLayer;
                 building++;
@@ -390,11 +396,18 @@ public static class EnvironmentCostAnalyzer
         {
             var name = current.name.ToLowerInvariant();
             if (name.Contains("_bldg_")) return "bldg";
+            if (name.Contains("_veg_")) return "veg";
             if (name.Contains("_tran_")) return "tran";
             if (name.Contains("_dem_") || name.Contains("_relief_") ||
                 name.StartsWith("dem", StringComparison.Ordinal) || name.StartsWith("relief", StringComparison.Ordinal)) return "dem";
         }
         return string.Empty;
+    }
+
+    private static int CountCollidersForPackage(string package)
+    {
+        return UnityEngine.Object.FindObjectsByType<MeshCollider>(FindObjectsSortMode.None)
+            .Count(collider => FindPackageFromHierarchy(collider.transform) == package);
     }
 
     private static CoverageReport SelectUnitCoverage(CoverageReport coverage, MeshPartitionUnit unit)
@@ -486,7 +499,7 @@ public static class EnvironmentCostAnalyzer
         {
             if (renderer.gameObject.scene != targetScene) continue;
             var package = FindPackageFromHierarchy(renderer.transform);
-            var castsShadow = package == "bldg" || package == "dem";
+            var castsShadow = package == "bldg" || package == "veg" || package == "dem";
             renderer.shadowCastingMode = castsShadow ? ShadowCastingMode.On : ShadowCastingMode.Off;
             renderer.receiveShadows = true;
             receivers++;
@@ -998,7 +1011,8 @@ public static class EnvironmentCostAnalyzer
     [Serializable] private sealed class CoverageReport { public List<DatasetCoverage> datasets; }
     [Serializable] private sealed class DatasetCoverage { public string id; public string title; public List<string> gridCodes; }
     [Serializable] private sealed class SourceMetadata { public string[] plateauDatasetIds; public string plateauSdkVersion; public string unityVersion; public string osmSource; public string osmDownloadedAt; }
-    [Serializable] private sealed class AnalysisSettings { public string date; public string timezone; public int[] hours; public double sampleSpacingMeters; public double pedestrianHeightMeters; public double walkingSpeedMetersPerSecond; public string[] obstaclePackages; public string[] groundPackages; }
+    [Serializable] private sealed class AnalysisSettings { public string date; public string timezone; public int[] hours; public double sampleSpacingMeters; public double pedestrianHeightMeters; public double walkingSpeedMetersPerSecond; public string[] obstaclePackages; public string[] groundPackages; public CityGmlVegetationSettings cityGmlVegetation; }
+    [Serializable] private sealed class CityGmlVegetationSettings { public bool requested; public int colliderCount; public string status; }
     [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public MeshPartitionResult meshPartition; public ScenarioMetadata scenario; public List<EdgeResult> edges; }
     [Serializable] private sealed class EdgeResult { public string id; public long osmWayId; public long? fromNodeId; public long? toNodeId; public string highway; public double[][] coordinates; public double lengthMeters; public double walkingSeconds; public int sampleCount; public int validSampleCount; public int noGroundSampleCount; public HourlyCost[] hourly; }
     [Serializable] private sealed class HourlyCost { public int hour; public string timestamp; public string status; public string exclusionReason; public double sunElevationDegrees; public double? shadeRatio; public double? solarExposureSeconds; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public int? shadeSampleCount; }
