@@ -29,6 +29,7 @@ public static class EnvironmentCostAnalyzer
     private const int TerrainLayer = 10;
     private static AnalysisRunConfig runConfig;
     private static MeshPartitionUnit activeMeshUnit;
+    private static EnvironmentCostPolicyScenario activeScenario;
     private static double CenterLatitude => runConfig.CenterLatitude;
     private static double CenterLongitude => runConfig.CenterLongitude;
     private static double RadiusMeters => runConfig.radiusMeters;
@@ -54,6 +55,7 @@ public static class EnvironmentCostAnalyzer
         {
             runConfig = AnalysisRunConfig.LoadForCurrentProcess();
             activeMeshUnit = MeshPartitionPlanner.LoadSelectedUnit(runConfig);
+            activeScenario = EnvironmentCostPolicyScenario.Load(runConfig);
             var coveragePath = runConfig.ResolvePath(runConfig.coverageOutputPath);
             var osmPath = runConfig.ResolvePath(runConfig.osmInputPath);
             outputPath = activeMeshUnit == null ? runConfig.ResolvePath(runConfig.environmentCostOutputPath) : runConfig.ResolvePath(activeMeshUnit.outputPath);
@@ -75,7 +77,7 @@ public static class EnvironmentCostAnalyzer
             if (!File.Exists(osmPath)) throw new FileNotFoundException("OSM input was not found.", osmPath);
 
             state.phase = "cache-check";
-            state.analysisKey = CalculateAnalysisKey(buildingCoverage, groundCoverage, coveragePath, osmPath);
+            state.analysisKey = CalculateAnalysisKey(buildingCoverage, groundCoverage, coveragePath, osmPath, activeScenario);
             state.message = "時刻別キャッシュを確認しています。";
             state.Touch();
             WriteJsonAtomic(statePath, state, Formatting.Indented);
@@ -127,6 +129,7 @@ public static class EnvironmentCostAnalyzer
                 }
 
                 layerCounts = AssignColliderLayers();
+                CreateScenarioFacilities(activeScenario, localGeoReference);
                 Physics.SyncTransforms();
                 Debug.Log($"ENVIRONMENT_COST_IMPORT_SUMMARY area={runConfig.areaId} buildingColliders={layerCounts.building} roadColliders={layerCounts.road} otherColliders={layerCounts.other}");
                 if (layerCounts.building == 0 || layerCounts.road == 0)
@@ -208,6 +211,7 @@ public static class EnvironmentCostAnalyzer
                     coreGridCode = activeMeshUnit.coreGridCode,
                     ownershipRule = "latitude/longitude minimum-inclusive, maximum-exclusive"
                 },
+                scenario = new ScenarioMetadata { id = activeScenario.id, recalculationScope = activeScenario.recalculationScope, fingerprintSha256 = activeScenario.Fingerprint() },
                 edges = edges
             };
             output.resultFingerprintSha256 = ResultFingerprint(output);
@@ -408,6 +412,65 @@ public static class EnvironmentCostAnalyzer
         };
     }
 
+    internal static void CreateScenarioFacilities(EnvironmentCostPolicyScenario scenario, GeoReference geoReference)
+    {
+        if (scenario.facilities == null || scenario.facilities.Count == 0) return;
+        var root = new GameObject($"EnvironmentCostScenario-{scenario.id}");
+        foreach (var facility in scenario.facilities)
+        {
+            var projected = geoReference.Project(new GeoCoordinate(facility.latitude, facility.longitude, 0.0));
+            var location = new Vector3((float)projected.X, 500.0f, (float)projected.Z);
+            var ground = 0.0f;
+            if (Physics.Raycast(location, Vector3.down, out var hit, 1000.0f, 1 << RoadLayer, QueryTriggerInteraction.Ignore)) ground = hit.point.y;
+
+            var facilityRoot = new GameObject($"Policy-{facility.type}-{facility.id}") { layer = BuildingLayer };
+            facilityRoot.transform.SetParent(root.transform, false);
+            facilityRoot.transform.position = new Vector3((float)projected.X, ground, (float)projected.Z);
+            if (facility.type == "tree") CreateTreeFacility(facilityRoot.transform, facility);
+            else CreateShadeFacility(facilityRoot.transform, facility);
+        }
+        Debug.Log($"ENVIRONMENT_COST_SCENARIO_APPLIED id={scenario.id} facilities={scenario.facilities.Count} scope={scenario.recalculationScope}");
+    }
+
+    private static void CreateTreeFacility(Transform parent, EnvironmentCostPolicyFacility facility)
+    {
+        var trunkHeight = Math.Max(1.0, facility.heightMeters * 0.35);
+        var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        trunk.name = "trunk";
+        trunk.layer = BuildingLayer;
+        trunk.transform.SetParent(parent, false);
+        trunk.transform.localPosition = Vector3.up * (float)(trunkHeight / 2.0);
+        trunk.transform.localScale = new Vector3((float)(facility.radiusMeters * 0.25), (float)(trunkHeight / 2.0), (float)(facility.radiusMeters * 0.25));
+
+        var canopy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        canopy.name = "canopy";
+        canopy.layer = BuildingLayer;
+        canopy.transform.SetParent(parent, false);
+        canopy.transform.localPosition = Vector3.up * (float)(trunkHeight + facility.radiusMeters * 0.55);
+        canopy.transform.localScale = Vector3.one * (float)(facility.radiusMeters * 2.0);
+    }
+
+    private static void CreateShadeFacility(Transform parent, EnvironmentCostPolicyFacility facility)
+    {
+        var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        roof.name = "roof";
+        roof.layer = BuildingLayer;
+        roof.transform.SetParent(parent, false);
+        roof.transform.localPosition = Vector3.up * (float)(facility.heightMeters - 0.15);
+        roof.transform.localScale = new Vector3((float)facility.widthMeters, 0.3f, (float)facility.depthMeters);
+
+        foreach (var x in new[] { -0.5f, 0.5f })
+        foreach (var z in new[] { -0.5f, 0.5f })
+        {
+            var post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            post.name = "post";
+            post.layer = BuildingLayer;
+            post.transform.SetParent(parent, false);
+            post.transform.localPosition = new Vector3(x * (float)facility.widthMeters, (float)(facility.heightMeters / 2.0), z * (float)facility.depthMeters);
+            post.transform.localScale = new Vector3(0.12f, (float)(facility.heightMeters / 2.0), 0.12f);
+        }
+    }
+
     /// <summary>Configures explicit shadow casting and receiving roles for an inspection Scene.</summary>
     internal static (int casters, int receivers) ConfigureInspectionShadows(UnityEngine.SceneManagement.Scene targetScene)
     {
@@ -599,7 +662,8 @@ public static class EnvironmentCostAnalyzer
         }
     }
 
-    private static string CalculateAnalysisKey(CoverageReport buildingCoverage, CoverageReport groundCoverage, string coveragePath, string osmPath)
+    private static string CalculateAnalysisKey(CoverageReport buildingCoverage, CoverageReport groundCoverage, string coveragePath, string osmPath,
+        EnvironmentCostPolicyScenario scenario)
     {
         var input = new StringBuilder();
         input.AppendLine("environment-cost-analysis-key-0.2");
@@ -614,6 +678,7 @@ public static class EnvironmentCostAnalyzer
         input.AppendLine(runConfig.pedestrianHeightMeters.ToString("R", CultureInfo.InvariantCulture));
         input.AppendLine(runConfig.walkingSpeedMetersPerSecond.ToString("R", CultureInfo.InvariantCulture));
         input.AppendLine(activeMeshUnit?.id ?? "monolithic");
+        input.AppendLine(scenario.Fingerprint());
         input.AppendLine(FileSha256(coveragePath));
         input.AppendLine(FileSha256(osmPath));
         AppendCoverageKey(input, "building", buildingCoverage);
@@ -809,6 +874,7 @@ public static class EnvironmentCostAnalyzer
             output.radiusMeters,
             output.coordinateZoneId,
             output.settings,
+            output.scenario,
             output.edges
         };
         using var sha = SHA256.Create();
@@ -927,10 +993,11 @@ public static class EnvironmentCostAnalyzer
     [Serializable] private sealed class DatasetCoverage { public string id; public string title; public List<string> gridCodes; }
     [Serializable] private sealed class SourceMetadata { public string[] plateauDatasetIds; public string plateauSdkVersion; public string unityVersion; public string osmSource; public string osmDownloadedAt; }
     [Serializable] private sealed class AnalysisSettings { public string date; public string timezone; public int[] hours; public double sampleSpacingMeters; public double pedestrianHeightMeters; public double walkingSpeedMetersPerSecond; public string[] obstaclePackages; public string[] groundPackages; }
-    [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public MeshPartitionResult meshPartition; public List<EdgeResult> edges; }
+    [Serializable] private sealed class AnalysisOutput { public string schemaVersion; public string status; public string analysisKey; public string resultFingerprintSha256; public string areaId; public string generatedAt; public double[] center; public double radiusMeters; public int coordinateZoneId; public SourceMetadata source; public AnalysisSettings settings; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public MeshPartitionResult meshPartition; public ScenarioMetadata scenario; public List<EdgeResult> edges; }
     [Serializable] private sealed class EdgeResult { public string id; public long osmWayId; public long? fromNodeId; public long? toNodeId; public string highway; public double[][] coordinates; public double lengthMeters; public double walkingSeconds; public int sampleCount; public int validSampleCount; public int noGroundSampleCount; public HourlyCost[] hourly; }
     [Serializable] private sealed class HourlyCost { public int hour; public string timestamp; public string status; public string exclusionReason; public double sunElevationDegrees; public double? shadeRatio; public double? solarExposureSeconds; [JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public int? shadeSampleCount; }
     [Serializable] private sealed class MeshPartitionResult { public string unitId; public string coreGridCode; public string ownershipRule; }
+    [Serializable] private sealed class ScenarioMetadata { public string id; public string recalculationScope; public string fingerprintSha256; }
     [Serializable] internal sealed class DatasetImportReport { public string datasetId; public string title; public int thirdMeshCount; public double importSeconds; public int importedColliderCount; }
     [Serializable] private sealed class AnalysisSummary { public string schemaVersion; public string status; public string generatedAt; public string areaId; public double[] center; public double radiusMeters; public List<DatasetImportReport> datasets; public int uniqueThirdMeshes; public int buildingColliderCount; public int roadColliderCount; public int osmWayCount; public int sourceSegmentCount; public int analyzedEdgeCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public double analysisSeconds; public double totalSeconds; public long peakWorkingSetBytes; public long outputBytes; public string outputPath; public string analysisKey; public string resultFingerprintSha256; public bool cacheEnabled; public bool cacheBaseHit; public int cacheHourlyHitCount; public int cacheHourlyMissCount; public double cacheReadSeconds; public double cacheWriteSeconds; public bool importSkipped; }
     [Serializable] private sealed class BaseEdgeCache { public string schemaVersion; public string analysisKey; public int osmWayCount; public int sourceSegmentCount; public long sampleCount; public long validSampleCount; public long noGroundSampleCount; public List<EdgeResult> edges; }
