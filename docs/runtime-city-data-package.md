@@ -76,7 +76,13 @@ flowchart TD
 
 `EnvironmentCostRuntimeCityPackageLoader` が扱う都市パッケージと、経路計算サーバが扱う server bundle は役割が異なる。前者は Player が都市を安全に開くための入力、後者は経路 API が施策別の経路を返すための入力である。Runtime が出力する施策・再計算結果は、最終的には `environment-cost-server-bundle-1.0` 形式へ変換して経路計算サーバへ配備する。この変換・配備は MVP 後・低優先度の #65 で扱い、#60 はその入力都市データを保証する段階である。
 
-図中の青はデータ、緑は処理、中立色は利用者または表示先を表す。
+**凡例**
+
+| 色 | 四角が示すもの | 例 |
+| --- | --- | --- |
+| <span style="display:inline-block;width:1em;height:1em;background:#dbeafe;border:1px solid #2563eb"></span> 青系 | 処理の入出力となるデータまたは配布物 | CityGML 由来 Scene、道路ネットワーク bundle、基準環境コスト、Player、都市パッケージ |
+| <span style="display:inline-block;width:1em;height:1em;background:#dcfce7;border:1px solid #16a34a"></span> 緑系 | データを生成、検証、変換、配信する処理 | パッケージ生成、Player ビルド、Runtime 検証、server bundle のロード、経路 API |
+| <span style="display:inline-block;width:1em;height:1em;background:#f8fafc;border:1px solid #64748b"></span> 中立色 | 人が行う操作、または処理結果を確認する表示先 | 実行バイナリ使用者、Web Viewer |
 
 ### 1. Unity Editor で実行バイナリを生成するときに必要なもの
 
