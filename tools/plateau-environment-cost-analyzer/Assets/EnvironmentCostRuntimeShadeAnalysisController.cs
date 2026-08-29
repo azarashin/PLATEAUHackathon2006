@@ -65,7 +65,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
         if (LatestResult == null) return;
         LatestResult = null;
         statusMessage = $"Policy scenario '{scenarioId}' changed. Run the analysis again to refresh the result.";
-        Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_INVALIDATED scenario={scenarioId}");
+        UnityEngine.Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_ANALYSIS_INVALIDATED scenario={scenarioId}");
     }
 
     private void OnGUI()
