@@ -17,6 +17,7 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
     public PackageState State => state;
     public string StatusMessage => statusMessage;
     public EnvironmentCostRuntimeCityPackageManifest Manifest { get; private set; }
+    public string PackageRootPath { get; private set; }
 
     public void Configure(string newPackageRoot)
     {
@@ -43,6 +44,7 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
         state = PackageState.Loading;
         statusMessage = "都市データパッケージを検証中…";
         Manifest = null;
+        PackageRootPath = null;
         yield return null;
 
         try
@@ -72,6 +74,7 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
             }
 
             Manifest = manifest;
+            PackageRootPath = root;
             state = PackageState.Ready;
             statusMessage = $"都市データ準備完了: {manifest.displayName} / {manifest.version} ({manifest.files.Length} files)";
             Debug.Log($"ENVIRONMENT_COST_RUNTIME_CITY_PACKAGE_READY area={manifest.areaId} version={manifest.version} files={manifest.files.Length}");

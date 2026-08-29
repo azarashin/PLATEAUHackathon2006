@@ -161,6 +161,18 @@ $unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.18f1\Editor\Unity.exe'
 
 Runtime 起動時の `EnvironmentCostRuntimeCityPackageLoader` は manifest、全ファイルのサイズ・SHA-256、Scene とパッケージの地域・座標系・範囲、必須 Collider レイヤーを検証する。欠落、改変、版・範囲不一致なら状態オーバーレイと Console に理由を表示し、以後の編集・再計算の開始点として利用しない。
 
+## Runtime 日陰解析コア（#61）
+
+都市パッケージ生成時には `runtime-shade-input.json` も作成する。これは道路辺を Scene と同じローカル座標へ変換した解析入力であり、Runtime は PLATEAU SDK の座標変換や Editor API に依存せずに利用する。
+
+Player 起動後、都市パッケージ検証が完了すると画面に **Runtime Shade Analysis** が表示される。時刻を選び **Run full-road analysis for selected hour** を押すと、全道路辺について次を実行する。
+
+1. `Road` レイヤーへ下向き Raycast を行い、歩行可能な地表を取得する。
+2. 歩行者高を加えた地点から太陽方向に `Building` レイヤーへ Raycast を行い、遮蔽を判定する。
+3. 道路ごとの日陰率、日射曝露時間、`available` / `partial` / `missing` をメモリ上の結果 DTO として返す。
+
+この段階は全道路を同期解析する基準実装である。編集結果の永続保存、進捗・取消、影響範囲だけの再計算は #63 で扱う。操作結果を server bundle として出力・配備する機能は含まない。
+
 ## Player の作成と確認
 
 1. 先に Inspection Scene を生成する。Scene Builder は `EnvironmentCostRuntimeCityPackageLoader` をシーンのルートへ付加する（既存のローカル Scene には Player 起動時に自動付加する）。

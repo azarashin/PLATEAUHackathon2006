@@ -81,6 +81,18 @@ public static class HourlyEnvironmentCostSelfTests
             runtimePackage.ValidateStructure();
             AssertEqual(true, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("road-network/topology.json"));
             AssertEqual(false, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("../outside.json"));
+            var runtimeShadeInput = new EnvironmentCostRuntimeShadeAnalysisInput
+            {
+                schemaVersion = "environment-cost-runtime-shade-input-0.1", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
+                coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
+                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "edge-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
+            };
+            var runtimeShadeResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(runtimeShadeInput,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
+            AssertEqual("completed", runtimeShadeResult.status);
+            AssertEqual("missing", runtimeShadeResult.edges[0].hourly[0].status);
+            AssertEqual("road-surface-not-found", runtimeShadeResult.edges[0].hourly[0].exclusionReason);
+            AssertRuntimeShadeRaycasts();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -125,6 +137,38 @@ public static class HourlyEnvironmentCostSelfTests
         if (expected.Length != actual.Count || !expected.SequenceEqual(actual, StringComparer.Ordinal))
         {
             throw new InvalidOperationException($"Unexpected normalized grid codes: {string.Join(",", actual)}.");
+        }
+    }
+
+    private static void AssertRuntimeShadeRaycasts()
+    {
+        var road = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        var obstruction = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            road.layer = 9;
+            road.transform.position = new Vector3(5f, -0.5f, 0f);
+            road.transform.localScale = new Vector3(30f, 1f, 6f);
+            obstruction.layer = 8;
+            var sun = HourlyEnvironmentCostRules.CalculateSun(new DateTime(2025, 8, 1), 12, 35.0, 139.0, "Asia/Tokyo");
+            obstruction.transform.position = new Vector3(5f, 1.5f, 0f) + sun.direction * 5f;
+            obstruction.transform.localScale = Vector3.one * 10f;
+            Physics.SyncTransforms();
+            var input = new EnvironmentCostRuntimeShadeAnalysisInput
+            {
+                schemaVersion = "environment-cost-runtime-shade-input-0.1", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
+                coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
+                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "edge-rays", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
+            };
+            var result = EnvironmentCostRuntimeShadeAnalyzer.Analyze(input,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
+            AssertEqual("available", result.edges[0].hourly[0].status);
+            AssertNear(0.5, result.edges[0].hourly[0].shadeRatio);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(road);
+            UnityEngine.Object.DestroyImmediate(obstruction);
         }
     }
 }
