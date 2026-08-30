@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public static class HourlyEnvironmentCostSelfTests
 {
@@ -132,6 +133,7 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual("missing", runtimeShadeResult.edges[0].hourly[0].status);
             AssertEqual("road-surface-not-found", runtimeShadeResult.edges[0].hourly[0].exclusionReason);
             AssertRuntimeShadeRaycasts();
+            AssertRuntimeUiKeyboardFocusPolicy();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -209,5 +211,31 @@ public static class HourlyEnvironmentCostSelfTests
             UnityEngine.Object.DestroyImmediate(road);
             UnityEngine.Object.DestroyImmediate(obstruction);
         }
+    }
+
+    private static void AssertRuntimeUiKeyboardFocusPolicy()
+    {
+        var root = new VisualElement();
+        var button = new Button();
+        var slider = new Slider();
+        var sliderInt = new SliderInt();
+        var toggle = new Toggle();
+        var text = new TextField();
+        var number = new FloatField();
+        root.Add(button);
+        root.Add(slider);
+        root.Add(sliderInt);
+        root.Add(toggle);
+        root.Add(text);
+        root.Add(number);
+
+        EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(root);
+
+        AssertEqual(false, button.focusable);
+        AssertEqual(false, slider.focusable);
+        AssertEqual(false, sliderInt.focusable);
+        AssertEqual(false, toggle.focusable);
+        AssertEqual(true, text.focusable);
+        AssertEqual(true, number.focusable);
     }
 }

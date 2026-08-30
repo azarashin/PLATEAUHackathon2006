@@ -71,6 +71,7 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
             tabButtons[index].AddToClassList("runtime-tab");
             tabs.Add(tabButtons[index]);
         }
+        EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(root);
         SelectTab(0);
     }
 }
