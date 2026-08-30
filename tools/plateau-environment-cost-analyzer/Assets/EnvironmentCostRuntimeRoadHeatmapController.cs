@@ -28,6 +28,12 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         { "missing", new Color(0.25f, 0.28f, 0.32f) }
     };
 
+    private static readonly Dictionary<string, string> StatusLabels = new Dictionary<string, string>
+    {
+        { "improved", "改善" }, { "degraded", "悪化" }, { "unchanged", "変化なし" },
+        { "partial", "一部欠測" }, { "missing", "比較不能" }, { "available", "全データあり" }
+    };
+
     private EnvironmentCostInspectionMetadata metadata;
     private EnvironmentCostRuntimeRouteComparisonController routeComparison;
     private EnvironmentCostRuntimeRoadHeatmapComparisonResult heatmap;
@@ -193,7 +199,7 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         var profileField = new DropdownField("環境コストの経路プロファイル", new List<string> { "最短（係数 0）", "バランス（係数 0.5）", "日陰優先（係数 2）" }, 2); panel.Add(profileField);
         var policyField = new DropdownField("比較する施策", new List<string> { "案A", "案B" }, 0); panel.Add(policyField);
         var run = new Button(RunComparison) { text = "道路別比較を実行" }; panel.Add(run);
-        panel.Add(new Label("凡例: 改善=緑 / 悪化=オレンジ / 変化なし=青灰 / partial=黄 / missing=暗灰"));
+        AddLegend(panel);
         var roadId = new TextField("道路ID"); panel.Add(roadId);
         panel.Add(new Button(() => SelectRoad(roadId.value)) { text = "道路を選択" });
         var details = new Label(); details.AddToClassList("runtime-status"); panel.Add(details);
@@ -224,10 +230,50 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
                 policyField.choices = policyChoices;
                 if (policyIndex > 0) { policyIndex = 0; policyField.SetValueWithoutNotify("案A"); }
             }
-            details.text = BuildDetail();
+            details.text = BuildDetailJapanese();
             state.text = status;
         }).Every(250);
     }
+
+    private string BuildDetailJapanese()
+    {
+        if (heatmap == null) return "道路を選択すると、現状・施策後・差分・品質状態を表示します。";
+        var road = heatmap.edges.FirstOrDefault(item => item.id == selectedRoadId);
+        if (road == null) return "道路IDを入力して道路を選択してください。";
+        var unit = heatmap.metric == "shadeRatio" ? "%" : "秒";
+        var before = heatmap.metric == "shadeRatio" ? road.baselineValue * 100.0 : road.baselineValue;
+        var after = heatmap.metric == "shadeRatio" ? road.policyValue * 100.0 : road.policyValue;
+        var delta = heatmap.metric == "shadeRatio" ? road.delta * 100.0 : road.delta;
+        return $"道路: {road.id}\n現状: {FormatValue(before, unit)}（{StatusLabel(road.baselineStatus)}）\n施策後: {FormatValue(after, unit)}（{StatusLabel(road.policyStatus)}）\n差分: {FormatValue(delta, unit, true)}\n比較状態: {StatusLabel(road.status)}\n歩行時間: {road.walkingSeconds:F1} 秒\nsource edge: {string.Join(", ", road.sourceEdgeIds ?? Array.Empty<string>())}";
+    }
+
+    private static void AddLegend(VisualElement panel)
+    {
+        var legend = new VisualElement();
+        legend.style.flexDirection = FlexDirection.Row;
+        legend.style.flexWrap = Wrap.Wrap;
+        legend.style.marginTop = 4;
+        legend.style.marginBottom = 4;
+        legend.Add(new Label("凡例: "));
+        AddLegendItem(legend, "improved", "緑");
+        AddLegendItem(legend, "degraded", "オレンジ");
+        AddLegendItem(legend, "unchanged", "青灰");
+        AddLegendItem(legend, "partial", "黄");
+        AddLegendItem(legend, "missing", "暗灰");
+        panel.Add(legend);
+    }
+
+    private static void AddLegendItem(VisualElement legend, string comparisonStatus, string colorName)
+    {
+        var item = new Label($"■ {StatusLabel(comparisonStatus)}（{colorName}）  ");
+        item.style.color = StatusColors[comparisonStatus];
+        legend.Add(item);
+    }
+
+    private static string StatusLabel(string comparisonStatus)
+        => !string.IsNullOrEmpty(comparisonStatus) && StatusLabels.TryGetValue(comparisonStatus, out var label)
+            ? label
+            : "不明";
 
     private string BuildDetail()
     {
