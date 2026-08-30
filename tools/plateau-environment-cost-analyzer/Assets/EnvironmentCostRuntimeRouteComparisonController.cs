@@ -18,6 +18,10 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
 {
     private const int RoadLayer = 9;
     private const int TerrainLayer = 10;
+    // Marker scale is relative to this camera distance, so endpoints remain legible at city scale.
+    private const float EndpointMarkerReferenceDistance = 250f;
+    private const float EndpointMarkerMinimumScale = 0.35f;
+    private const float EndpointMarkerMaximumScale = 24f;
     private enum CaptureTarget { None, Start, End }
 
     private EnvironmentCostInspectionMetadata metadata;
@@ -97,6 +101,7 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
 
     private void Update()
     {
+        UpdateEndpointMarkerScales();
         if (captureTarget == CaptureTarget.None || EnvironmentCostRuntimeUiInputGate.IsPointerOverUi || !Input.GetMouseButtonDown(0)) return;
         var camera = ResolveCamera();
         if (camera == null) { status = "起終点の指定に使えるカメラがありません。"; return; }
@@ -318,6 +323,26 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
             DestroyEndpointMarker(ref endMarker);
             endMarker = CreateEndpointMarker("RuntimeRouteEndMarker", position, new Color(0.16f, 0.45f, 0.9f));
         }
+    }
+
+    private void UpdateEndpointMarkerScales()
+    {
+        if (startMarker == null && endMarker == null) return;
+        var camera = ResolveCamera();
+        if (camera == null) return;
+        UpdateEndpointMarkerScale(startMarker, camera);
+        UpdateEndpointMarkerScale(endMarker, camera);
+    }
+
+    private static void UpdateEndpointMarkerScale(GameObject marker, Camera camera)
+    {
+        if (marker == null || camera == null) return;
+        var distance = Vector3.Distance(camera.transform.position, marker.transform.position);
+        var scale = Mathf.Clamp(
+            distance / EndpointMarkerReferenceDistance,
+            EndpointMarkerMinimumScale,
+            EndpointMarkerMaximumScale);
+        marker.transform.localScale = Vector3.one * scale;
     }
 
     private static GameObject CreateEndpointMarker(string name, Vector3 groundPosition, Color color)
