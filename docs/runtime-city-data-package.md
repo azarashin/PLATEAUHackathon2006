@@ -163,6 +163,16 @@ Runtime 起動時の `EnvironmentCostRuntimeCityPackageLoader` は manifest、�
 
 ## Runtime 日陰解析コア（#61）
 
+### Runtime の範囲の扱い
+
+Runtime では次の三つを混同しない。
+
+- **解析範囲**: 分析設定の中心・半径で、元データの取得と基準環境コスト計算を限定する条件。広域都市データの外形や編集可能領域ではない。
+- **配置可能範囲**: Player で `Road` または `Terrain` レイヤーの Collider にレイキャストが当たり、かつ配置物が生成済み道路ネットワークの少なくとも一辺へ日陰影響を与え得る範囲。固定半径だけで拒否しない。
+- **出力範囲**: `runtime-shade-input.json` に収録された道路辺のうち、解析範囲に交差する辺。Runtime の再計算・保存結果はこの道路ネットワークに対してのみ生成する。
+
+したがって、都市表示や地表が広くても、道路ネットワーク出力に含まれない地点の施策は保存・配置できない。この場合は、対象地点を含む分析設定で道路ネットワークと基準環境コストを再生成する。
+
 都市パッケージ生成時には `runtime-shade-input.json` も作成する。これは道路辺を Scene と同じローカル座標へ変換した解析入力であり、Runtime は PLATEAU SDK の座標変換や Editor API に依存せずに利用する。
 
 Player 起動後、都市パッケージ検証が完了すると画面に **Runtime Shade Analysis** が表示される。時刻を選び **Run full-road analysis for selected hour** を押すと、全道路辺について次を実行する。

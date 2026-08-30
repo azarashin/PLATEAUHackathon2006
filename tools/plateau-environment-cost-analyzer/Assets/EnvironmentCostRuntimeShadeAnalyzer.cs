@@ -15,21 +15,7 @@ public static class EnvironmentCostRuntimeShadeAnalyzer
         if (request == null) throw new ArgumentNullException(nameof(request));
         request.Validate(input);
 
-        var result = new EnvironmentCostRuntimeShadeAnalysisResult
-        {
-            schemaVersion = "environment-cost-runtime-shade-result-0.1",
-            status = "completed",
-            areaId = input.areaId,
-            generatedAtUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
-            provenance = EnvironmentCostRuntimeShadeAnalysisProvenance.From(input, request),
-            edges = new List<EnvironmentCostRuntimeShadeEdgeResult>(input.edges.Length)
-        };
-        var suns = new Dictionary<int, HourlyEnvironmentCostRules.SunPosition>();
-        foreach (var hour in request.hours)
-            suns[hour] = HourlyEnvironmentCostRules.CalculateSun(request.analysisDate, hour, input.center[1], input.center[0], input.timezone);
-
-        var buildingMask = 1 << request.buildingLayer;
-        var roadMask = 1 << request.roadLayer;
+        var result = CreateResult(input, request);
         for (var edgeIndex = 0; edgeIndex < input.edges.Length; edgeIndex++)
         {
             if (isCancellationRequested?.Invoke() == true)
@@ -38,10 +24,30 @@ public static class EnvironmentCostRuntimeShadeAnalyzer
                 result.message = "Cancellation was requested before all runtime shade edges were calculated.";
                 return result;
             }
-            result.edges.Add(AnalyzeEdge(input, input.edges[edgeIndex], request, suns, roadMask, buildingMask));
+            result.edges.Add(AnalyzeEdge(input, input.edges[edgeIndex], request));
             onEdgeCompleted?.Invoke(edgeIndex + 1, input.edges.Length);
         }
         return result;
+    }
+
+    public static EnvironmentCostRuntimeShadeAnalysisResult CreateResult(EnvironmentCostRuntimeShadeAnalysisInput input,
+        EnvironmentCostRuntimeShadeAnalysisRequest request) => new EnvironmentCostRuntimeShadeAnalysisResult
+    {
+        schemaVersion = "environment-cost-runtime-shade-result-0.1",
+        status = "completed",
+        areaId = input.areaId,
+        generatedAtUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+        provenance = EnvironmentCostRuntimeShadeAnalysisProvenance.From(input, request),
+        edges = new List<EnvironmentCostRuntimeShadeEdgeResult>(input.edges.Length)
+    };
+
+    public static EnvironmentCostRuntimeShadeEdgeResult AnalyzeEdge(EnvironmentCostRuntimeShadeAnalysisInput input,
+        EnvironmentCostRuntimeShadeInputEdge edge, EnvironmentCostRuntimeShadeAnalysisRequest request)
+    {
+        var suns = new Dictionary<int, HourlyEnvironmentCostRules.SunPosition>();
+        foreach (var hour in request.hours)
+            suns[hour] = HourlyEnvironmentCostRules.CalculateSun(request.analysisDate, hour, input.center[1], input.center[0], input.timezone);
+        return AnalyzeEdge(input, edge, request, suns, 1 << request.roadLayer, 1 << request.buildingLayer);
     }
 
     private static EnvironmentCostRuntimeShadeEdgeResult AnalyzeEdge(EnvironmentCostRuntimeShadeAnalysisInput input,
@@ -189,6 +195,14 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisProvenance
     public int roadLayer;
     public string obstructionCondition;
     public string groundCondition;
+    public string scenarioId;
+    public string policyFingerprintSha256;
+    public string cityPackageVersion;
+    public string cityPackageManifestSha256;
+    public string recalculationScope;
+    public int totalEdgeCount;
+    public int recalculatedEdgeCount;
+    public string resultFingerprintSha256;
     public static EnvironmentCostRuntimeShadeAnalysisProvenance From(EnvironmentCostRuntimeShadeAnalysisInput input,
         EnvironmentCostRuntimeShadeAnalysisRequest request) => new EnvironmentCostRuntimeShadeAnalysisProvenance
     {
