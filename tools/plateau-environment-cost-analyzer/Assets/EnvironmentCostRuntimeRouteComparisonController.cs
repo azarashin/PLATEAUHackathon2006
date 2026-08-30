@@ -55,6 +55,25 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
     private Material routeMaterial;
 
     public bool IsCapturingRoutePoint => captureTarget != CaptureTarget.None;
+    public int CompletedPolicyCount => comparison?.policies?.Count ?? 0;
+
+    /// <summary>Returns exactly the completed comparison condition and policy selected for the road heatmap.</summary>
+    public bool TryGetRoadHeatmapContext(int requestedPolicyIndex, out EnvironmentCostRuntimeRouteComparison core,
+        out EnvironmentCostRuntimeRouteComparisonResult completedComparison,
+        out EnvironmentCostRuntimeShadeAnalysisResult policyResult)
+    {
+        core = routeCore;
+        completedComparison = comparison;
+        policyResult = null;
+        if (core == null || completedComparison == null || completedComparison.policies == null || completedComparison.policies.Count == 0)
+            return false;
+        if (requestedPolicyIndex < 0 || requestedPolicyIndex >= completedComparison.policies.Count) return false;
+        var policyIndex = requestedPolicyIndex;
+        var fingerprint = completedComparison.policies[policyIndex]?.scenario?.resultFingerprintSha256;
+        if (string.IsNullOrWhiteSpace(fingerprint)) return false;
+        policyResult = results.Values.FirstOrDefault(item => item?.provenance?.resultFingerprintSha256 == fingerprint);
+        return policyResult != null;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AddToInspectionScene()

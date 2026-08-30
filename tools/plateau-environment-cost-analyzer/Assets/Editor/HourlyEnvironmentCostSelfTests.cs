@@ -293,6 +293,25 @@ public static class HourlyEnvironmentCostSelfTests
                     throw new InvalidOperationException("Runtime comparison must share snapped start/end nodes.");
             }
             AssertEqual(policyA.provenance.resultFingerprintSha256, compared.policies[0].scenario.resultFingerprintSha256);
+            var roadHeatmap = core.CompareRoadHeatmap(new EnvironmentCostRuntimeRoadHeatmapComparisonRequest
+            {
+                areaId = compared.areaId, timestamp = compared.timestamp, metric = "shadeRatio"
+            }, compared, policyA);
+            AssertEqual(EnvironmentCostRuntimeRoadHeatmapComparison.ResultSchema, roadHeatmap.schemaVersion);
+            AssertEqual(true, roadHeatmap.edges.Count > 0);
+            AssertEqual(true, roadHeatmap.edges.All(edge => edge.status == "improved" || edge.status == "degraded" || edge.status == "unchanged" || edge.status == "partial" || edge.status == "missing"));
+            AssertEqual(roadHeatmap.comparisonFingerprintSha256, EnvironmentCostRuntimeRoadHeatmapComparison.CalculateFingerprint(roadHeatmap));
+            var environmentCostHeatmap = core.CompareRoadHeatmap(new EnvironmentCostRuntimeRoadHeatmapComparisonRequest
+            {
+                areaId = compared.areaId, timestamp = compared.timestamp, metric = "environmentCostSeconds", profileId = "shade", solarAvoidanceFactor = 2.0
+            }, compared, policyA);
+            AssertEqual("environmentCostSeconds", environmentCostHeatmap.metric);
+            AssertNear(2.0, environmentCostHeatmap.solarAvoidanceFactor);
+            AssertEqual(true, environmentCostHeatmap.edges.All(edge => edge.baselineValue < 0 || edge.baselineValue >= edge.walkingSeconds));
+            AssertThrows<InvalidOperationException>(() => core.CompareRoadHeatmap(new EnvironmentCostRuntimeRoadHeatmapComparisonRequest
+            {
+                areaId = compared.areaId, timestamp = "2025-08-01T13:00:00+09:00", metric = "shadeRatio"
+            }, compared, policyA));
             var evidence = new EnvironmentCostRuntimeRouteComparisonEvidence
             {
                 generatedAtUtc = "2025-08-01T00:00:00Z", comparison = compared,
