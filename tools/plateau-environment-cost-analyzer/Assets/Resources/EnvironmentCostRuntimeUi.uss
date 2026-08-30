@@ -32,8 +32,10 @@
 .runtime-scroll { max-height: 420px; }
 .runtime-row { flex-direction: row; gap: 6px; }
 .runtime-panel Label { color: rgb(30, 41, 59); -unity-font-style: normal; font-size: 11px; }
-.runtime-panel TextField, .runtime-panel Slider, .runtime-panel SliderInt, .runtime-panel Toggle { margin-top: 3px; margin-bottom: 3px; }
-.runtime-panel .unity-text-field__input { color: rgb(15, 23, 42); background-color: rgb(255, 255, 255); border-left-color: rgb(148, 163, 184); border-right-color: rgb(148, 163, 184); border-top-color: rgb(148, 163, 184); border-bottom-color: rgb(148, 163, 184); }
+.runtime-panel TextField, .runtime-panel Slider, .runtime-panel SliderInt, .runtime-panel Toggle { margin-top: 2px; margin-bottom: 2px; }
+.runtime-panel .unity-base-field__label { min-width: 145px; }
+.runtime-panel .unity-text-field { max-width: 390px; min-height: 25px; }
+.runtime-panel .unity-text-field__input { color: rgb(15, 23, 42); background-color: rgb(255, 255, 255); border-left-color: rgb(148, 163, 184); border-right-color: rgb(148, 163, 184); border-top-color: rgb(148, 163, 184); border-bottom-color: rgb(148, 163, 184); min-height: 22px; padding-top: 2px; padding-bottom: 2px; }
 .runtime-panel .unity-button { color: rgb(255, 255, 255); background-color: rgb(13, 148, 136); border-left-color: rgb(15, 118, 110); border-right-color: rgb(15, 118, 110); border-top-color: rgb(15, 118, 110); border-bottom-color: rgb(15, 118, 110); }
 .runtime-panel .unity-button:hover { background-color: rgb(5, 150, 105); }
 .runtime-panel .unity-button:active { background-color: rgb(4, 120, 87); }
