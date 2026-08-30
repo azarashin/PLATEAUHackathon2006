@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -120,19 +121,48 @@ public static class HourlyEnvironmentCostSelfTests
                 new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(1000f, 0f, 1000f) }));
             var runtimeEvidence = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
+            runtimeEvidence.message = null; // Null and empty text have the same persisted semantic meaning.
+            runtimeEvidence.edges[0].hourly[0].shadeRatio = 0.6180339887498949;
+            runtimeEvidence.edges[0].hourly[0].solarExposureSeconds = 18.654066884390497;
             runtimeEvidence.provenance.scenarioId = "runtime-policy-self-test";
             runtimeEvidence.provenance.policyFingerprintSha256 = runtimePolicy.Fingerprint();
             runtimeEvidence.provenance.recalculationScope = "局所再計算";
             runtimeEvidence.provenance.totalEdgeCount = runtimeShadeInput.edges.Length;
             runtimeEvidence.provenance.recalculatedEdgeCount = affectedEdges.Count;
-            if (string.IsNullOrWhiteSpace(EnvironmentCostRuntimeShadeResultStore.CalculateSha256(runtimeEvidence)))
+            var runtimeEvidenceFingerprint = EnvironmentCostRuntimeShadeResultStore.CalculateSha256(runtimeEvidence);
+            if (string.IsNullOrWhiteSpace(runtimeEvidenceFingerprint))
                 throw new InvalidOperationException("Expected Runtime shade evidence fingerprint.");
+            runtimeEvidence.provenance.resultFingerprintSha256 = runtimeEvidenceFingerprint;
+            AssertEqual(runtimeEvidenceFingerprint, EnvironmentCostRuntimeShadeResultStore.CalculateSha256(runtimeEvidence));
+            runtimeEvidence.provenance.resultFingerprintAlgorithm = EnvironmentCostRuntimeShadeResultStore.SemanticFingerprintAlgorithm;
+            var serializedRuntimeEvidence = EnvironmentCostRuntimePolicyJson.Serialize(runtimeEvidence, Newtonsoft.Json.Formatting.Indented);
+            var reloadedRuntimeEvidence = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimeShadeAnalysisResult>(serializedRuntimeEvidence);
+            AssertEqual(runtimeEvidenceFingerprint, EnvironmentCostRuntimeShadeResultStore.CalculateSha256(reloadedRuntimeEvidence));
+            var temporaryScenarioId = "runtime-shade-store-self-test-" + Guid.NewGuid().ToString("N");
+            var temporaryDirectory = EnvironmentCostRuntimeShadeResultStore.GetDirectory(runtimeEvidence.areaId, temporaryScenarioId);
+            try
+            {
+                var persistedPath = EnvironmentCostRuntimeShadeResultStore.Save(runtimeEvidence, temporaryScenarioId);
+                AssertEqual(true, File.Exists(persistedPath));
+                var persistedRuntimeEvidence = EnvironmentCostRuntimeShadeResultStore.LoadForRouteComparison(persistedPath);
+                AssertEqual(EnvironmentCostRuntimeShadeResultStore.SemanticFingerprintAlgorithm, persistedRuntimeEvidence.provenance.resultFingerprintAlgorithm);
+                AssertEqual(runtimeEvidenceFingerprint, persistedRuntimeEvidence.provenance.resultFingerprintSha256);
+                AssertEqual(runtimeEvidenceFingerprint, EnvironmentCostRuntimeShadeResultStore.CalculateSha256(persistedRuntimeEvidence));
+            }
+            finally
+            {
+                if (Directory.Exists(temporaryDirectory)) Directory.Delete(temporaryDirectory, true);
+            }
+            reloadedRuntimeEvidence.edges[0].hourly[0].shadeRatio += 0.01;
+            AssertEqual(false, runtimeEvidenceFingerprint == EnvironmentCostRuntimeShadeResultStore.CalculateSha256(reloadedRuntimeEvidence));
             var runtimeShadeResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             AssertEqual("completed", runtimeShadeResult.status);
             AssertEqual("missing", runtimeShadeResult.edges[0].hourly[0].status);
             AssertEqual("road-surface-not-found", runtimeShadeResult.edges[0].hourly[0].exclusionReason);
             AssertRuntimeShadeRaycasts();
+            AssertRuntimeRouteComparison();
+            AssertRuntimeRouteComparisonWithLocalCityPackage();
             AssertRuntimeUiKeyboardFocusPolicy();
             AssertRuntimeUiDocumentInputGate();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
@@ -212,6 +242,147 @@ public static class HourlyEnvironmentCostSelfTests
             UnityEngine.Object.DestroyImmediate(road);
             UnityEngine.Object.DestroyImmediate(obstruction);
         }
+    }
+
+    private static void AssertRuntimeRouteComparison()
+    {
+        var repositoryRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty)?.FullName ?? string.Empty)?.FullName;
+        if (string.IsNullOrWhiteSpace(repositoryRoot)) throw new InvalidOperationException("Repository root could not be resolved for route fixture.");
+        var fixtureRoot = Path.Combine(repositoryRoot, "data", "fixtures", "route-server-bundle-v1");
+        var packageRoot = Path.Combine(Path.GetTempPath(), "environment-cost-runtime-route-self-test-" + Guid.NewGuid().ToString("N"));
+        var roadRoot = Path.Combine(packageRoot, "road-network");
+        Directory.CreateDirectory(roadRoot);
+        try
+        {
+            foreach (var name in new[] { "manifest.json", "topology.json", "cost-12.json" })
+                File.Copy(Path.Combine(fixtureRoot, name), Path.Combine(roadRoot, name));
+            File.WriteAllText(Path.Combine(packageRoot, "manifest.json"),
+                "{\"schemaVersion\":\"environment-cost-runtime-city-package-0.1\",\"areaId\":\"route-server-fixture\",\"version\":\"self-test\"}");
+
+            var core = EnvironmentCostRuntimeRouteComparison.Load(packageRoot);
+            AssertEqual("route-server-fixture", core.AreaId);
+            var result = core.Compare(new EnvironmentCostRuntimeRouteComparisonRequest
+            {
+                areaId = "route-server-fixture",
+                timestamp = "2025-08-01T12:00:00+09:00",
+                start = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.735, latitude = 35.69, nodeIndex = -1 },
+                end = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.736, latitude = 35.69, nodeIndex = -1 }
+            }, null);
+            AssertEqual(EnvironmentCostRuntimeRouteComparison.ResultSchema, result.schemaVersion);
+            if (result.baseline.routes.Count != 3) throw new InvalidOperationException("Expected three Runtime route profiles.");
+            AssertGridCodes(new[] { "osm-way-201-0:forward", "osm-way-202-0:forward" }, result.baseline.routes[0].edgeIds);
+            AssertGridCodes(new[] { "osm-way-203-0:forward", "osm-way-204-0:forward" }, result.baseline.routes[1].edgeIds);
+            AssertGridCodes(new[] { "osm-way-205-0:forward", "osm-way-206-0:forward" }, result.baseline.routes[2].edgeIds);
+            AssertNear(200.0, result.baseline.routes[0].walkingSeconds);
+            AssertNear(180.0, result.baseline.routes[0].solarExposureSeconds);
+            AssertNear(230.0, result.baseline.routes[1].walkingSeconds);
+            AssertNear(115.0, result.baseline.routes[1].solarExposureSeconds);
+            AssertNear(300.0, result.baseline.routes[2].walkingSeconds);
+            AssertNear(15.0, result.baseline.routes[2].solarExposureSeconds);
+            AssertEqual(result.comparisonFingerprintSha256, EnvironmentCostRuntimeRouteComparison.CalculateComparisonFingerprint(result));
+
+            var policyA = CreateFixtureRuntimeRouteResult(packageRoot, "policy-a", 1.0);
+            var policyB = CreateFixtureRuntimeRouteResult(packageRoot, "policy-b", 0.0);
+            var compared = core.Compare(result.conditions, null, policyA, policyB);
+            if (compared.policies.Count != 2) throw new InvalidOperationException("Expected two Runtime policy comparisons.");
+            AssertNear(0.0, compared.policies[0].routes[2].solarExposureSeconds);
+            AssertNear(compared.policies[1].routes[2].walkingSeconds, compared.policies[1].routes[2].solarExposureSeconds);
+            foreach (var policy in compared.policies)
+            {
+                if (policy.start.nodeIndex != compared.baseline.start.nodeIndex || policy.end.nodeIndex != compared.baseline.end.nodeIndex)
+                    throw new InvalidOperationException("Runtime comparison must share snapped start/end nodes.");
+            }
+            AssertEqual(policyA.provenance.resultFingerprintSha256, compared.policies[0].scenario.resultFingerprintSha256);
+            var evidence = new EnvironmentCostRuntimeRouteComparisonEvidence
+            {
+                generatedAtUtc = "2025-08-01T00:00:00Z", comparison = compared,
+                policyScenarios = new System.Collections.Generic.List<EnvironmentCostRuntimePolicyScenario>
+                {
+                    new EnvironmentCostRuntimePolicyScenario { id = "policy-a", areaId = "route-server-fixture", coordinateZoneId = 9 },
+                    new EnvironmentCostRuntimePolicyScenario { id = "policy-b", areaId = "route-server-fixture", coordinateZoneId = 9 }
+                }
+            };
+            evidence.comparisonFingerprintSha256 = evidence.CalculateFingerprint();
+            AssertEqual(evidence.comparisonFingerprintSha256, evidence.CalculateFingerprint());
+            policyB.provenance.timezone = "UTC";
+            AssertThrows<InvalidOperationException>(() => core.Compare(result.conditions, null, policyA, policyB));
+        }
+        finally
+        {
+            if (Directory.Exists(packageRoot)) Directory.Delete(packageRoot, true);
+        }
+    }
+
+    private static void AssertRuntimeRouteComparisonWithLocalCityPackage()
+    {
+        var packageRoot = Path.Combine(Application.streamingAssetsPath, "EnvironmentCostCities", "ichigaya-venue");
+        if (!Directory.Exists(packageRoot))
+        {
+            Debug.Log("ENVIRONMENT_COST_RUNTIME_ROUTE_CITY_PACKAGE_SKIPPED reason=package-not-found");
+            return;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var core = EnvironmentCostRuntimeRouteComparison.Load(packageRoot);
+        var result = core.Compare(new EnvironmentCostRuntimeRouteComparisonRequest
+        {
+            areaId = "ichigaya-venue",
+            timestamp = "2025-08-01T12:00:00+09:00",
+            start = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.736043, latitude = 35.69047, nodeIndex = -1 },
+            end = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.700556, latitude = 35.689606, nodeIndex = -1 }
+        }, null);
+        stopwatch.Stop();
+
+        AssertEqual(true, result.baseline.start.nodeIndex == 43591);
+        AssertEqual(true, result.baseline.end.nodeIndex == 76412);
+        AssertEqual(true, result.baseline.routes.Count == 3);
+        AssertEqual(true, result.baseline.routes[0].edgeIds.Count == 173);
+        AssertEqual(true, result.baseline.routes[1].edgeIds.Count == 208);
+        AssertEqual(true, result.baseline.routes[2].edgeIds.Count == 197);
+        AssertNear(2593.5727713118204, result.baseline.routes[0].walkingSeconds, 0.000001);
+        AssertNear(2697.583815912474, result.baseline.routes[1].walkingSeconds, 0.000001);
+        AssertNear(2707.5896082504987, result.baseline.routes[2].walkingSeconds, 0.000001);
+        AssertNear(0.34608912421242477, result.baseline.routes[0].observedShadeRatio, 0.000001);
+        AssertNear(0.7210275379560118, result.baseline.routes[1].observedShadeRatio, 0.000001);
+        AssertNear(0.7247973927581977, result.baseline.routes[2].observedShadeRatio, 0.000001);
+        Debug.Log($"ENVIRONMENT_COST_RUNTIME_ROUTE_CITY_PACKAGE_PASSED elapsedMilliseconds={stopwatch.Elapsed.TotalMilliseconds:F1}");
+    }
+
+    private static EnvironmentCostRuntimeShadeAnalysisResult CreateFixtureRuntimeRouteResult(string packageRoot, string scenarioId, double shadeRatio)
+    {
+        var result = new EnvironmentCostRuntimeShadeAnalysisResult
+        {
+            schemaVersion = "environment-cost-runtime-shade-result-0.1",
+            status = "completed",
+            areaId = "route-server-fixture",
+            generatedAtUtc = "2025-08-01T03:00:00Z",
+            provenance = new EnvironmentCostRuntimeShadeAnalysisProvenance
+            {
+                areaId = "route-server-fixture", analysisDate = "2025-08-01", timezone = "Asia/Tokyo", hours = new[] { 12 },
+                scenarioId = scenarioId, policyFingerprintSha256 = new string(scenarioId == "policy-a" ? 'a' : 'b', 64),
+                cityPackageVersion = "self-test",
+                cityPackageManifestSha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(Path.Combine(packageRoot, "manifest.json"))
+            },
+            edges = new System.Collections.Generic.List<EnvironmentCostRuntimeShadeEdgeResult>()
+        };
+        foreach (var suffix in new[] { "201", "202", "203", "204", "205", "206" })
+        {
+            result.edges.Add(new EnvironmentCostRuntimeShadeEdgeResult
+            {
+                id = $"osm-way-{suffix}-0",
+                hourly = new[]
+                {
+                    new EnvironmentCostRuntimeShadeHourlyResult
+                    {
+                        hour = 12, timestamp = "2025-08-01T12:00:00+09:00", status = "available",
+                        shadeRatio = shadeRatio, solarExposureSeconds = 1.0 - shadeRatio,
+                        sampleCount = 1, validSampleCount = 1, noGroundSampleCount = 0
+                    }
+                }
+            });
+        }
+        result.provenance.resultFingerprintSha256 = EnvironmentCostRuntimeShadeResultStore.CalculateSha256(result);
+        return result;
     }
 
     private static void AssertRuntimeUiKeyboardFocusPolicy()

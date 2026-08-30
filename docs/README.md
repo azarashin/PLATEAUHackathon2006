@@ -38,6 +38,7 @@
 | [時間別環境コストの解析・検証・可視化](hourly-environment-cost-analysis.md) | 日陰率・日射曝露、キャッシュ、欠測、Unityヒートマップ、検証方法 | 解析ロジックやUnityでの確認を行うとき |
 | [環境コスト Inspection Scene のDEM・影・実行時確認](environment-cost-inspection-runtime.md) | DEM、遮蔽物、自由カメラ、Windows Playerの確認手順 | CityGML読込結果を3D表示・ビルドで確認するとき |
 | [Runtime UI の入力フォーカス境界](runtime-ui-input-focus.md) | UI Toolkit とカメラ操作で競合するキーボード入力の原因、対策、回帰試験 | Runtime UI の入力・フォーカス挙動を変更するとき |
+| [Runtimeの施策前後経路・KPI比較](runtime-route-comparison.md) | 現状・案A・案BのRuntime経路計算、表示、比較証跡、操作手順 | Runtime内で施策効果を比較・検証するとき |
 | [太陽位置計算と3D影表示](solar-position-and-3d-shadows.md) | 日時・地域からの太陽方位／高度、Inspection SceneのDirectional Light・影、夜間の扱い | 太陽位置の計算根拠や影表示を確認・変更するとき |
 | [市ヶ谷1地域分の実解析結果](ichigaya-pilot-analysis.md) | 市ヶ谷で行った実解析の記録と旧成果物との関係 | 市ヶ谷の実行実績・性能値を確認するとき |
 | [環境コスト道路ネットワーク生成](environment-cost-road-network-generation.md) | 解析結果と道路グラフを結合し、サーバー用データを生成する手順 | Unity解析後に経路用データを作るとき |

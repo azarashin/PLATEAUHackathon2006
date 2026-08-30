@@ -29,6 +29,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private bool dirty;
     private EnvironmentCostRuntimePolicyFacility lastValidSelected;
     private Camera interactionCamera;
+    private EnvironmentCostRuntimeRouteComparisonController routeComparison;
     private string status = "施策シナリオエディターを読み込み中です…";
     private string selectedType = "tree";
     private string scenarioIdInput = "runtime-scenario";
@@ -36,6 +37,9 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private string authorInput = "";
     private string memoInput = "";
     private Vector2 scroll;
+    // Incremented after a successful save so the UI Toolkit list can refresh without rebuilding the panel.
+    private int savedScenarioListVersion;
+    private string pendingScenarioDeletionPath;
 
     public EnvironmentCostRuntimePolicyScenario Scenario => scenario;
     public bool IsDirty => dirty;
@@ -81,6 +85,8 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private void Update()
     {
         if (scenario == null) return;
+        routeComparison ??= GetComponent<EnvironmentCostRuntimeRouteComparisonController>();
+        if (routeComparison != null && routeComparison.IsCapturingRoutePoint) return;
         var editingUi = EnvironmentCostRuntimeUiInputGate.IsTextInputFocused;
         if (!EnvironmentCostRuntimeUiInputGate.IsPointerOverUi)
         {
@@ -281,6 +287,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         {
             ApplyHeaderInputs();
             EnvironmentCostRuntimePolicyScenarioStore.Save(scenario);
+            savedScenarioListVersion++;
             dirty = false;
             status = $"「{scenario.id}」を保存しました（{scenario.facilities.Count}件）。保存先: {EnvironmentCostRuntimePolicyScenarioStore.GetPath(scenario.areaId, scenario.id)}";
             Debug.Log($"ENVIRONMENT_COST_RUNTIME_POLICY_SCENARIO_SAVED area={scenario.areaId} id={scenario.id} facilities={scenario.facilities.Count} fingerprint={scenario.Fingerprint()}");
@@ -299,6 +306,47 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             selected = null; lastValidSelected = null; dirty = false; RenderScenario(); shadeAnalysis?.InvalidateForPolicyChange(scenario.id, forceFullRecalculation: true); status = $"「{scenario.id}」を読み込みました。";
         }
         catch (Exception exception) { status = $"読込に失敗しました: {exception.Message}"; Debug.LogException(exception); }
+    }
+
+    private void RequestDeleteSavedScenario(string path)
+    {
+        pendingScenarioDeletionPath = path;
+        savedScenarioListVersion++;
+        status = $"「{Path.GetFileNameWithoutExtension(path)}」を削除します。確認ボタンを押してください。";
+    }
+
+    private void CancelDeleteSavedScenario()
+    {
+        pendingScenarioDeletionPath = null;
+        savedScenarioListVersion++;
+        status = "シナリオの削除を取り消しました。";
+    }
+
+    private void DeleteSavedScenario(string path)
+    {
+        try
+        {
+            var deletedId = Path.GetFileNameWithoutExtension(path);
+            EnvironmentCostRuntimePolicyScenarioStore.Delete(metadata.AreaId, path);
+            if (scenario != null && string.Equals(EnvironmentCostRuntimePolicyScenarioStore.GetPath(metadata.AreaId, scenario.id), path, StringComparison.OrdinalIgnoreCase))
+            {
+                scenarioIdInput = "runtime-scenario";
+                displayNameInput = "新しいシナリオ";
+                authorInput = string.Empty;
+                memoInput = string.Empty;
+                CreateNewScenario();
+            }
+            pendingScenarioDeletionPath = null;
+            savedScenarioListVersion++;
+            status = $"「{deletedId}」を削除しました。日陰解析結果と比較証跡は削除していません。";
+        }
+        catch (Exception exception)
+        {
+            pendingScenarioDeletionPath = null;
+            savedScenarioListVersion++;
+            status = $"シナリオを削除できませんでした: {exception.Message}";
+            Debug.LogException(exception);
+        }
     }
 
     private void ImportLegacyScenario()
@@ -440,6 +488,13 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         panel.Add(id); panel.Add(name); panel.Add(author); panel.Add(memo);
         id.RegisterValueChangedCallback(change => scenarioIdInput = change.newValue); name.RegisterValueChangedCallback(change => displayNameInput = change.newValue);
         author.RegisterValueChangedCallback(change => authorInput = change.newValue); memo.RegisterValueChangedCallback(change => memoInput = change.newValue);
+        void RefreshHeaderInputs()
+        {
+            if (!string.Equals(id.value, scenarioIdInput, StringComparison.Ordinal)) id.SetValueWithoutNotify(scenarioIdInput);
+            if (!string.Equals(name.value, displayNameInput, StringComparison.Ordinal)) name.SetValueWithoutNotify(displayNameInput);
+            if (!string.Equals(author.value, authorInput, StringComparison.Ordinal)) author.SetValueWithoutNotify(authorInput);
+            if (!string.Equals(memo.value, memoInput, StringComparison.Ordinal)) memo.SetValueWithoutNotify(memoInput);
+        }
         var types = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(types);
         foreach (var type in new[] { "tree", "shade", "obstacle" }) { var captured = type; types.Add(new Button(() => selectedType = captured) { text = FacilityTypeLabel(captured) }); }
         var place = new Toggle("選択した種別を道路・地表のクリックで配置") { value = placeMode }; panel.Add(place); place.RegisterValueChangedCallback(change => placeMode = change.newValue);
@@ -463,9 +518,40 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         var commands = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(commands);
         commands.Add(new Button(SaveScenario) { text = "保存" }); commands.Add(new Button(CloneScenario) { text = "A/B 比較用に複製" }); commands.Add(new Button(CreateNewScenario) { text = "新規作成" });
         panel.Add(new Button(ImportLegacyScenario) { text = "既存 0.1 JSON を取り込む" });
-        var loads = new VisualElement(); panel.Add(loads); foreach (var path in EnvironmentCostRuntimePolicyScenarioStore.List(metadata.AreaId)) { var captured = path; loads.Add(new Button(() => LoadScenario(captured)) { text = "読み込む: " + Path.GetFileNameWithoutExtension(path) }); }
+        var loads = new VisualElement(); panel.Add(loads);
+        var renderedScenarioListVersion = -1;
+        void RefreshSavedScenarioList()
+        {
+            loads.Clear();
+            foreach (var path in EnvironmentCostRuntimePolicyScenarioStore.List(metadata.AreaId))
+            {
+                var captured = path;
+                var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                row.AddToClassList("runtime-row");
+                var load = new Button(() => LoadScenario(captured)) { text = "読み込む: " + Path.GetFileNameWithoutExtension(path) };
+                load.style.flexGrow = 1;
+                row.Add(load);
+                if (string.Equals(pendingScenarioDeletionPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    row.Add(new Button(CancelDeleteSavedScenario) { text = "取消" });
+                    var confirm = new Button(() => DeleteSavedScenario(captured)) { text = "削除を確定" };
+                    confirm.AddToClassList("runtime-button-danger");
+                    row.Add(confirm);
+                }
+                else
+                {
+                    var remove = new Button(() => RequestDeleteSavedScenario(captured)) { text = "削除" };
+                    remove.AddToClassList("runtime-button-danger");
+                    row.Add(remove);
+                }
+                loads.Add(row);
+            }
+            renderedScenarioListVersion = savedScenarioListVersion;
+        }
+        panel.Add(new Button(() => { savedScenarioListVersion++; RefreshSavedScenarioList(); }) { text = "保存済みシナリオ一覧を更新" });
+        RefreshSavedScenarioList();
         var state = new Label(); state.AddToClassList("runtime-status"); panel.Add(state);
-        panel.schedule.Execute(() => { RefreshSelectedEditor(); place.SetValueWithoutNotify(placeMode); state.text = (dirty ? "未保存・変更あり" : "保存済み") + "\n" + status; }).Every(100);
+        panel.schedule.Execute(() => { if (renderedScenarioListVersion != savedScenarioListVersion) RefreshSavedScenarioList(); RefreshHeaderInputs(); RefreshSelectedEditor(); place.SetValueWithoutNotify(placeMode); state.text = (dirty ? "未保存・変更あり" : "保存済み") + "\n" + status; }).Every(100);
     }
 
     private static void AddNumberField(VisualElement parent, string label, float value, Action<float> apply)
