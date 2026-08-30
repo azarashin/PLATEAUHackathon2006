@@ -82,11 +82,15 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     {
         if (scenario == null) return;
         var editingUi = EnvironmentCostRuntimeUiInputGate.IsTextInputFocused;
-        if (!editingUi && !EnvironmentCostRuntimeUiInputGate.IsPointerOverUi)
+        if (!EnvironmentCostRuntimeUiInputGate.IsPointerOverUi)
         {
-            if (Input.GetMouseButtonDown(0)) BeginMapInteraction();
-            if (dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
-            if (dragging && Input.GetMouseButtonUp(0)) dragging = false;
+            if (Input.GetMouseButtonDown(0))
+            {
+                EnvironmentCostRuntimeUiInputGate.ClearTextInputFocus();
+                BeginMapInteraction();
+            }
+            if (!editingUi && dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
+            if (!editingUi && dragging && Input.GetMouseButtonUp(0)) dragging = false;
         }
         if (!editingUi && selected != null && (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))) DeleteSelected();
     }

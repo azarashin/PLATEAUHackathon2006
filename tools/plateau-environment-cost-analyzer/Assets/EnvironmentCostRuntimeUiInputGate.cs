@@ -5,6 +5,7 @@ public static class EnvironmentCostRuntimeUiInputGate
 {
     public static bool IsPointerOverUi { get; private set; }
     public static bool IsTextInputFocused { get; private set; }
+    private static Focusable focusedElement;
 
     public static void Track(VisualElement panel)
     {
@@ -13,8 +14,16 @@ public static class EnvironmentCostRuntimeUiInputGate
         panel.RegisterCallback<PointerDownEvent>(evt => evt.StopPropagation());
         panel.schedule.Execute(() =>
         {
-            var focused = panel.panel?.focusController?.focusedElement;
-            IsTextInputFocused = focused is TextField;
+            focusedElement = panel.panel?.focusController?.focusedElement;
+            IsTextInputFocused = focusedElement is TextField;
         }).Every(100);
+    }
+
+    /// <summary>Returns keyboard ownership to map/camera input after a click outside Runtime UI.</summary>
+    public static void ClearTextInputFocus()
+    {
+        focusedElement?.Blur();
+        focusedElement = null;
+        IsTextInputFocused = false;
     }
 }
