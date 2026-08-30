@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -30,6 +31,11 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         var uiObject = new GameObject("Environment Cost Runtime UI");
         var document = uiObject.AddComponent<UIDocument>();
         document.panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+        // A transient PanelSettings has no theme by default.  Without it, controls are laid out
+        // but labels and input widgets have no runtime font/style and appear as empty panels.
+        var theme = Resources.FindObjectsOfTypeAll<ThemeStyleSheet>().FirstOrDefault() ??
+            Resources.LoadAll("", typeof(ThemeStyleSheet)).OfType<ThemeStyleSheet>().FirstOrDefault();
+        if (theme != null) document.panelSettings.themeStyleSheet = theme;
         document.visualTreeAsset = Resources.Load<VisualTreeAsset>("EnvironmentCostRuntimeUi");
         var root = document.rootVisualElement.Q<VisualElement>("runtime-ui-root") ?? document.rootVisualElement;
         var style = Resources.Load<StyleSheet>("EnvironmentCostRuntimeUi");
