@@ -39,11 +39,11 @@ flowchart TD
 
 既定プロファイルは次の3種類である。
 
-| 表示 | 日射回避係数 |
-| --- | ---: |
-| 最短 | 0.0 |
-| バランス | 0.5 |
-| 日陰優先 | 2.0 |
+| 表示     | 日射回避係数 |
+| -------- | -----------: |
+| 最短     |          0.0 |
+| バランス |          0.5 |
+| 日陰優先 |          2.0 |
 
 欠測辺は探索時に全日向と仮定し、その歩行時間を「不明な歩行時間」として別に記録する。日陰率は観測済み区間から計算し、`missing`・`partial`・`available`を表示する。
 
@@ -69,11 +69,13 @@ Application.persistentDataPath/
 
 ### 発生した問題
 
-Runtimeの日陰解析結果は、`shadeRatio` と `solarExposureSeconds` を `double` として保持し、そのIEEE 754ビット列を含めて `resultFingerprintSha256` を計算する。fingerprint は、保存後に結果が変質していないことを確認するための値である。
+Runtimeの日陰解析結果では、`shadeRatio` と `solarExposureSeconds` を `double` として保持し、そのIEEE 754ビット列を含めて `resultFingerprintSha256` を計算する。fingerprint は、保存・読込を経た解析結果が変質していないことを確認するための値である。
 
-初期実装では、解析結果の保存と比較時の読込に `UnityEngine.JsonUtility` を使用していた。実データの `18.654066884390497` のような小数を含む約13万道路辺の結果で、保存前の fingerprint、JSON内の fingerprint、およびJSONから独立再計算した値は一致した一方、`JsonUtility.FromJson` 後の再計算だけが不一致となった。
+初期実装では、解析結果の保存および比較時の読込に `UnityEngine.JsonUtility` を使用していた。`18.654066884390497` のような小数値を含む約13万道路辺の実データで検証したところ、保存前に計算した fingerprint、JSON内に保存された fingerprint、および保存されたJSONを別経路で読み取り独立に再計算した fingerprint は一致した。一方、`JsonUtility.FromJson` で復元したオブジェクトから再計算した fingerprint のみ不一致となった。
 
-これは単なるJSON文字列から `double` への必然的な丸め誤差ではない。正確なround-tripを行う実装であれば、十分な桁数で出力した `double` の文字列表現は同じIEEE 754ビット列へ復元できる。`JsonUtility` はUnity serializerを内部利用する簡易シリアライザであり、この解析結果に必要な `double` の厳密なround-tripを保証する用途には用いない。
+これは、JSONによる10進文字列表現を経由する以上避けられない `double` の丸め誤差、という性質のものではない。`double` は、round-tripを保証する適切な10進文字列表現と正しく丸めるパーサーを使用すれば、元と同一のIEEE 754ビット列へ復元できる。
+
+`JsonUtility` は内部的にUnity serializerを使用する簡易的なJSONシリアライザであり、`double` のIEEE 754ビット列まで含めた厳密なround-tripは仕様上保証されていない。そのため、本システムのように保存前後で `double` のbit-exactな一致を要求し、そのビット列をfingerprintの計算対象とする用途には使用しない。
 
 ### 対策
 
