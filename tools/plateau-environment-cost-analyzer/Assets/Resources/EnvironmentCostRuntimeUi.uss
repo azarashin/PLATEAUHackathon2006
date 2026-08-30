@@ -29,3 +29,6 @@
 .runtime-panel-title { font-size: 18px; unity-font-style: bold; margin-bottom: 6px; }
 .runtime-status { white-space: normal; margin-top: 6px; }
 .runtime-scroll { max-height: 420px; }
+.runtime-row { flex-direction: row; gap: 6px; }
+.runtime-panel Label { color: rgb(245, 248, 255); -unity-font-style: normal; }
+.runtime-panel TextField, .runtime-panel Slider, .runtime-panel SliderInt, .runtime-panel Toggle { margin-top: 3px; margin-bottom: 3px; }

@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -28,16 +27,20 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
             yield return null;
         }
 
+        var panelSettings = Resources.Load<PanelSettings>("EnvironmentCostRuntimePanelSettings");
+        if (panelSettings == null)
+        {
+            Debug.LogError("Runtime UI PanelSettings asset is missing. Create EnvironmentCostRuntimePanelSettings.asset before building the Player.");
+            yield break;
+        }
         var uiObject = new GameObject("Environment Cost Runtime UI");
         var document = uiObject.AddComponent<UIDocument>();
-        document.panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-        // A transient PanelSettings has no theme by default.  Without it, controls are laid out
-        // but labels and input widgets have no runtime font/style and appear as empty panels.
-        var theme = Resources.FindObjectsOfTypeAll<ThemeStyleSheet>().FirstOrDefault() ??
-            Resources.LoadAll("", typeof(ThemeStyleSheet)).OfType<ThemeStyleSheet>().FirstOrDefault();
-        if (theme != null) document.panelSettings.themeStyleSheet = theme;
+        document.panelSettings = panelSettings;
         document.visualTreeAsset = Resources.Load<VisualTreeAsset>("EnvironmentCostRuntimeUi");
         var root = document.rootVisualElement.Q<VisualElement>("runtime-ui-root") ?? document.rootVisualElement;
+        // A PanelSettings created for Runtime has no editor-only default font. Assign an OS font
+        // explicitly so Japanese labels and controls remain visible in a standalone Player.
+        root.style.unityFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo UI", "Arial" }, 16);
         var style = Resources.Load<StyleSheet>("EnvironmentCostRuntimeUi");
         if (style != null) root.styleSheets.Add(style);
         solar.BuildUi(root);

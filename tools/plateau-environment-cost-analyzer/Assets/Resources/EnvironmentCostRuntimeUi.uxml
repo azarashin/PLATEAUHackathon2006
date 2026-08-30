@@ -1,3 +1,44 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <ui:VisualElement name="runtime-ui-root" class="runtime-ui-root" />
+    <Style src="EnvironmentCostRuntimeUi.uss" />
+    <ui:VisualElement name="runtime-ui-root" class="runtime-ui-root">
+        <ui:VisualElement name="solar-panel" class="runtime-panel">
+            <ui:Label text="太陽・影の確認" class="runtime-panel-title" />
+            <ui:Label name="solar-area" text="地域: 読み込み中" />
+            <ui:TextField name="solar-date" label="日付 (YYYY-MM-DD)" />
+            <ui:Slider name="solar-hour" label="時刻" low-value="0" high-value="23" />
+            <ui:Label name="solar-status" class="runtime-status" />
+        </ui:VisualElement>
+        <ui:VisualElement name="shade-panel" class="runtime-panel">
+            <ui:Label text="日陰解析" class="runtime-panel-title" />
+            <ui:SliderInt name="shade-hour" label="解析時刻" low-value="0" high-value="23" />
+            <ui:VisualElement class="runtime-row">
+                <ui:Button name="shade-selected" text="選択時刻を解析" />
+                <ui:Button name="shade-all" text="全時刻を解析" />
+            </ui:VisualElement>
+            <ui:Button name="shade-cancel" text="解析を取り消す" />
+            <ui:Label name="shade-status" class="runtime-status" />
+        </ui:VisualElement>
+        <ui:ScrollView name="policy-panel" class="runtime-panel runtime-scroll">
+            <ui:Label text="施策シナリオエディター" class="runtime-panel-title" />
+            <ui:TextField name="policy-id" label="シナリオ ID" />
+            <ui:TextField name="policy-name" label="表示名" />
+            <ui:TextField name="policy-author" label="作成者・組織" />
+            <ui:TextField name="policy-memo" label="証跡メモ" multiline="true" />
+            <ui:VisualElement class="runtime-row">
+                <ui:Button name="policy-tree" text="樹木" />
+                <ui:Button name="policy-shade" text="日よけ" />
+                <ui:Button name="policy-obstacle" text="障害物" />
+            </ui:VisualElement>
+            <ui:Toggle name="policy-place" label="選択した種別を道路・地表のクリックで配置" />
+            <ui:VisualElement name="policy-selected" />
+            <ui:VisualElement class="runtime-row">
+                <ui:Button name="policy-save" text="保存" />
+                <ui:Button name="policy-clone" text="A/B 比較用に複製" />
+                <ui:Button name="policy-new" text="新規作成" />
+            </ui:VisualElement>
+            <ui:Button name="policy-import" text="既存 0.1 JSON を取り込む" />
+            <ui:VisualElement name="policy-loads" />
+            <ui:Label name="policy-status" class="runtime-status" />
+        </ui:ScrollView>
+    </ui:VisualElement>
 </ui:UXML>
