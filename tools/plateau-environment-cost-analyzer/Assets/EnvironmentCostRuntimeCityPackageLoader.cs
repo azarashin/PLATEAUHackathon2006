@@ -107,7 +107,8 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
         }
     }
 
-    private void OnGUI()
+    // Package errors are surfaced through the Runtime UI controller after UI Toolkit starts.
+    private void LegacyOnGUI()
     {
         if (!showStatusOverlay || state == PackageState.Ready || state == PackageState.NotStarted) return;
         GUI.Box(new Rect(12, 12, 680, 52), statusMessage);

@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 /// <summary>Runs full or conservative policy-impact recalculation without blocking the Player frame loop.</summary>
 public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviour
@@ -208,25 +209,24 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
     private static EnvironmentCostRuntimePolicyFacility CloneFacility(EnvironmentCostRuntimePolicyFacility source)
         => source == null ? null : EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimePolicyFacility>(EnvironmentCostRuntimePolicyJson.Serialize(source));
 
-    private void OnGUI()
+    public void BuildUi(VisualElement root)
     {
-        if (!Application.isPlaying) return;
-        GUILayout.BeginArea(new Rect(16f, 216f, 430f, 250f), GUI.skin.box);
-        GUILayout.Label("日陰解析");
-        selectedHour = Mathf.RoundToInt(GUILayout.HorizontalSlider(selectedHour, 0f, 23f));
-        GUILayout.Label($"解析時刻: {selectedHour:00}:00");
-        var originalEnabled = GUI.enabled;
-        GUI.enabled = originalEnabled && !IsRunning && packageLoader != null && packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready;
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("選択時刻を解析")) RunSelectedHour();
-        if (GUILayout.Button("全時刻を解析")) RunAllHours();
-        GUILayout.EndHorizontal();
-        GUI.enabled = originalEnabled;
-        if (IsRunning) GUILayout.Label("解析中は3D表示とカメラ操作を一時停止しています。");
-        if (IsRunning && GUILayout.Button("解析を取り消す")) CancelCurrentRun();
-        if (lastElapsedSeconds >= 0.0) GUILayout.Label($"前回の解析時間: {lastElapsedSeconds:F1}秒（{lastCompletedScope}）");
-        GUILayout.Label(statusMessage);
-        GUILayout.EndArea();
+        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); root.Add(panel);
+        var title = new Label("日陰解析"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
+        var hour = new SliderInt("解析時刻", 0, 23) { value = selectedHour }; panel.Add(hour);
+        hour.RegisterValueChangedCallback(change => selectedHour = change.newValue);
+        var commands = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(commands);
+        var selectedButton = new Button(RunSelectedHour) { text = "選択時刻を解析" }; commands.Add(selectedButton);
+        var allButton = new Button(RunAllHours) { text = "全時刻を解析" }; commands.Add(allButton);
+        var cancel = new Button(CancelCurrentRun) { text = "解析を取り消す" }; panel.Add(cancel);
+        var status = new Label(); status.AddToClassList("runtime-status"); panel.Add(status);
+        panel.schedule.Execute(() =>
+        {
+            var ready = !IsRunning && packageLoader != null && packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready;
+            selectedButton.SetEnabled(ready); allButton.SetEnabled(ready); cancel.style.display = IsRunning ? DisplayStyle.Flex : DisplayStyle.None;
+            status.text = $"解析時刻: {selectedHour:00}:00" + (IsRunning ? "\n解析中は3D表示とカメラ操作を一時停止しています。" : "") +
+                (lastElapsedSeconds >= 0.0 ? $"\n前回の解析時間: {lastElapsedSeconds:F1}秒（{lastCompletedScope}）" : "") + $"\n{statusMessage}";
+        }).Every(100);
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]

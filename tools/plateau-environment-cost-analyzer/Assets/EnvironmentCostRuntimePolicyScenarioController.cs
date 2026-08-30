@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using PLATEAU.Geometries;
 using PLATEAU.Native;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 /// <summary>Player UI and map interaction for tree, shade, and obstacle policy scenarios.</summary>
 public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehaviour
@@ -80,12 +81,16 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private void Update()
     {
         if (scenario == null) return;
-        var editingUi = GUIUtility.keyboardControl != 0;
-        if (!editingUi && !IsPointerOverPanel())
+        var editingUi = EnvironmentCostRuntimeUiInputGate.IsTextInputFocused;
+        if (!EnvironmentCostRuntimeUiInputGate.IsPointerOverUi)
         {
-            if (Input.GetMouseButtonDown(0)) BeginMapInteraction();
-            if (dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
-            if (dragging && Input.GetMouseButtonUp(0)) dragging = false;
+            if (Input.GetMouseButtonDown(0))
+            {
+                EnvironmentCostRuntimeUiInputGate.ClearTextInputFocus();
+                BeginMapInteraction();
+            }
+            if (!editingUi && dragging && Input.GetMouseButton(0)) MoveSelectedToRoad();
+            if (!editingUi && dragging && Input.GetMouseButtonUp(0)) dragging = false;
         }
         if (!editingUi && selected != null && (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))) DeleteSelected();
     }
@@ -418,7 +423,6 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
     private static float FacilityFootprintRadius(EnvironmentCostRuntimePolicyFacility facility) => facility == null ? 0f : facility.type == "tree" ? (float)facility.radiusMeters : Mathf.Max((float)facility.widthMeters, (float)facility.depthMeters) * .5f;
     private static bool IsGroundLayer(int layer) => layer == RoadLayer || layer == TerrainLayer;
     private static string FacilityTypeLabel(string type) => type == "tree" ? "樹木" : type == "shade" ? "日よけ" : "障害物";
-    private bool IsPointerOverPanel() => Input.mousePosition.x < 490f && Input.mousePosition.y < 760f;
     private void MarkDirty(string message, EnvironmentCostRuntimePolicyFacility previous = null,
         EnvironmentCostRuntimePolicyFacility current = null)
     {
@@ -427,7 +431,58 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
         shadeAnalysis?.InvalidateForPolicyChange(scenario.id, previous, current);
     }
 
-    private void OnGUI()
+    public void BuildUi(VisualElement root)
+    {
+        var panel = new ScrollView(); panel.AddToClassList("runtime-panel"); panel.AddToClassList("runtime-scroll"); root.Add(panel);
+        var title = new Label("施策シナリオエディター"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
+        var id = new TextField("シナリオ ID") { value = scenarioIdInput }; var name = new TextField("表示名") { value = displayNameInput };
+        var author = new TextField("作成者・組織") { value = authorInput }; var memo = new TextField("証跡メモ") { value = memoInput, multiline = true };
+        panel.Add(id); panel.Add(name); panel.Add(author); panel.Add(memo);
+        id.RegisterValueChangedCallback(change => scenarioIdInput = change.newValue); name.RegisterValueChangedCallback(change => displayNameInput = change.newValue);
+        author.RegisterValueChangedCallback(change => authorInput = change.newValue); memo.RegisterValueChangedCallback(change => memoInput = change.newValue);
+        var types = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(types);
+        foreach (var type in new[] { "tree", "shade", "obstacle" }) { var captured = type; types.Add(new Button(() => selectedType = captured) { text = FacilityTypeLabel(captured) }); }
+        var place = new Toggle("選択した種別を道路・地表のクリックで配置") { value = placeMode }; panel.Add(place); place.RegisterValueChangedCallback(change => placeMode = change.newValue);
+        var selectedEditor = new VisualElement(); panel.Add(selectedEditor); EnvironmentCostRuntimePolicyFacility renderedSelected = null;
+        void RefreshSelectedEditor()
+        {
+            if (ReferenceEquals(renderedSelected, selected)) return;
+            renderedSelected = selected; selectedEditor.Clear();
+            if (selected == null) { selectedEditor.Add(new Label("選択中の施策はありません。")); return; }
+            selectedEditor.Add(new Label($"選択中: {selected.id}（{FacilityTypeLabel(selected.type)}）"));
+            AddNumberField(selectedEditor, "ローカル X（m）", selected.localPosition.x, value => selected.localPosition.x = value);
+            AddNumberField(selectedEditor, "地表 Y（m）", selected.localPosition.y, value => selected.localPosition.y = value);
+            AddNumberField(selectedEditor, "ローカル Z（m）", selected.localPosition.z, value => selected.localPosition.z = value);
+            AddNumberField(selectedEditor, "高さ（m）", (float)selected.heightMeters, value => selected.heightMeters = value);
+            if (selected.type == "tree") AddNumberField(selectedEditor, "樹冠半径（m）", (float)selected.radiusMeters, value => selected.radiusMeters = value);
+            else { AddNumberField(selectedEditor, "幅（m）", (float)selected.widthMeters, value => selected.widthMeters = value); AddNumberField(selectedEditor, "奥行き（m）", (float)selected.depthMeters, value => selected.depthMeters = value); }
+            AddNumberField(selectedEditor, "向き（度）", selected.rotationDegrees, value => selected.rotationDegrees = value);
+            selectedEditor.Add(new Button(ApplySelectedFacility) { text = "位置・寸法を反映" }); selectedEditor.Add(new Button(DeleteSelected) { text = "選択した施策を削除" });
+            EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(selectedEditor);
+        }
+        var commands = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(commands);
+        commands.Add(new Button(SaveScenario) { text = "保存" }); commands.Add(new Button(CloneScenario) { text = "A/B 比較用に複製" }); commands.Add(new Button(CreateNewScenario) { text = "新規作成" });
+        panel.Add(new Button(ImportLegacyScenario) { text = "既存 0.1 JSON を取り込む" });
+        var loads = new VisualElement(); panel.Add(loads); foreach (var path in EnvironmentCostRuntimePolicyScenarioStore.List(metadata.AreaId)) { var captured = path; loads.Add(new Button(() => LoadScenario(captured)) { text = "読み込む: " + Path.GetFileNameWithoutExtension(path) }); }
+        var state = new Label(); state.AddToClassList("runtime-status"); panel.Add(state);
+        panel.schedule.Execute(() => { RefreshSelectedEditor(); place.SetValueWithoutNotify(placeMode); state.text = (dirty ? "未保存・変更あり" : "保存済み") + "\n" + status; }).Every(100);
+    }
+
+    private static void AddNumberField(VisualElement parent, string label, float value, Action<float> apply)
+    {
+        var field = new FloatField(label) { value = value }; field.RegisterValueChangedCallback(change => apply(change.newValue)); parent.Add(field);
+    }
+
+    private void ApplySelectedFacility()
+    {
+        if (selected == null) return;
+        try { var previous = CloneFacility(lastValidSelected ?? selected); selected.Validate(selected.id); if (!ValidatePosition(selected.localPosition, selected, out var issue)) throw new InvalidOperationException(issue); UpdateGeoCoordinate(selected); RenderScenario(); lastValidSelected = CloneFacility(selected); MarkDirty("位置・寸法を更新しました。", previous, selected); }
+        catch (Exception exception) { RestoreLastValidSelected(); status = exception.Message; }
+    }
+
+    // Retained temporarily as source-only reference while the UI Toolkit version is verified;
+    // Unity does not invoke this method because it is no longer named OnGUI.
+    private void LegacyOnGUI()
     {
         if (!Application.isPlaying || scenario == null) return;
         GUILayout.BeginArea(new Rect(16, 476, 460, Mathf.Min(Screen.height - 492, 620)), GUI.skin.box);

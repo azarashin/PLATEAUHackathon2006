@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 /// <summary>
 /// Drives the inspection Scene's directional light from the same solar-position calculation as the batch analyser.
@@ -40,37 +41,19 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
         ApplySun();
     }
 
-    private void OnGUI()
+    public void BuildUi(VisualElement root)
     {
-        if (!Application.isPlaying) return;
-
-        const float width = 340f;
-        GUILayout.BeginArea(new Rect(16f, 16f, width, 190f), GUI.skin.box);
-        GUILayout.Label("太陽・影の確認", GUI.skin.label);
-        GUILayout.Label($"地域: {metadata?.AreaId ?? "未設定"}  タイムゾーン: {metadata?.Timezone ?? "未設定"}");
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("日付 (YYYY-MM-DD)", GUILayout.Width(145f));
-        var updatedDate = GUILayout.TextField(dateText ?? string.Empty, GUILayout.Width(150f));
-        GUILayout.EndHorizontal();
-        if (!string.Equals(updatedDate, dateText, StringComparison.Ordinal))
-        {
-            dateText = updatedDate;
-            ApplySun();
-        }
-
-        GUILayout.Label($"時刻: {localHour:00.00} {metadata?.Timezone ?? "未設定"}");
-        var updatedHour = GUILayout.HorizontalSlider(localHour, firstHour, lastHour);
-        if (!Mathf.Approximately(updatedHour, localHour))
-        {
-            localHour = updatedHour;
-            ApplySun();
-        }
-
-        if (!string.IsNullOrWhiteSpace(validationMessage)) GUILayout.Label(validationMessage);
-        else if (currentSun.elevationDegrees <= 0.0) GUILayout.Label("夜間: ディレクショナルライトを無効化（解析用の日陰値にはしません）");
-        else GUILayout.Label($"方位: {currentSun.azimuthDegrees:F1}°  高度: {currentSun.elevationDegrees:F1}°");
-        GUILayout.Label($"影の可視化範囲: カメラから約{shadowDistanceMeters:F0} m");
-        GUILayout.EndArea();
+        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); root.Add(panel);
+        var title = new Label("太陽・影の確認"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
+        panel.Add(new Label($"地域: {metadata?.AreaId ?? "未設定"}  タイムゾーン: {metadata?.Timezone ?? "未設定"}"));
+        var date = new TextField("日付 (YYYY-MM-DD)") { value = dateText ?? string.Empty }; panel.Add(date);
+        date.RegisterValueChangedCallback(change => { dateText = change.newValue; ApplySun(); });
+        var hour = new Slider("時刻", firstHour, lastHour) { value = localHour }; panel.Add(hour);
+        var details = new Label(); details.AddToClassList("runtime-status"); panel.Add(details);
+        hour.RegisterValueChangedCallback(change => { localHour = change.newValue; ApplySun(); });
+        panel.schedule.Execute(() => details.text = !string.IsNullOrWhiteSpace(validationMessage) ? validationMessage :
+            currentSun.elevationDegrees <= 0.0 ? "夜間: ディレクショナルライトを無効化" :
+            $"時刻: {localHour:00.00} {metadata?.Timezone}\n方位: {currentSun.azimuthDegrees:F1}°  高度: {currentSun.elevationDegrees:F1}°\n影の可視化範囲: カメラから約{shadowDistanceMeters:F0} m").Every(100);
     }
 
     private void ApplySun()

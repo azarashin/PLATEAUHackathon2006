@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public static class HourlyEnvironmentCostSelfTests
 {
@@ -116,7 +117,7 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual(true, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
                 new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "near-output", type = "tree", localPosition = new Vector3(5f, 0f, 0f) }));
             AssertEqual(false, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
-                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(85f, 0f, 80f) }));
+                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(1000f, 0f, 1000f) }));
             var runtimeEvidence = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             runtimeEvidence.provenance.scenarioId = "runtime-policy-self-test";
@@ -132,6 +133,8 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual("missing", runtimeShadeResult.edges[0].hourly[0].status);
             AssertEqual("road-surface-not-found", runtimeShadeResult.edges[0].hourly[0].exclusionReason);
             AssertRuntimeShadeRaycasts();
+            AssertRuntimeUiKeyboardFocusPolicy();
+            AssertRuntimeUiDocumentInputGate();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -208,6 +211,120 @@ public static class HourlyEnvironmentCostSelfTests
         {
             UnityEngine.Object.DestroyImmediate(road);
             UnityEngine.Object.DestroyImmediate(obstruction);
+        }
+    }
+
+    private static void AssertRuntimeUiKeyboardFocusPolicy()
+    {
+        var root = new VisualElement();
+        var button = new Button();
+        var slider = new Slider();
+        var sliderInt = new SliderInt();
+        var toggle = new Toggle();
+        var text = new TextField();
+        var number = new FloatField();
+        root.Add(button);
+        root.Add(slider);
+        root.Add(sliderInt);
+        root.Add(toggle);
+        root.Add(text);
+        root.Add(number);
+
+        EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(root);
+
+        AssertEqual(false, button.focusable);
+        AssertEqual(false, slider.focusable);
+        AssertEqual(false, sliderInt.focusable);
+        AssertEqual(false, toggle.focusable);
+        AssertEqual(true, text.focusable);
+        AssertEqual(true, number.focusable);
+        AssertEqual(true, text.tabIndex < 0);
+        AssertEqual(true, number.tabIndex < 0);
+    }
+
+    private static void AssertRuntimeUiDocumentInputGate()
+    {
+        var uiObject = new GameObject("Runtime UI input gate self-test");
+        try
+        {
+            var document = uiObject.AddComponent<UIDocument>();
+            document.panelSettings = Resources.Load<PanelSettings>("EnvironmentCostRuntimePanelSettings");
+            if (document.panelSettings == null) throw new InvalidOperationException("Runtime PanelSettings is missing.");
+
+            var documentRoot = document.rootVisualElement;
+            var uiSurface = new VisualElement();
+            var text = new TextField { value = "baseline" };
+            documentRoot.Add(uiSurface);
+            uiSurface.Add(text);
+            EnvironmentCostRuntimeUiInputGate.TrackDocument(documentRoot, uiSurface);
+            EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(documentRoot);
+
+            // Simulate the panel restoring a field without an explicit click. Camera keys must
+            // still be intercepted at the UIDocument root and must not edit the field.
+            text.Focus();
+            using (var key = KeyDownEvent.GetPooled('w', KeyCode.W, EventModifiers.None))
+            {
+                var target = documentRoot.panel?.focusController?.focusedElement as VisualElement ?? text;
+                key.target = target;
+                target.SendEvent(key);
+                AssertEqual(true, key.isDefaultPrevented);
+            }
+            AssertEqual("baseline", text.value);
+
+            // A direct pointer selection arms the field for ordinary text entry.
+            using (var pointer = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0 }))
+            {
+                pointer.target = text;
+                text.SendEvent(pointer);
+            }
+            text.Focus();
+            AssertEqual(true, EnvironmentCostRuntimeUiInputGate.IsTextInputFocused);
+            using (var key = KeyDownEvent.GetPooled('w', KeyCode.W, EventModifiers.None))
+            {
+                var target = documentRoot.panel?.focusController?.focusedElement as VisualElement ?? text;
+                key.target = target;
+                target.SendEvent(key);
+                AssertEqual(false, key.isDefaultPrevented);
+            }
+
+            // Clicking a non-editable UI surface must immediately release any live text focus.
+            using (var pointer = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0 }))
+            {
+                pointer.target = uiSurface;
+                uiSurface.SendEvent(pointer);
+            }
+            AssertEqual(false, EnvironmentCostRuntimeUiInputGate.IsTextInputFocused);
+            using (var key = KeyDownEvent.GetPooled('w', KeyCode.W, EventModifiers.None))
+            {
+                key.target = documentRoot;
+                documentRoot.SendEvent(key);
+                AssertEqual(true, key.isDefaultPrevented);
+            }
+
+            // The Player's coordinate fallback reports a click outside the visible UI as null.
+            // This is the exact app-start -> world-click -> hold-W regression path.
+            using (var pointer = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0 }))
+            {
+                pointer.target = text;
+                text.SendEvent(pointer);
+            }
+            text.Focus();
+            AssertEqual(true, EnvironmentCostRuntimeUiInputGate.IsTextInputFocused);
+            EnvironmentCostRuntimeUiInputGate.HandlePointerSelection(null, false);
+            AssertEqual(false, EnvironmentCostRuntimeUiInputGate.IsPointerOverUi);
+            AssertEqual(false, EnvironmentCostRuntimeUiInputGate.IsTextInputFocused);
+            using (var key = KeyDownEvent.GetPooled('w', KeyCode.W, EventModifiers.None))
+            {
+                key.target = documentRoot;
+                documentRoot.SendEvent(key);
+                AssertEqual(true, key.isDefaultPrevented);
+            }
+        }
+        finally
+        {
+            var document = uiObject.GetComponent<UIDocument>();
+            if (document != null) EnvironmentCostRuntimeUiInputGate.StopTracking(document.rootVisualElement);
+            UnityEngine.Object.DestroyImmediate(uiObject);
         }
     }
 }

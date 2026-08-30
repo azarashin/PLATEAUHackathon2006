@@ -240,6 +240,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
 
     private static void ConfigureRuntimePresentation(GameObject root, AnalysisRunConfig config, Scene scene)
     {
+        EnvironmentCostRuntimeUiAssets.Ensure();
         var bounds = CalculateRenderableBounds(scene);
         var cameraObject = new GameObject("Environment Cost Runtime Camera");
         cameraObject.tag = "MainCamera";
@@ -266,6 +267,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         packageLoader.Configure("EnvironmentCostCities");
         root.AddComponent<EnvironmentCostRuntimeShadeAnalysisController>();
         root.AddComponent<EnvironmentCostRuntimePolicyScenarioController>();
+        root.AddComponent<EnvironmentCostRuntimeUiController>();
         var solarController = root.AddComponent<EnvironmentCostSolarController>();
         solarController.Configure(metadata, sun, config.hours);
     }
