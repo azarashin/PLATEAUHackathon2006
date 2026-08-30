@@ -334,12 +334,12 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         if (target == CaptureTarget.Start)
         {
             DestroyEndpointMarker(ref startMarker);
-            startMarker = CreateEndpointMarker("RuntimeRouteStartMarker", position, new Color(0.0f, 0.58f, 0.55f));
+            startMarker = CreateEndpointMarker("RuntimeRouteStartMarker", position, new Color(0.65f, 0.9f, 0.05f));
         }
         else if (target == CaptureTarget.End)
         {
             DestroyEndpointMarker(ref endMarker);
-            endMarker = CreateEndpointMarker("RuntimeRouteEndMarker", position, new Color(0.16f, 0.45f, 0.9f));
+            endMarker = CreateEndpointMarker("RuntimeRouteEndMarker", position, new Color(0.62f, 0.25f, 0.8f));
         }
     }
 
