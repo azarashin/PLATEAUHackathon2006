@@ -47,8 +47,30 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         root.Clear();
         var style = Resources.Load<StyleSheet>("EnvironmentCostRuntimeUi");
         if (style != null) root.styleSheets.Add(style);
-        solar.BuildUi(root);
-        shade.BuildUi(root);
-        policy.BuildUi(root);
+        var tabs = new VisualElement(); tabs.AddToClassList("runtime-tabs"); root.Add(tabs);
+        var content = new VisualElement(); content.AddToClassList("runtime-tab-content"); root.Add(content);
+        solar.BuildUi(content);
+        shade.BuildUi(content);
+        policy.BuildUi(content);
+
+        var panels = new[] { content.ElementAt(0), content.ElementAt(1), content.ElementAt(2) };
+        var tabButtons = new Button[panels.Length];
+        void SelectTab(int selectedIndex)
+        {
+            for (var index = 0; index < panels.Length; index++)
+            {
+                panels[index].style.display = index == selectedIndex ? DisplayStyle.Flex : DisplayStyle.None;
+                tabButtons[index].EnableInClassList("runtime-tab-active", index == selectedIndex);
+            }
+        }
+        var labels = new[] { "太陽・影", "日陰解析", "施策シナリオ" };
+        for (var index = 0; index < labels.Length; index++)
+        {
+            var captured = index;
+            tabButtons[index] = new Button(() => SelectTab(captured)) { text = labels[index] };
+            tabButtons[index].AddToClassList("runtime-tab");
+            tabs.Add(tabButtons[index]);
+        }
+        SelectTab(0);
     }
 }

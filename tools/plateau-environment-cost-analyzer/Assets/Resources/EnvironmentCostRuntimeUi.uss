@@ -6,6 +6,11 @@
     width: 500px;
 }
 
+.runtime-tabs { flex-direction: row; margin-bottom: 8px; gap: 4px; }
+.runtime-tab { background-color: rgb(219, 234, 254); color: rgb(30, 64, 175); border-left-color: rgb(147, 197, 253); border-right-color: rgb(147, 197, 253); border-top-color: rgb(147, 197, 253); border-bottom-color: rgb(147, 197, 253); }
+.runtime-tab.runtime-tab-active { background-color: rgb(37, 99, 235); color: rgb(255, 255, 255); }
+.runtime-tab-content { width: 500px; }
+
 .runtime-panel {
     background-color: rgba(248, 250, 252, 0.96);
     border-left-width: 1px;
