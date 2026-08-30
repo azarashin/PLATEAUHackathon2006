@@ -1,0 +1,31 @@
+.runtime-ui-root {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 16px;
+    padding-top: 16px;
+    width: 460px;
+}
+
+.runtime-panel {
+    background-color: rgba(24, 31, 43, 0.92);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(153, 184, 224);
+    border-right-color: rgb(153, 184, 224);
+    border-top-color: rgb(153, 184, 224);
+    border-bottom-color: rgb(153, 184, 224);
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    color: white;
+    margin-bottom: 10px;
+    padding: 10px;
+    width: 440px;
+}
+
+.runtime-panel-title { font-size: 18px; unity-font-style: bold; margin-bottom: 6px; }
+.runtime-status { white-space: normal; margin-top: 6px; }
+.runtime-scroll { max-height: 420px; }

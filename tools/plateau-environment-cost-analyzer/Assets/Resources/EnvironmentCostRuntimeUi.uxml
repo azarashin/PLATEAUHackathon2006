@@ -1,0 +1,3 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="runtime-ui-root" class="runtime-ui-root" />
+</ui:UXML>

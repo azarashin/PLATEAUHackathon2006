@@ -116,7 +116,7 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual(true, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
                 new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "near-output", type = "tree", localPosition = new Vector3(5f, 0f, 0f) }));
             AssertEqual(false, EnvironmentCostRuntimePolicyImpact.HasPotentiallyAffectedEdge(runtimeShadeInput,
-                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(85f, 0f, 80f) }));
+                new DateTime(2025, 8, 1), new EnvironmentCostRuntimePolicyFacility { id = "outside-output", type = "tree", localPosition = new Vector3(1000f, 0f, 1000f) }));
             var runtimeEvidence = EnvironmentCostRuntimeShadeAnalyzer.CreateResult(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             runtimeEvidence.provenance.scenarioId = "runtime-policy-self-test";
