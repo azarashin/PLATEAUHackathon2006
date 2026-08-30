@@ -41,6 +41,9 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
     private string selectedScenarioB;
     private string selectedTimestamp;
     private string selectedProfile = "shade";
+    private bool showShortestRoute = true;
+    private bool showBalancedRoute = true;
+    private bool showShadeRoute = true;
     private string selectedPolicy = "案A";
     private string displayMode = "重ね表示";
     private string status = "都市データパッケージを読み込み中です…";
@@ -279,14 +282,29 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         if (comparison == null) return;
         routeRoot = new GameObject("RuntimeRouteComparison").transform;
         var policyIndex = selectedPolicy == "案B" && comparison.policies.Count > 1 ? 1 : 0;
-        if (displayMode != "施策後のみ") CreateRouteLine("現状", RouteFor(comparison.baseline), new Color(0.15f, 0.39f, 0.65f), 1.1f);
-        if (displayMode != "現状のみ" && comparison.policies.Count > 0)
-            CreateRouteLine(policyIndex == 0 ? "案A" : "案B", RouteFor(comparison.policies[policyIndex]),
-                policyIndex == 0 ? new Color(0.0f, 0.58f, 0.55f) : new Color(0.1f, 0.55f, 0.25f), 1.35f);
+        foreach (var profile in VisibleRouteProfiles())
+        {
+            if (displayMode != "施策後のみ")
+                CreateRouteLine($"現状-{profile.id}", RouteFor(comparison.baseline, profile.id), profile.color, 1.1f);
+            if (displayMode != "現状のみ" && comparison.policies.Count > 0)
+                CreateRouteLine($"{(policyIndex == 0 ? "案A" : "案B")}-{profile.id}",
+                    RouteFor(comparison.policies[policyIndex], profile.id), profile.color, 1.35f);
+        }
     }
 
     private EnvironmentCostRuntimeRoute RouteFor(EnvironmentCostRuntimeRouteScenarioResult scenario)
         => scenario?.routes?.FirstOrDefault(route => route.profile.id == selectedProfile);
+
+    private static EnvironmentCostRuntimeRoute RouteFor(EnvironmentCostRuntimeRouteScenarioResult scenario, string profileId)
+        => scenario?.routes?.FirstOrDefault(route => route.profile.id == profileId);
+
+    private IEnumerable<(string id, Color color)> VisibleRouteProfiles()
+    {
+        // Keep profile colours fixed across 現状/案A/案B.  The small height offset identifies the compared state.
+        if (showShortestRoute) yield return ("shortest", new Color(0.10f, 0.39f, 0.86f));
+        if (showBalancedRoute) yield return ("balanced", new Color(0.00f, 0.58f, 0.55f));
+        if (showShadeRoute) yield return ("shade", new Color(0.13f, 0.60f, 0.25f));
+    }
 
     private void CreateRouteLine(string name, EnvironmentCostRuntimeRoute route, Color color, float height)
     {
@@ -435,7 +453,13 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         points.Add(new Button(() => { captureTarget = CaptureTarget.Start; status = "道路または地表をクリックして起点を指定してください。"; }) { text = "起点を地図で指定" });
         points.Add(new Button(() => { captureTarget = CaptureTarget.End; status = "道路または地表をクリックして終点を指定してください。"; }) { text = "終点を地図で指定" });
         points.Add(new Button(CancelRoutePointSelection) { text = "指定を取消" });
-        var profile = new DropdownField("表示する経路", new List<string> { "最短", "バランス", "日陰優先" }, 2); panel.Add(profile);
+        var routeVisibilityLabel = new Label("地図に表示する経路"); routeVisibilityLabel.AddToClassList("runtime-field-label"); panel.Add(routeVisibilityLabel);
+        var routeVisibility = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } }; panel.Add(routeVisibility);
+        var shortestToggle = new Toggle("最短（青）") { value = showShortestRoute };
+        var balancedToggle = new Toggle("バランス（青緑）") { value = showBalancedRoute };
+        var shadeToggle = new Toggle("日陰優先（緑）") { value = showShadeRoute };
+        routeVisibility.Add(shortestToggle); routeVisibility.Add(balancedToggle); routeVisibility.Add(shadeToggle);
+        var profile = new DropdownField("KPIを表示する経路", new List<string> { "最短", "バランス", "日陰優先" }, 2); panel.Add(profile);
         var policy = new DropdownField("表示する施策", new List<string> { "案A", "案B" }, 0); panel.Add(policy);
         var mode = new DropdownField("地図表示", new List<string> { "現状のみ", "施策後のみ", "重ね表示" }, 2); panel.Add(mode);
         var run = new Button(RunComparison) { text = "同一条件で経路・KPIを比較" }; panel.Add(run);
@@ -447,6 +471,9 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         scenarioB.RegisterValueChangedCallback(change => { selectedScenarioB = DisplayToId(change.newValue); InvalidateComparison("案Bを変更しました。比較を再実行してください。"); });
         timestamp.RegisterValueChangedCallback(change => { selectedTimestamp = change.newValue; InvalidateComparison("比較時刻を変更しました。比較を再実行してください。"); });
         profile.RegisterValueChangedCallback(change => { selectedProfile = change.newValue == "最短" ? "shortest" : change.newValue == "バランス" ? "balanced" : "shade"; RenderRoutes(); });
+        shortestToggle.RegisterValueChangedCallback(change => { showShortestRoute = change.newValue; RenderRoutes(); });
+        balancedToggle.RegisterValueChangedCallback(change => { showBalancedRoute = change.newValue; RenderRoutes(); });
+        shadeToggle.RegisterValueChangedCallback(change => { showShadeRoute = change.newValue; RenderRoutes(); });
         policy.RegisterValueChangedCallback(change => { selectedPolicy = change.newValue; RenderRoutes(); });
         mode.RegisterValueChangedCallback(change => { displayMode = change.newValue; RenderRoutes(); });
 
