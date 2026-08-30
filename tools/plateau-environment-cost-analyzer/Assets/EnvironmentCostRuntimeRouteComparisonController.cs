@@ -30,6 +30,8 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
     private EnvironmentCostRuntimeRouteCoordinate endCoordinate;
     private CaptureTarget captureTarget;
     private Transform routeRoot;
+    private GameObject startMarker;
+    private GameObject endMarker;
     private Camera interactionCamera;
     private string selectedScenarioA;
     private string selectedScenarioB;
@@ -106,7 +108,9 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         }
 
         var coordinate = ToGeographic(hit.point);
-        if (captureTarget == CaptureTarget.Start) startCoordinate = coordinate; else endCoordinate = coordinate;
+        var selectedTarget = captureTarget;
+        if (selectedTarget == CaptureTarget.Start) startCoordinate = coordinate; else endCoordinate = coordinate;
+        ReplaceEndpointMarker(selectedTarget, hit.point);
         var label = captureTarget == CaptureTarget.Start ? "起点" : "終点";
         captureTarget = CaptureTarget.None;
         comparisonVersion++;
@@ -302,6 +306,77 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         routeRoot = null;
     }
 
+    private void ReplaceEndpointMarker(CaptureTarget target, Vector3 position)
+    {
+        if (target == CaptureTarget.Start)
+        {
+            DestroyEndpointMarker(ref startMarker);
+            startMarker = CreateEndpointMarker("RuntimeRouteStartMarker", position, new Color(0.0f, 0.58f, 0.55f));
+        }
+        else if (target == CaptureTarget.End)
+        {
+            DestroyEndpointMarker(ref endMarker);
+            endMarker = CreateEndpointMarker("RuntimeRouteEndMarker", position, new Color(0.16f, 0.45f, 0.9f));
+        }
+    }
+
+    private static GameObject CreateEndpointMarker(string name, Vector3 groundPosition, Color color)
+    {
+        var marker = new GameObject(name);
+        marker.transform.position = groundPosition;
+        marker.layer = 2; // Ignore Raycast: markers must not affect subsequent point selection.
+
+        var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+        var material = shader == null ? null : new Material(shader) { color = color };
+        CreateMarkerPrimitive(PrimitiveType.Cylinder, "Post", marker.transform, new Vector3(1.2f, 4.0f, 1.2f), new Vector3(0f, 4.0f, 0f), material);
+        CreateMarkerPrimitive(PrimitiveType.Sphere, "Head", marker.transform, new Vector3(2.2f, 2.2f, 2.2f), new Vector3(0f, 8.8f, 0f), material);
+        return marker;
+    }
+
+    private static void CreateMarkerPrimitive(PrimitiveType primitiveType, string name, Transform parent, Vector3 scale, Vector3 localPosition, Material material)
+    {
+        var visual = GameObject.CreatePrimitive(primitiveType);
+        visual.name = name;
+        visual.layer = 2;
+        visual.transform.SetParent(parent, false);
+        visual.transform.localPosition = localPosition;
+        visual.transform.localScale = scale;
+        var collider = visual.GetComponent<Collider>();
+        if (collider != null)
+        {
+            collider.enabled = false;
+            Destroy(collider);
+        }
+        var renderer = visual.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+    }
+
+    private static void DestroyEndpointMarker(ref GameObject marker)
+    {
+        if (marker == null) return;
+        var material = marker.GetComponentInChildren<Renderer>()?.sharedMaterial;
+        Destroy(marker);
+        if (material != null) Destroy(material);
+        marker = null;
+    }
+
+    private void ClearEndpointMarkers()
+    {
+        DestroyEndpointMarker(ref startMarker);
+        DestroyEndpointMarker(ref endMarker);
+    }
+
+    private void CancelRoutePointSelection()
+    {
+        captureTarget = CaptureTarget.None;
+        status = "起点・終点の指定をキャンセルしました。設定済みの地点とマーカーは保持されます。";
+    }
+
     private void SaveEvidence()
     {
         try
@@ -334,7 +409,7 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         var points = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(points);
         points.Add(new Button(() => { captureTarget = CaptureTarget.Start; status = "道路または地表をクリックして起点を指定してください。"; }) { text = "起点を地図で指定" });
         points.Add(new Button(() => { captureTarget = CaptureTarget.End; status = "道路または地表をクリックして終点を指定してください。"; }) { text = "終点を地図で指定" });
-        points.Add(new Button(() => { captureTarget = CaptureTarget.None; status = "起終点の指定をキャンセルしました。"; }) { text = "指定を取消" });
+        points.Add(new Button(CancelRoutePointSelection) { text = "指定を取消" });
         var profile = new DropdownField("表示する経路", new List<string> { "最短", "バランス", "日陰優先" }, 2); panel.Add(profile);
         var policy = new DropdownField("表示する施策", new List<string> { "案A", "案B" }, 0); panel.Add(policy);
         var mode = new DropdownField("地図表示", new List<string> { "現状のみ", "施策後のみ", "重ね表示" }, 2); panel.Add(mode);
@@ -429,6 +504,7 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
     private void OnDestroy()
     {
         ClearRoutes();
+        ClearEndpointMarkers();
         if (routeMaterial != null) Destroy(routeMaterial);
     }
 }
