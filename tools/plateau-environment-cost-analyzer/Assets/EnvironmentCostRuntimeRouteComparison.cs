@@ -23,6 +23,10 @@ public sealed class EnvironmentCostRuntimeRouteComparison
 
     private readonly Package package;
     private readonly List<int>[] outgoing;
+    // Each physical edge has one or two directed representations.  The road heatmap
+    // needs only one representative geometry, so resolve it once at package load
+    // instead of searching every directed edge for every physical edge.
+    private readonly int[] representativeDirectedEdges;
     private readonly object baselineCostCacheLock = new object();
 
     private EnvironmentCostRuntimeRouteComparison(Package package)
@@ -30,7 +34,18 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         this.package = package;
         outgoing = new List<int>[package.nodes.Length];
         for (var index = 0; index < outgoing.Length; index++) outgoing[index] = new List<int>();
-        for (var index = 0; index < package.directedEdges.Length; index++) outgoing[package.directedEdges[index].fromNodeIndex].Add(index);
+        representativeDirectedEdges = new int[package.physicalEdges.Length];
+        for (var index = 0; index < representativeDirectedEdges.Length; index++) representativeDirectedEdges[index] = -1;
+        for (var index = 0; index < package.directedEdges.Length; index++)
+        {
+            var edge = package.directedEdges[index];
+            outgoing[edge.fromNodeIndex].Add(index);
+            if (representativeDirectedEdges[edge.physicalEdgeIndex] < 0)
+                representativeDirectedEdges[edge.physicalEdgeIndex] = index;
+        }
+        for (var index = 0; index < representativeDirectedEdges.Length; index++)
+            if (representativeDirectedEdges[index] < 0)
+                throw new InvalidOperationException("A physical edge has no representative directed edge.");
     }
 
     /// <summary>Loads manifest.json, road-network/manifest.json, topology and its baseline cost slice.</summary>
@@ -145,7 +160,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         };
         for (var index = 0; index < package.physicalEdges.Length; index++)
         {
-            var directed = package.directedEdges.First(edge => edge.physicalEdgeIndex == index);
+            var directed = package.directedEdges[representativeDirectedEdges[index]];
             var before = baseline.costs[index];
             var after = policySource.costs[index];
             var road = new EnvironmentCostRuntimeRoadHeatmapEdge
