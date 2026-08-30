@@ -22,11 +22,13 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         var solar = GetComponent<EnvironmentCostSolarController>();
         var shade = GetComponent<EnvironmentCostRuntimeShadeAnalysisController>();
         var policy = GetComponent<EnvironmentCostRuntimePolicyScenarioController>();
-        while (solar == null || shade == null || policy == null || policy.Scenario == null)
+        var comparison = GetComponent<EnvironmentCostRuntimeRouteComparisonController>();
+        while (solar == null || shade == null || policy == null || comparison == null || policy.Scenario == null)
         {
             solar ??= GetComponent<EnvironmentCostSolarController>();
             shade ??= GetComponent<EnvironmentCostRuntimeShadeAnalysisController>();
             policy ??= GetComponent<EnvironmentCostRuntimePolicyScenarioController>();
+            comparison ??= GetComponent<EnvironmentCostRuntimeRouteComparisonController>();
             yield return null;
         }
 
@@ -58,8 +60,9 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         solar.BuildUi(content);
         shade.BuildUi(content);
         policy.BuildUi(content);
+        comparison.BuildUi(content);
 
-        var panels = new[] { content.ElementAt(0), content.ElementAt(1), content.ElementAt(2) };
+        var panels = new[] { content.ElementAt(0), content.ElementAt(1), content.ElementAt(2), content.ElementAt(3) };
         var tabButtons = new Button[panels.Length];
         void SelectTab(int selectedIndex)
         {
@@ -69,7 +72,7 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
                 tabButtons[index].EnableInClassList("runtime-tab-active", index == selectedIndex);
             }
         }
-        var labels = new[] { "太陽・影", "日陰解析", "施策シナリオ" };
+        var labels = new[] { "太陽・影", "日陰解析", "施策シナリオ", "経路・KPI比較" };
         for (var index = 0; index < labels.Length; index++)
         {
             var captured = index;

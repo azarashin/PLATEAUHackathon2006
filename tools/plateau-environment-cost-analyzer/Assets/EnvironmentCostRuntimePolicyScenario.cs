@@ -167,6 +167,19 @@ public static class EnvironmentCostRuntimePolicyScenarioStore
         return Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json").OrderBy(path => path, StringComparer.Ordinal).ToArray() : Array.Empty<string>();
     }
 
+    /// <summary>Deletes only the saved scenario JSON. Runtime analysis and comparison evidence are retained.</summary>
+    public static void Delete(string areaId, string path)
+    {
+        if (string.IsNullOrWhiteSpace(areaId) || string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Scenario area and path are required.");
+        var directory = Path.GetFullPath(GetDirectory(areaId)).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var candidate = Path.GetFullPath(path);
+        if (!candidate.StartsWith(directory, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetExtension(candidate), ".json", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Scenario path is outside the saved scenario directory.");
+        if (!File.Exists(candidate)) throw new FileNotFoundException("Saved scenario was not found.", candidate);
+        File.Delete(candidate);
+    }
+
     private static string SanitizeFileName(string value)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -181,7 +194,11 @@ public static class EnvironmentCostRuntimePolicyJson
 
     private static JsonSerializerSettings CreateSettings()
     {
-        var settings = new JsonSerializerSettings();
+        var settings = new JsonSerializerSettings
+        {
+            FloatParseHandling = FloatParseHandling.Double,
+            Culture = CultureInfo.InvariantCulture
+        };
         settings.Converters.Add(new Vector3JsonConverter());
         return settings;
     }

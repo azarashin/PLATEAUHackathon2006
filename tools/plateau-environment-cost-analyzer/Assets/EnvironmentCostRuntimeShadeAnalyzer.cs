@@ -202,6 +202,8 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisProvenance
     public string recalculationScope;
     public int totalEdgeCount;
     public int recalculatedEdgeCount;
+    /// <summary>Algorithm used for resultFingerprintSha256.  Explicit so old JSON is never mistaken for a verified result.</summary>
+    public string resultFingerprintAlgorithm;
     public string resultFingerprintSha256;
     public static EnvironmentCostRuntimeShadeAnalysisProvenance From(EnvironmentCostRuntimeShadeAnalysisInput input,
         EnvironmentCostRuntimeShadeAnalysisRequest request) => new EnvironmentCostRuntimeShadeAnalysisProvenance

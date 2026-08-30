@@ -40,5 +40,23 @@
             <ui:VisualElement name="policy-loads" />
             <ui:Label name="policy-status" class="runtime-status" />
         </ui:ScrollView>
+        <ui:ScrollView name="route-comparison-panel" class="runtime-panel runtime-scroll">
+            <ui:Label text="経路・KPI比較" class="runtime-panel-title" />
+            <ui:DropdownField name="route-scenario-a" label="案A" />
+            <ui:DropdownField name="route-scenario-b" label="案B（任意）" />
+            <ui:DropdownField name="route-timestamp" label="比較時刻" />
+            <ui:Button name="route-refresh" text="解析結果を再読込" />
+            <ui:VisualElement class="runtime-row">
+                <ui:Button name="route-start" text="起点を地図で指定" />
+                <ui:Button name="route-end" text="終点を地図で指定" />
+            </ui:VisualElement>
+            <ui:DropdownField name="route-profile" label="表示する経路" />
+            <ui:DropdownField name="route-policy" label="表示する施策" />
+            <ui:DropdownField name="route-display-mode" label="地図表示" />
+            <ui:Button name="route-run" text="同一条件で経路・KPIを比較" />
+            <ui:Label name="route-kpis" class="runtime-status" />
+            <ui:Button name="route-export" text="比較証跡をエクスポート" />
+            <ui:Label name="route-status" class="runtime-status" />
+        </ui:ScrollView>
     </ui:VisualElement>
 </ui:UXML>

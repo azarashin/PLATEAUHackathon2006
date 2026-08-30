@@ -44,5 +44,8 @@
 .runtime-panel .unity-button { color: rgb(255, 255, 255); background-color: rgb(13, 148, 136); border-left-color: rgb(15, 118, 110); border-right-color: rgb(15, 118, 110); border-top-color: rgb(15, 118, 110); border-bottom-color: rgb(15, 118, 110); }
 .runtime-panel .unity-button:hover { background-color: rgb(5, 150, 105); }
 .runtime-panel .unity-button:active { background-color: rgb(4, 120, 87); }
+.runtime-panel .runtime-button-danger { background-color: rgb(220, 38, 38); border-left-color: rgb(185, 28, 28); border-right-color: rgb(185, 28, 28); border-top-color: rgb(185, 28, 28); border-bottom-color: rgb(185, 28, 28); }
+.runtime-panel .runtime-button-danger:hover { background-color: rgb(185, 28, 28); }
+.runtime-panel .runtime-button-danger:active { background-color: rgb(153, 27, 27); }
 .runtime-panel .unity-slider__tracker { background-color: rgb(191, 219, 254); }
 .runtime-panel .unity-slider__dragger { background-color: rgb(37, 99, 235); }

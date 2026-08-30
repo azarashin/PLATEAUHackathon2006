@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/environment-cost-runtime-route-comparison-0.1.schema.json",
+  "title": "Runtime route comparison evidence 0.1",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAtUtc", "comparison", "policyScenarios", "comparisonFingerprintSha256"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-runtime-route-comparison-0.1" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "comparisonFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "policyScenarios": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "#/$defs/policyScenario" } },
+    "comparison": {
+      "type": "object",
+      "required": ["schemaVersion", "areaId", "timestamp", "topologyFingerprintSha256", "graphFingerprintSha256", "bundleFingerprintSha256", "cityPackageVersion", "cityPackageManifestSha256", "comparisonFingerprintSha256", "conditions", "baseline", "policies"],
+      "properties": {
+        "schemaVersion": { "const": "environment-cost-runtime-route-comparison-0.1" },
+        "areaId": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "topologyFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "graphFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "bundleFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "comparisonFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "cityPackageVersion": { "type": "string", "minLength": 1 },
+        "cityPackageManifestSha256": { "$ref": "#/$defs/sha256" },
+        "conditions": { "$ref": "#/$defs/conditions" },
+        "baseline": { "$ref": "#/$defs/scenarioResult" },
+        "policies": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "$ref": "#/$defs/policyScenarioResult" } }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "conditions": {
+      "type": "object",
+      "required": ["areaId", "timestamp", "start", "end", "profiles"],
+      "properties": {
+        "areaId": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "start": { "$ref": "#/$defs/coordinate" },
+        "end": { "$ref": "#/$defs/coordinate" },
+        "profiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/profile" } }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "required": ["id", "solarAvoidanceFactor"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "solarAvoidanceFactor": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "policyScenario": {
+      "type": "object",
+      "required": ["schemaVersion", "id", "displayName", "areaId", "coordinateZoneId", "centerLongitude", "centerLatitude", "cityPackageVersion", "cityPackageManifestSha256", "facilities"],
+      "properties": {
+        "schemaVersion": { "const": "environment-cost-runtime-policy-scenario-0.1" },
+        "id": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string" },
+        "areaId": { "type": "string", "minLength": 1 },
+        "coordinateZoneId": { "type": "integer", "minimum": 1, "maximum": 19 },
+        "centerLongitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "centerLatitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "cityPackageVersion": { "type": "string", "minLength": 1 },
+        "cityPackageManifestSha256": { "$ref": "#/$defs/sha256" },
+        "facilities": { "type": "array", "items": { "$ref": "#/$defs/facility" } }
+      },
+      "additionalProperties": true
+    },
+    "facility": {
+      "type": "object",
+      "required": ["id", "type", "localPosition", "latitude", "longitude", "rotationDegrees", "heightMeters", "radiusMeters", "widthMeters", "depthMeters"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["tree", "shade", "obstacle"] },
+        "localPosition": { "$ref": "#/$defs/vector3" },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "rotationDegrees": { "type": "number" },
+        "heightMeters": { "type": "number", "exclusiveMinimum": 0 },
+        "radiusMeters": { "type": "number", "exclusiveMinimum": 0 },
+        "widthMeters": { "type": "number", "exclusiveMinimum": 0 },
+        "depthMeters": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "vector3": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } },
+      "additionalProperties": false
+    },
+    "scenarioResult": {
+      "type": "object",
+      "required": ["scenario", "start", "end", "routes"],
+      "properties": {
+        "scenario": { "$ref": "#/$defs/baselineProvenance" },
+        "start": { "$ref": "#/$defs/snap" },
+        "end": { "$ref": "#/$defs/snap" },
+        "routes": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/route" } }
+      },
+      "additionalProperties": true
+    },
+    "policyScenarioResult": {
+      "type": "object",
+      "required": ["scenario", "start", "end", "routes"],
+      "properties": {
+        "scenario": { "$ref": "#/$defs/policyProvenance" },
+        "start": { "$ref": "#/$defs/snap" },
+        "end": { "$ref": "#/$defs/snap" },
+        "routes": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/route" } }
+      },
+      "additionalProperties": true
+    },
+    "baselineProvenance": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "properties": {
+        "id": { "const": "baseline" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "const": "package-baseline" }
+      },
+      "additionalProperties": true
+    },
+    "policyProvenance": {
+      "type": "object",
+      "required": ["id", "label", "kind", "policyFingerprintSha256", "resultFingerprintSha256", "generatedAtUtc"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "const": "runtime-shade" },
+        "policyFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "resultFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "generatedAtUtc": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+    "snap": {
+      "type": "object",
+      "required": ["nodeIndex", "nodeId", "snapped", "distanceMeters"],
+      "properties": {
+        "nodeIndex": { "type": "integer", "minimum": 0 },
+        "nodeId": { "type": "string", "minLength": 1 },
+        "distanceMeters": { "type": "number", "minimum": 0 },
+        "snapped": { "$ref": "#/$defs/coordinate" }
+      },
+      "additionalProperties": true
+    },
+    "coordinate": {
+      "type": "object",
+      "required": ["longitude", "latitude", "nodeIndex"],
+      "properties": {
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "nodeIndex": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "route": {
+      "type": "object",
+      "required": ["profile", "edgeIds", "coordinates", "distanceMeters", "walkingSeconds", "solarExposureSeconds", "unknownWalkingSeconds", "coverageStatus"],
+      "properties": {
+        "profile": { "$ref": "#/$defs/profile" },
+        "edgeIds": { "type": "array", "items": { "type": "string" } },
+        "coordinates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/coordinate" } },
+        "distanceMeters": { "type": "number", "minimum": 0 },
+        "walkingSeconds": { "type": "number", "minimum": 0 },
+        "solarExposureSeconds": { "type": "number", "minimum": 0 },
+        "unknownWalkingSeconds": { "type": "number", "minimum": 0 },
+        "coverageStatus": { "enum": ["available", "partial", "missing"] }
+      },
+      "additionalProperties": true
+    }
+  }
+}
