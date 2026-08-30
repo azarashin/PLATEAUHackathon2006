@@ -15,6 +15,12 @@ using UnityEngine.UIElements;
 /// <summary>Renders a road-by-road Runtime policy comparison that is bound to the completed route/KPI comparison.</summary>
 public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
 {
+    private const int RoadLayer = 9;
+    private const int TerrainLayer = 10;
+    private const float SurfaceRayOriginHeight = 500f;
+    private const float SurfaceRayDistance = 1000f;
+    private const float HeatmapSurfaceOffset = 1.1f;
+
     private static readonly Dictionary<string, Color> StatusColors = new Dictionary<string, Color>
     {
         { "improved", new Color(0.05f, 0.62f, 0.36f) }, { "degraded", new Color(0.93f, 0.38f, 0.12f) },
@@ -114,8 +120,8 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         var triangles = new List<int>();
         foreach (var road in roads)
         {
-            var from = ToLocal(reference, road.from) + Vector3.up * 0.7f;
-            var to = ToLocal(reference, road.to) + Vector3.up * 0.7f;
+            var from = ToLocal(reference, road.from) + Vector3.up * HeatmapSurfaceOffset;
+            var to = ToLocal(reference, road.to) + Vector3.up * HeatmapSurfaceOffset;
             var direction = to - from;
             if (direction.sqrMagnitude < 0.0001f) continue;
             var side = Vector3.Cross(Vector3.up, direction.normalized) * 0.8f;
@@ -145,10 +151,15 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         return GeoReference.Create(origin, 1f, CoordinateSystem.EUN, metadata.CoordinateZoneId);
     }
 
-    private static Vector3 ToLocal(GeoReference reference, EnvironmentCostRuntimeRouteCoordinate coordinate)
+    private Vector3 ToLocal(GeoReference reference, EnvironmentCostRuntimeRouteCoordinate coordinate)
     {
         var point = reference.Project(new GeoCoordinate(coordinate.latitude, coordinate.longitude, 0.0));
-        return new Vector3((float)point.X, 0f, (float)point.Z);
+        var projected = new Vector3((float)point.X, 0f, (float)point.Z);
+        var rayOrigin = projected + Vector3.up * SurfaceRayOriginHeight;
+        var surfaceMask = (1 << RoadLayer) | (1 << TerrainLayer);
+        return Physics.Raycast(rayOrigin, Vector3.down, out var hit, SurfaceRayDistance, surfaceMask, QueryTriggerInteraction.Ignore)
+            ? hit.point
+            : projected + Vector3.up * 0.5f;
     }
 
     private void SelectRoad(string roadId)
