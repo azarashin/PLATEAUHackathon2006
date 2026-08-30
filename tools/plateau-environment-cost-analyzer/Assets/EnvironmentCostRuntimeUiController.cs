@@ -40,7 +40,7 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         var root = document.rootVisualElement.Q<VisualElement>("runtime-ui-root") ?? document.rootVisualElement;
         // A PanelSettings created for Runtime has no editor-only default font. Assign an OS font
         // explicitly so Japanese labels and controls remain visible in a standalone Player.
-        root.style.unityFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo UI", "Arial" }, 12);
+        root.style.unityFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo UI", "Arial" }, 11);
         // The first UXML revision contains declarative design-time examples. Runtime controllers
         // construct and bind the live controls below, so clear those examples to avoid rendering
         // a second set of panels while the binding is migrated into UXML.

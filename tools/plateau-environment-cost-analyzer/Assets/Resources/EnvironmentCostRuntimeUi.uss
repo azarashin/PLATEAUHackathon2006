@@ -3,32 +3,39 @@
     align-items: flex-start;
     padding-left: 16px;
     padding-top: 16px;
-    width: 460px;
+    width: 500px;
 }
 
 .runtime-panel {
-    background-color: rgba(24, 31, 43, 0.92);
+    background-color: rgba(248, 250, 252, 0.96);
     border-left-width: 1px;
     border-right-width: 1px;
     border-top-width: 1px;
     border-bottom-width: 1px;
-    border-left-color: rgb(153, 184, 224);
-    border-right-color: rgb(153, 184, 224);
-    border-top-color: rgb(153, 184, 224);
-    border-bottom-color: rgb(153, 184, 224);
+    border-left-color: rgb(37, 99, 235);
+    border-right-color: rgb(37, 99, 235);
+    border-top-color: rgb(37, 99, 235);
+    border-bottom-color: rgb(37, 99, 235);
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
-    color: white;
-    margin-bottom: 10px;
-    padding: 10px;
-    width: 440px;
+    color: rgb(15, 23, 42);
+    margin-bottom: 18px;
+    padding: 10px 12px 24px 12px;
+    width: 480px;
+    flex-shrink: 0;
 }
 
-.runtime-panel-title { font-size: 15px; unity-font-style: bold; margin-bottom: 4px; }
-.runtime-status { white-space: normal; margin-top: 6px; }
+.runtime-panel-title { color: rgb(15, 71, 125); font-size: 14px; unity-font-style: bold; margin-bottom: 4px; }
+.runtime-status { color: rgb(51, 65, 85); font-size: 11px; white-space: normal; margin-top: 8px; }
 .runtime-scroll { max-height: 420px; }
 .runtime-row { flex-direction: row; gap: 6px; }
-.runtime-panel Label { color: rgb(245, 248, 255); -unity-font-style: normal; font-size: 12px; }
+.runtime-panel Label { color: rgb(30, 41, 59); -unity-font-style: normal; font-size: 11px; }
 .runtime-panel TextField, .runtime-panel Slider, .runtime-panel SliderInt, .runtime-panel Toggle { margin-top: 3px; margin-bottom: 3px; }
+.runtime-panel .unity-text-field__input { color: rgb(15, 23, 42); background-color: rgb(255, 255, 255); border-left-color: rgb(148, 163, 184); border-right-color: rgb(148, 163, 184); border-top-color: rgb(148, 163, 184); border-bottom-color: rgb(148, 163, 184); }
+.runtime-panel .unity-button { color: rgb(255, 255, 255); background-color: rgb(13, 148, 136); border-left-color: rgb(15, 118, 110); border-right-color: rgb(15, 118, 110); border-top-color: rgb(15, 118, 110); border-bottom-color: rgb(15, 118, 110); }
+.runtime-panel .unity-button:hover { background-color: rgb(5, 150, 105); }
+.runtime-panel .unity-button:active { background-color: rgb(4, 120, 87); }
+.runtime-panel .unity-slider__tracker { background-color: rgb(191, 219, 254); }
+.runtime-panel .unity-slider__dragger { background-color: rgb(37, 99, 235); }
