@@ -433,7 +433,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
 
     public void BuildUi(VisualElement root)
     {
-        var panel = new ScrollView(); panel.AddToClassList("runtime-panel"); panel.AddToClassList("runtime-scroll"); EnvironmentCostRuntimeUiInputGate.Track(panel); root.Add(panel);
+        var panel = new ScrollView(); panel.AddToClassList("runtime-panel"); panel.AddToClassList("runtime-scroll"); root.Add(panel);
         var title = new Label("施策シナリオエディター"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
         var id = new TextField("シナリオ ID") { value = scenarioIdInput }; var name = new TextField("表示名") { value = displayNameInput };
         var author = new TextField("作成者・組織") { value = authorInput }; var memo = new TextField("証跡メモ") { value = memoInput, multiline = true };
@@ -458,6 +458,7 @@ public sealed class EnvironmentCostRuntimePolicyScenarioController : MonoBehavio
             else { AddNumberField(selectedEditor, "幅（m）", (float)selected.widthMeters, value => selected.widthMeters = value); AddNumberField(selectedEditor, "奥行き（m）", (float)selected.depthMeters, value => selected.depthMeters = value); }
             AddNumberField(selectedEditor, "向き（度）", selected.rotationDegrees, value => selected.rotationDegrees = value);
             selectedEditor.Add(new Button(ApplySelectedFacility) { text = "位置・寸法を反映" }); selectedEditor.Add(new Button(DeleteSelected) { text = "選択した施策を削除" });
+            EnvironmentCostRuntimeUiInputGate.DisableNonEditableKeyboardFocus(selectedEditor);
         }
         var commands = new VisualElement { style = { flexDirection = FlexDirection.Row } }; panel.Add(commands);
         commands.Add(new Button(SaveScenario) { text = "保存" }); commands.Add(new Button(CloneScenario) { text = "A/B 比較用に複製" }); commands.Add(new Button(CreateNewScenario) { text = "新規作成" });

@@ -43,7 +43,7 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
 
     public void BuildUi(VisualElement root)
     {
-        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); EnvironmentCostRuntimeUiInputGate.Track(panel); root.Add(panel);
+        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); root.Add(panel);
         var title = new Label("太陽・影の確認"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
         panel.Add(new Label($"地域: {metadata?.AreaId ?? "未設定"}  タイムゾーン: {metadata?.Timezone ?? "未設定"}"));
         var date = new TextField("日付 (YYYY-MM-DD)") { value = dateText ?? string.Empty }; panel.Add(date);

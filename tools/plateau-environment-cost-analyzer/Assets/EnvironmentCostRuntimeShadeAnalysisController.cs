@@ -211,7 +211,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisController : MonoBehaviou
 
     public void BuildUi(VisualElement root)
     {
-        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); EnvironmentCostRuntimeUiInputGate.Track(panel); root.Add(panel);
+        var panel = new VisualElement(); panel.AddToClassList("runtime-panel"); root.Add(panel);
         var title = new Label("日陰解析"); title.AddToClassList("runtime-panel-title"); panel.Add(title);
         var hour = new SliderInt("解析時刻", 0, 23) { value = selectedHour }; panel.Add(hour);
         hour.RegisterValueChangedCallback(change => selectedHour = change.newValue);
