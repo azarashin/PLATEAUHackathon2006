@@ -58,7 +58,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         {
             var files = new List<EnvironmentCostRuntimeCityPackageFile>();
             CopyToPackage(baselinePath, stagingRoot, "baseline-environment-cost.json", "baseline-environment-cost", files);
-            CreateRuntimeShadeInput(baselinePath, analysis, stagingRoot, files);
+            CreateRuntimeShadeInput(baselinePath, config.sidewalkNetworkPath, analysis, stagingRoot, files);
             var roadDirectory = Path.GetDirectoryName(roadManifestPath) ?? throw new InvalidOperationException("Road bundle directory is missing.");
             var roadManifest = JObject.Parse(File.ReadAllText(roadManifestPath));
             CopyToPackage(roadManifestPath, stagingRoot, "road-network/manifest.json", "road-network-manifest", files);
@@ -90,12 +90,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
                         new EnvironmentCostRuntimeCityPackageLayer { name = "Terrain", layer = 10, role = "display-and-terrain-surface" }
                     }
                 },
-                sources = new[]
-                {
-                    Source("analysis-config", config.analysisConfigPath, config.ResolvePath(config.analysisConfigPath)),
-                    Source("road-network-bundle", config.roadNetworkBundlePath, roadManifestPath),
-                    Source("baseline-environment-cost", config.baselineEnvironmentCostPath, baselinePath)
-                },
+                sources = BuildSources(config, roadManifestPath, baselinePath),
                 files = files.ToArray()
             };
             manifest.ValidateStructure();
@@ -140,7 +135,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         CopyToPackage(Path.Combine(sourceRoot, name), targetRoot, $"road-network/{name}", $"road-network-{kind}", files);
     }
 
-    private static void CreateRuntimeShadeInput(string baselinePath, AnalysisRunConfig analysis, string targetRoot,
+    private static void CreateRuntimeShadeInput(string baselinePath, string sidewalkNetworkPath, AnalysisRunConfig analysis, string targetRoot,
         List<EnvironmentCostRuntimeCityPackageFile> files)
     {
         var source = JObject.Parse(File.ReadAllText(baselinePath));
@@ -150,25 +145,52 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         var referencePoint = worldReference.Project(new GeoCoordinate(analysis.CenterLatitude, analysis.CenterLongitude, 0.0));
         using var localReference = GeoReference.Create(referencePoint, 1.0f, CoordinateSystem.EUN, analysis.coordinateZoneId);
         var edges = new List<EnvironmentCostRuntimeShadeInputEdge>(sourceEdges.Count);
-        foreach (var sourceEdge in sourceEdges.OfType<JObject>())
+        string graphFingerprint = null;
+        EnvironmentCostRuntimeShadeInputQuality quality = null;
+        if (!string.IsNullOrWhiteSpace(sidewalkNetworkPath))
+        {
+            var path = Path.GetFullPath(Path.IsPathRooted(sidewalkNetworkPath) ? sidewalkNetworkPath : Path.Combine(analysis.repositoryRoot, sidewalkNetworkPath));
+            var graph = JObject.Parse(File.ReadAllText(path));
+            if (!string.Equals((string)graph["schemaVersion"], "environment-cost-pedestrian-network-2.0", StringComparison.Ordinal) ||
+                !string.Equals((string)graph["areaId"], analysis.areaId, StringComparison.Ordinal))
+                throw new InvalidOperationException("Sidewalk network must be a matching pedestrian-network v2 document.");
+            graphFingerprint = (string)graph["graphFingerprintSha256"];
+            if (string.IsNullOrWhiteSpace(graphFingerprint) || graphFingerprint.Length != 64)
+                throw new InvalidOperationException("Sidewalk network graph fingerprint is invalid.");
+            var physicalEdges = graph["physicalEdges"] as JArray ?? throw new InvalidOperationException("Sidewalk network has no physicalEdges.");
+            foreach (var physical in physicalEdges.OfType<JObject>())
+            {
+                var geometry = physical["geometry"] as JArray;
+                if (geometry == null || geometry.Count < 2) throw new InvalidOperationException("Physical sidewalk edge has invalid geometry.");
+                // The v2 contract keeps full geometry on the physical edge.  Use only its
+                // endpoints here because the shade sampler owns subdivision deterministically.
+                var id = (string)physical["id"] ?? throw new InvalidOperationException("Physical sidewalk edge has no id.");
+                edges.Add(new EnvironmentCostRuntimeShadeInputEdge { id = id, physicalEdgeId = id,
+                    from = ToLocalPoint(localReference, geometry[0] as JArray), to = ToLocalPoint(localReference, geometry[geometry.Count - 1] as JArray),
+                    lengthMeters = (double?)physical["lengthMeters"] ?? throw new InvalidOperationException("Physical sidewalk edge has no length."),
+                    walkingSeconds = (double?)physical["walkingSeconds"] ?? throw new InvalidOperationException("Physical sidewalk edge has no walking time.") });
+            }
+            var fallbackRatio = (double?)graph.SelectToken("quality.lengthMeters.fallbackRatio") ?? -1.0;
+            var supportedRatio = (double?)graph.SelectToken("quality.lengthMeters.explicitOrDerivedRatio") ?? -1.0;
+            quality = new EnvironmentCostRuntimeShadeInputQuality { status = fallbackRatio >= 0.0 && fallbackRatio <= 0.2 && supportedRatio >= 0.8 ? "accepted" : "unverified", explicitOrDerivedRatio = supportedRatio, fallbackRatio = fallbackRatio, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" };
+            CopyToPackage(path, targetRoot, "sidewalk-network.json", "sidewalk-network-v2", files);
+        }
+        else foreach (var sourceEdge in sourceEdges.OfType<JObject>())
         {
             var coordinates = sourceEdge["coordinates"] as JArray;
             if (coordinates == null || coordinates.Count != 2) throw new InvalidOperationException("Baseline edge has invalid coordinates.");
-            edges.Add(new EnvironmentCostRuntimeShadeInputEdge
-            {
-                id = (string)sourceEdge["id"] ?? throw new InvalidOperationException("Baseline edge has no id."),
-                from = ToLocalPoint(localReference, coordinates[0] as JArray),
-                to = ToLocalPoint(localReference, coordinates[1] as JArray),
+            var id = (string)sourceEdge["id"] ?? throw new InvalidOperationException("Baseline edge has no id.");
+            edges.Add(new EnvironmentCostRuntimeShadeInputEdge { id = id, physicalEdgeId = id,
+                from = ToLocalPoint(localReference, coordinates[0] as JArray), to = ToLocalPoint(localReference, coordinates[1] as JArray),
                 lengthMeters = (double?)sourceEdge["lengthMeters"] ?? throw new InvalidOperationException("Baseline edge has no length."),
-                walkingSeconds = (double?)sourceEdge["walkingSeconds"] ?? throw new InvalidOperationException("Baseline edge has no walking time.")
-            });
+                walkingSeconds = (double?)sourceEdge["walkingSeconds"] ?? throw new InvalidOperationException("Baseline edge has no walking time.") });
         }
         var input = new EnvironmentCostRuntimeShadeAnalysisInput
         {
-            schemaVersion = "environment-cost-runtime-shade-input-0.1", areaId = analysis.areaId, center = analysis.center,
+            schemaVersion = quality == null ? "environment-cost-runtime-shade-input-0.1" : "environment-cost-runtime-shade-input-0.3", areaId = analysis.areaId, center = analysis.center,
             coordinateZoneId = analysis.coordinateZoneId, radiusMeters = (float)analysis.radiusMeters, analysisDate = analysis.date, timezone = analysis.timezone,
             sampleSpacingMeters = (float)analysis.sampleSpacingMeters, pedestrianHeightMeters = (float)analysis.pedestrianHeightMeters,
-            edges = edges.ToArray()
+            graphFingerprintSha256 = graphFingerprint, quality = quality, edges = edges.ToArray()
         };
         input.Validate();
         var relativePath = "runtime-shade-input.json";
@@ -242,6 +264,19 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             if (string.Equals(args[index], name, StringComparison.OrdinalIgnoreCase)) return args[index + 1];
         return null;
     }
+
+    private static EnvironmentCostRuntimeCityPackageSource[] BuildSources(RuntimeCityPackageConfig config, string roadManifestPath, string baselinePath)
+    {
+        var sources = new List<EnvironmentCostRuntimeCityPackageSource>
+        {
+            Source("analysis-config", config.analysisConfigPath, config.ResolvePath(config.analysisConfigPath)),
+            Source("road-network-bundle", config.roadNetworkBundlePath, roadManifestPath),
+            Source("baseline-environment-cost", config.baselineEnvironmentCostPath, baselinePath)
+        };
+        if (!string.IsNullOrWhiteSpace(config.sidewalkNetworkPath))
+            sources.Add(Source("sidewalk-network-v2", config.sidewalkNetworkPath, config.ResolvePath(config.sidewalkNetworkPath)));
+        return sources.ToArray();
+    }
 }
 
 [Serializable]
@@ -254,6 +289,7 @@ public sealed class RuntimeCityPackageConfig
     public string analysisConfigPath;
     public string roadNetworkBundlePath;
     public string baselineEnvironmentCostPath;
+    public string sidewalkNetworkPath;
     public string packageRelativePath;
     [JsonIgnore] public string repositoryRoot;
 

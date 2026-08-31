@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/environment-cost-server-bundle-v2.schema.json",
+  "title": "Environment cost server bundle manifest v2",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "status", "dataset", "inputs", "area", "scenario", "networkQuality", "counts", "topology", "costSlices", "bundleFingerprintSha256"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-server-bundle-2.0" }, "status": { "const": "completed" },
+    "dataset": { "type": "object", "required": ["id", "provenance", "generatedAt"] },
+    "inputs": { "type": "object", "required": ["roadGraphFingerprintSha256", "environmentCostFingerprintSha256"] },
+    "area": { "type": "object", "required": ["areaId", "center", "radiusMeters"] },
+    "scenario": { "type": "object", "required": ["referenceDate", "timezone", "availableTimestamps", "defaultTimestamp"] },
+    "networkQuality": { "type": "object", "required": ["status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion"] },
+    "counts": { "type": "object", "required": ["nodeCount", "physicalEdgeCount", "directedEdgeCount", "hourCount"] },
+    "topology": { "$ref": "#/$defs/file" }, "costSlices": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/file" } },
+    "bundleFingerprintSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "file": { "type": "object", "required": ["file", "bytes", "fileSha256", "contentFingerprintSha256"], "properties": { "file": { "type": "string", "minLength": 1 }, "bytes": { "type": "integer", "minimum": 1 }, "fileSha256": { "$ref": "#/$defs/sha256" }, "contentFingerprintSha256": { "$ref": "#/$defs/sha256" } } } }
+}

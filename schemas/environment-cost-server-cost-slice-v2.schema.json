@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/environment-cost-server-cost-slice-v2.schema.json",
+  "title": "Environment cost server cost slice v2",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "areaId", "timestamp", "topologyContentFingerprintSha256", "environmentCostFingerprintSha256", "physicalEdgeCount", "statusCounts", "costs", "contentFingerprintSha256"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-server-cost-slice-2.0" }, "areaId": { "type": "string", "minLength": 1 }, "timestamp": { "type": "string", "format": "date-time" },
+    "topologyContentFingerprintSha256": { "$ref": "#/$defs/sha256" }, "environmentCostFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "physicalEdgeCount": { "type": "integer", "minimum": 1 }, "statusCounts": { "type": "object" }, "costs": { "type": "array", "minItems": 1 }, "contentFingerprintSha256": { "$ref": "#/$defs/sha256" }
+  }, "$defs": { "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+}

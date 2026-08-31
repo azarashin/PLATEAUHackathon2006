@@ -120,16 +120,30 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisInput
     public string timezone;
     public float sampleSpacingMeters;
     public float pedestrianHeightMeters;
+    // Present for sidewalk-network v2 inputs.  Keeping it nullable allows existing 0.1
+    // packages to remain readable while package generation moves to physical geometry.
+    public string graphFingerprintSha256;
+    public EnvironmentCostRuntimeShadeInputQuality quality;
     public EnvironmentCostRuntimeShadeInputEdge[] edges;
 
     public void Validate()
     {
-        if (!string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.1", StringComparison.Ordinal) ||
+        if ((!string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.1", StringComparison.Ordinal) &&
+             !string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.3", StringComparison.Ordinal)) ||
             string.IsNullOrWhiteSpace(areaId) || center == null || center.Length != 2 || coordinateZoneId < 1 || coordinateZoneId > 19 ||
             !DateTime.TryParseExact(analysisDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ||
             string.IsNullOrWhiteSpace(timezone) || radiusMeters <= 0 || sampleSpacingMeters <= 0 || pedestrianHeightMeters < 0 || edges == null || edges.Length == 0)
             throw new InvalidOperationException("Runtime shade input is incomplete.");
         foreach (var edge in edges) edge.Validate();
+        if (string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.3", StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(graphFingerprintSha256) || graphFingerprintSha256.Length != 64 || quality == null)
+                throw new InvalidOperationException("Runtime shade input v0.3 is missing sidewalk graph provenance.");
+            var physicalIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var edge in edges)
+                if (string.IsNullOrWhiteSpace(edge.physicalEdgeId) || !physicalIds.Add(edge.physicalEdgeId))
+                    throw new InvalidOperationException("Runtime shade input v0.3 must sample every physical edge exactly once.");
+        }
     }
 }
 
@@ -137,6 +151,7 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisInput
 public sealed class EnvironmentCostRuntimeShadeInputEdge
 {
     public string id;
+    public string physicalEdgeId;
     public float[] from;
     public float[] to;
     public double lengthMeters;
@@ -146,6 +161,15 @@ public sealed class EnvironmentCostRuntimeShadeInputEdge
         if (string.IsNullOrWhiteSpace(id) || from == null || from.Length != 2 || to == null || to.Length != 2 ||
             lengthMeters <= 0 || walkingSeconds <= 0) throw new InvalidOperationException("Runtime shade input edge is invalid.");
     }
+}
+
+[Serializable]
+public sealed class EnvironmentCostRuntimeShadeInputQuality
+{
+    public string status;
+    public double explicitOrDerivedRatio;
+    public double fallbackRatio;
+    public string sourceSchemaVersion;
 }
 
 [Serializable]
@@ -205,12 +229,15 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisProvenance
     /// <summary>Algorithm used for resultFingerprintSha256.  Explicit so old JSON is never mistaken for a verified result.</summary>
     public string resultFingerprintAlgorithm;
     public string resultFingerprintSha256;
+    public string graphFingerprintSha256;
+    public EnvironmentCostRuntimeShadeInputQuality networkQuality;
     public static EnvironmentCostRuntimeShadeAnalysisProvenance From(EnvironmentCostRuntimeShadeAnalysisInput input,
         EnvironmentCostRuntimeShadeAnalysisRequest request) => new EnvironmentCostRuntimeShadeAnalysisProvenance
     {
         areaId = input.areaId, coordinateZoneId = input.coordinateZoneId, center = input.center, radiusMeters = input.radiusMeters, analysisDate = request.analysisDate.ToString("yyyy-MM-dd"),
         timezone = input.timezone, hours = request.hours, sampleSpacingMeters = input.sampleSpacingMeters,
         pedestrianHeightMeters = input.pedestrianHeightMeters, buildingLayer = request.buildingLayer, roadLayer = request.roadLayer,
-        obstructionCondition = "Physics.Raycast toward solar direction against Building layer", groundCondition = "Physics.Raycast downward against Road layer"
+        obstructionCondition = "Physics.Raycast toward solar direction against Building layer", groundCondition = "Physics.Raycast downward against Road layer",
+        graphFingerprintSha256 = input.graphFingerprintSha256, networkQuality = input.quality
     };
 }

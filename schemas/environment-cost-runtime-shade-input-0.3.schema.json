@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.pit-creation.com/schemas/environment-cost-runtime-shade-input-0.3.schema.json",
+  "title": "Environment cost runtime shade input v0.3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "areaId", "center", "coordinateZoneId", "radiusMeters", "analysisDate", "timezone", "sampleSpacingMeters", "pedestrianHeightMeters", "graphFingerprintSha256", "quality", "edges"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-runtime-shade-input-0.3" },
+    "areaId": { "type": "string", "minLength": 1 },
+    "center": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } },
+    "coordinateZoneId": { "type": "integer", "minimum": 1, "maximum": 19 },
+    "radiusMeters": { "type": "number", "exclusiveMinimum": 0 },
+    "analysisDate": { "type": "string", "format": "date" },
+    "timezone": { "type": "string", "minLength": 1 },
+    "sampleSpacingMeters": { "type": "number", "exclusiveMinimum": 0 },
+    "pedestrianHeightMeters": { "type": "number", "minimum": 0 },
+    "graphFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "quality": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion"],
+      "properties": {
+        "status": { "enum": ["accepted", "unverified"] },
+        "explicitOrDerivedRatio": { "type": "number", "minimum": -1, "maximum": 1 },
+        "fallbackRatio": { "type": "number", "minimum": -1, "maximum": 1 },
+        "sourceSchemaVersion": { "const": "environment-cost-pedestrian-network-2.0" }
+      }
+    },
+    "edges": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/physicalEdge" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "point": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } },
+    "physicalEdge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "physicalEdgeId", "from", "to", "lengthMeters", "walkingSeconds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "physicalEdgeId": { "type": "string", "minLength": 1 },
+        "from": { "$ref": "#/$defs/point" }, "to": { "$ref": "#/$defs/point" },
+        "lengthMeters": { "type": "number", "exclusiveMinimum": 0 }, "walkingSeconds": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

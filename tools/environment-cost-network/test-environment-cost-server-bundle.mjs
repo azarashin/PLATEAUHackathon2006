@@ -59,6 +59,13 @@ try {
     shadeRatio: 0.25, solarExposureSeconds: 75,
   })
 
+  await writeFile(join(directory, 'v2-manifest.json'), JSON.stringify({ schemaVersion: 'environment-cost-server-bundle-2.0' }))
+  await assert.rejects(
+    () => loadEnvironmentCostServerBundle(join(directory, 'v2-manifest.json')),
+    /v2 was identified but is not supported/,
+    'a v2 bundle must be identified instead of being interpreted as v1',
+  )
+
   const costPath = join(directory, 'cost-08.json')
   const originalCost = await readFile(costPath, 'utf8')
   await writeFile(costPath, `${originalCost} `)
