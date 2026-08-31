@@ -3,7 +3,7 @@
   "$id": "https://www.pit-creation.com/schemas/environment-cost-pedestrian-network-2.0.schema.json",
   "title": "Environment cost sidewalk pedestrian network v2",
   "type": "object",
-  "required": ["schemaVersion", "areaId", "generatedAt", "graphFingerprintSha256", "extent", "coordinateReferenceSystem", "nodes", "edges"],
+  "required": ["schemaVersion", "areaId", "generatedAt", "graphFingerprintSha256", "extent", "coordinateReferenceSystem", "nodes", "physicalEdges", "edges"],
   "properties": {
     "schemaVersion": { "const": "environment-cost-pedestrian-network-2.0" },
     "areaId": { "type": "string", "minLength": 1 },
@@ -12,6 +12,7 @@
     "extent": { "type": "object", "required": ["center", "radiusMeters"] },
     "coordinateReferenceSystem": { "type": "object", "required": ["geographic", "projected"] },
     "nodes": { "type": "array", "items": { "type": "object", "required": ["id", "coordinate", "zLevel", "kind", "source"] } },
-    "edges": { "type": "array", "items": { "type": "object", "required": ["id", "fromNodeId", "toNodeId", "geometry", "lengthMeters", "walkability", "facility", "side", "level", "source", "fallback"] } }
+    "physicalEdges": { "type": "array", "items": { "type": "object", "required": ["id", "fromNodeId", "toNodeId", "geometry", "lengthMeters", "walkingSeconds", "walkability", "facility", "side", "level", "source", "fallback"] } },
+    "edges": { "type": "array", "items": { "type": "object", "required": ["id", "physicalEdgeId", "fromNodeId", "toNodeId", "walkingSeconds", "walkability", "facility", "side", "level", "source", "fallback"] } }
   }
 }
