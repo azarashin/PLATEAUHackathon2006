@@ -27,6 +27,7 @@
 | [歩行用道路グラフ生成ツール](../tools/road-network/README.md) | OSMノードID付き入力からグラフを作る共通ツール、補正、テスト | 任意地域でグラフを生成するとき |
 | [市ヶ谷周辺の歩行道路グラフ生成・品質確認](ichigaya-pedestrian-road-network.md) | 市ヶ谷での初回生成記録、品質値、代表経路 | 市ヶ谷の基準値を確認するとき |
 | [4地域の歩行道路ネットワーク](four-region-pedestrian-road-networks.md) | 京都・舞鶴・藤沢・さいたまの取得、生成、品質、代表経路、再生成手順 | #36の4地域データを再生成・検証するとき |
+| [歩道を意識する歩行者ネットワーク仕様（v2）](sidewalk-pedestrian-network-specification.md) | 歩道・横断・立体交差を扱うv2の入力、データ契約、品質・移行方針 | #71〜#73の歩道対応を実装・検証するとき |
 | [ノードID付きOSMによるUnity再解析手順](reanalyze-unity-with-node-id-osm.md) | OSMスナップショットを更新した後にUnity解析以降を整合して再実行する手順 | OSMを再取得・差し替えしたとき |
 
 品質レポートのローカル出力先は`data/raw/<areaId>-pedestrian-road-network-quality.json`です。Gitへ残す要約・決定性・代表経路の検証結果は`data/<areaId>-pedestrian-road-network-verification.json`です。
