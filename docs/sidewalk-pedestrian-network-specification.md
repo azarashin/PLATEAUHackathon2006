@@ -50,7 +50,7 @@ v2 は歩道の線形・接続・品質根拠を追加するが、既存の Unit
 }
 ```
 
-必須項目は `id`、接続 node ID、EPSG:4326 の `[longitude, latitude]` geometry、`lengthMeters`、`walkability`、`facility`、`level`、`source`、`fallback` とする。`source.kind` は `citygml` / `osm-way` / `osm-node` / `override` / `v1-centerline`、`confidence` は `explicit` / `derived` / `fallback` を取る。v2 edge ID はソース ID・side・区間番号から決定的に生成し、入力 snapshot と override の SHA-256 を manifest に残す。
+v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分離する。`physicalEdges` は `id`、接続 node ID、EPSG:4326 の `[longitude, latitude]` geometry、`lengthMeters`、`walkingSeconds`、`walkability`、`facility`、`level`、`source`、`fallback` を持つ。`edges` は `physicalEdgeId` と `walkingSeconds` を必須とし、同じ physical edge の forward / backward に geometry を重複保持しない。これによりUnityの日陰解析は physical edge ごとに一度だけ geometry を処理でき、経路探索は有向 edge を利用できる。`source.kind` は `citygml` / `osm-way` / `osm-node` / `override` / `v1-centerline`、`confidence` は `explicit` / `derived` / `fallback` を取る。v2 edge ID はソース ID・side・区間番号から決定的に生成し、入力 snapshot と override の SHA-256 を manifest に残す。
 
 ## 4. CRS とオフセット規則
 
@@ -89,7 +89,7 @@ v2 は歩道の線形・接続・品質根拠を追加するが、既存の Unit
 
 数値基準は、主要歩行者ネットワークの edge 長に対する `explicit + derived` の比率 80%以上、`fallback` 比率 20%以下、代表経路 3本の到着可能率 100%、異なる level 間の誤接続 0件とする。対象範囲に該当データがないこと自体は欠陥ではないが、`fallback` 又は `blocked` として明示する。
 
-品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、edge 数・延長、facility・side・source・confidence 別集計、歩行禁止除外数、横断数、立体交差の接続拒否数、fallback 延長・比率、未接続 component 数、代表経路の結果、目視確認者・日時・既知の制約を記録する。
+品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence 別集計、歩行禁止除外数、横断数、立体交差の接続拒否数、fallback 延長・比率、`explicit + derived` 延長・比率、未接続 component 数、代表経路の結果または未設定・入力不足による blocked 理由、目視確認者・日時・既知の制約を記録する。生成器は `explicit + derived >= 80%` かつ `fallback <= 20%` を機械検証し、満たさないv2グラフを正常成果物として扱わない。
 
 ## 8. v1 からの移行とロールバック
 

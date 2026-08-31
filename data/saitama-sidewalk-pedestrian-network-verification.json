@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
+  "verifiedAt": "2026-08-31T00:20:07.987Z",
+  "areaId": "saitama",
+  "captureManifest": {
+    "schemaVersion": "osm-snapshot-manifest-0.1",
+    "captureContractVersion": null,
+    "sha256": "0c4ea72d1754e41c668edcdc85f9d57ea6b7814c35fd58684ba9361fe105a915"
+  },
+  "status": "blocked",
+  "reason": "capture-contract-0.2-missing",
+  "recommendedVersion": "v1",
+  "validation": {
+    "graphBuilt": false,
+    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
+  "verifiedAt": "2026-08-31T00:20:07.624Z",
+  "areaId": "kyoto",
+  "captureManifest": {
+    "schemaVersion": "osm-snapshot-manifest-0.1",
+    "captureContractVersion": null,
+    "sha256": "18494207b9c89e00cdb86a399c241b7b7385642844742ec7ae7cbc30a902ffc4"
+  },
+  "status": "blocked",
+  "reason": "capture-contract-0.2-missing",
+  "recommendedVersion": "v1",
+  "validation": {
+    "graphBuilt": false,
+    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  }
+}

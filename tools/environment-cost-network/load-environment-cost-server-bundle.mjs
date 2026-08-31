@@ -12,7 +12,14 @@ function sha256(value) {
 }
 
 function validateManifest(manifest) {
-  invariant(manifest?.schemaVersion === 'environment-cost-server-bundle-1.0', 'server bundle manifest schemaVersion is invalid')
+  invariant(manifest && typeof manifest === 'object', 'server bundle manifest is invalid')
+  // v2 carries sidewalk physical geometry and quality metadata.  The current route engine
+  // deliberately does not silently reinterpret it as v1: a deployment must use the v2
+  // loader/engine together, otherwise route geometry and cost provenance could diverge.
+  if (manifest.schemaVersion === 'environment-cost-server-bundle-2.0') {
+    throw new Error('server bundle v2 was identified but is not supported by this route-server deployment; deploy the v2 route engine explicitly')
+  }
+  invariant(manifest.schemaVersion === 'environment-cost-server-bundle-1.0', `server bundle manifest schemaVersion is invalid: ${manifest.schemaVersion ?? '<missing>'}`)
   invariant(manifest.status === 'completed', 'server bundle manifest is not completed')
   invariant(typeof manifest.bundleFingerprintSha256 === 'string' && /^[0-9a-f]{64}$/.test(manifest.bundleFingerprintSha256), 'server bundle fingerprint is invalid')
   invariant(Array.isArray(manifest.scenario?.availableTimestamps) && manifest.scenario.availableTimestamps.length > 0, 'server bundle timestamps are missing')

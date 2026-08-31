@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const steps = [
+  ['Sidewalk graph v2', process.execPath, ['tools/road-network/test-build-sidewalk-pedestrian-graph.mjs']],
+  ['OSM snapshot capture v2', process.execPath, ['tools/road-network/test-capture-osm-snapshot-v2.mjs']],
   ['道路グラフ', process.execPath, ['tools/road-network/test-build-pedestrian-graph.mjs']],
   ['OSMスナップショット取得', process.execPath, ['tools/road-network/test-capture-osm-snapshot.mjs']],
   ['時間別環境コスト', process.execPath, ['tools/hourly-environment-cost/test-validate-hourly-output.mjs']],
