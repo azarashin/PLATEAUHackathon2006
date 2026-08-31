@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
+  "verifiedAt": "2026-08-31T00:20:07.739Z",
+  "areaId": "maizuru",
+  "captureManifest": {
+    "schemaVersion": "osm-snapshot-manifest-0.1",
+    "captureContractVersion": null,
+    "sha256": "dad86c1381d5880176b0d0b498308c10600b38f2e6d5373cbdf90d118ca63187"
+  },
+  "status": "blocked",
+  "reason": "capture-contract-0.2-missing",
+  "recommendedVersion": "v1",
+  "validation": {
+    "graphBuilt": false,
+    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  }
+}

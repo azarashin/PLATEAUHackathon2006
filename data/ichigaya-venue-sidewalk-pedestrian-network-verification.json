@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
+  "verifiedAt": "2026-08-31T00:20:48.655Z",
+  "areaId": "ichigaya-venue",
+  "captureManifest": {
+    "schemaVersion": "osm-snapshot-manifest-0.1",
+    "captureContractVersion": null,
+    "sha256": "424fac87b6ed446f75613ed7298cd3f12574e3298f5446b94f2a37ae2bb95fbd"
+  },
+  "status": "blocked",
+  "reason": "capture-contract-0.2-missing",
+  "recommendedVersion": "v1",
+  "validation": {
+    "graphBuilt": false,
+    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  }
+}
