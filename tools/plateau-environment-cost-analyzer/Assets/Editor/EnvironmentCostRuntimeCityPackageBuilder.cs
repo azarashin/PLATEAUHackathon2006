@@ -274,7 +274,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             Source("baseline-environment-cost", config.baselineEnvironmentCostPath, baselinePath)
         };
         if (!string.IsNullOrWhiteSpace(config.sidewalkNetworkPath))
-            sources.Add(Source("sidewalk-network-v2", config.sidewalkNetworkPath, config.ResolvePath(config.sidewalkNetworkPath))));
+            sources.Add(Source("sidewalk-network-v2", config.sidewalkNetworkPath, config.ResolvePath(config.sidewalkNetworkPath)));
         return sources.ToArray();
     }
 }
