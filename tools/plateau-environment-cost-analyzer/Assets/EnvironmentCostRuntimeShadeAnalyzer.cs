@@ -147,9 +147,10 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisInput
         {
             if (string.IsNullOrWhiteSpace(graphFingerprintSha256) || graphFingerprintSha256.Length != 64 || quality == null)
                 throw new InvalidOperationException("Runtime shade input v0.3 is missing sidewalk graph provenance.");
-            if ((quality.status != "accepted" && quality.status != "unverified") || quality.explicitOrDerivedRatio < 0.0 || quality.explicitOrDerivedRatio > 1.0 ||
+            if (quality.status != "accepted" || quality.explicitOrDerivedRatio < 0.0 || quality.explicitOrDerivedRatio > 1.0 ||
                 quality.fallbackRatio < 0.0 || quality.fallbackRatio > 1.0 || Math.Abs(quality.explicitOrDerivedRatio + quality.fallbackRatio - 1.0) > 0.000001 ||
-                !string.Equals(quality.sourceSchemaVersion, "environment-cost-pedestrian-network-2.0", StringComparison.Ordinal))
+                !string.Equals(quality.qualityContractVersion, "pedestrian-network-safety-1.0", StringComparison.Ordinal) ||
+                !string.Equals(quality.sourceSchemaVersion, "0.2", StringComparison.Ordinal) || quality.validationFailures == null || quality.validationFailures.Length != 0 || quality.validationWarnings == null)
                 throw new InvalidOperationException("Runtime shade input v0.3 has invalid sidewalk graph quality.");
             var physicalIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var edge in edges)
@@ -198,10 +199,13 @@ public sealed class EnvironmentCostRuntimeShadeInputEdge
 [Serializable]
 public sealed class EnvironmentCostRuntimeShadeInputQuality
 {
+    public string qualityContractVersion;
     public string status;
     public double explicitOrDerivedRatio;
     public double fallbackRatio;
     public string sourceSchemaVersion;
+    public string[] validationFailures;
+    public string[] validationWarnings;
 }
 
 [Serializable]

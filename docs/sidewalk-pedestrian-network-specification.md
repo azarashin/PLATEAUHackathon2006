@@ -87,9 +87,11 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 | 藤沢 | 藤沢駅 | EPSG:6677 | way 中心線、node タグ 0 | 同上。駅前立体・地下接続を確認 | 要再取得 |
 | さいたま | 大宮区・天沼町2丁目 | EPSG:6677 | way 中心線、node タグ 0 | 同上。幹線道路横断を確認 | 要再取得 |
 
-数値基準は、主要歩行者ネットワークの edge 長に対する `explicit + derived` の比率 80%以上、`fallback` 比率 20%以下、代表経路 3本の到着可能率 100%、異なる level 間の誤接続 0件とする。対象範囲に該当データがないこと自体は欠陥ではないが、`fallback` 又は `blocked` として明示する。
+品質契約 `pedestrian-network-safety-1.0` は、明示歩道率のしきい値ではなく歩行安全性を判定する。高速道路・自動車専用道路、`foot=no`、徒歩許可のない `access=no/private`、`construction` / `proposed` / `raceway` を除外する。`trunk` は一律除外せず、明示的な歩行禁止だけを除外条件とする。物理辺と双方向edgeの対応、異なる level 間の誤接続がないこと、代表ODが設定されている場合の到達可能性を検証する。生活道路の共有空間を表す中心線は許容し、`fallback=true` と根拠分類で明示する。
 
-品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence 別集計、歩行禁止除外数、横断数、立体交差の接続拒否数、fallback 延長・比率、`explicit + derived` 延長・比率、未接続 component 数、代表経路の結果または未設定・入力不足による blocked 理由、目視確認者・日時・既知の制約を記録する。生成器は `explicit + derived >= 80%` かつ `fallback <= 20%` を機械検証し、満たさないv2グラフを正常成果物として扱わない。
+`accepted` は必須の安全検証に通過した状態、`rejected` は既知危険・誤接続・構造破損・設定済み代表ODの不達、`unverified` は必須監査情報の不足を表す。代表OD未設定は警告であり、それだけで `unverified` にはしない。`explicit + derived` 比率と `fallback` 比率は地域別のデータ充足度を読む参考metricsとして記録するが、80/20の合否ゲートには使用しない。
+
+品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence・根拠分類別集計、歩行不能理由別の除外数、横断数、level分離により拒否した接続数、fallback 延長・比率、`explicit + derived` 延長・比率、代表経路の結果または未設定警告、必須監査情報、既知の制約を記録する。生成器は安全契約に反する成果物を `rejected` とし、必須監査情報が足りない場合は `unverified` とする。
 
 ## 8. v1 からの移行とロールバック
 

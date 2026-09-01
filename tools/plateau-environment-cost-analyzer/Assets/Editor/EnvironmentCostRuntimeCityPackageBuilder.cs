@@ -161,10 +161,14 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             var qualityStatus = (string)graphQuality["status"];
             var fallbackRatio = (double?)graphQuality["fallbackRatio"];
             var supportedRatio = (double?)graphQuality["explicitOrDerivedRatio"];
+            var validationFailures = graphQuality["validationFailures"] as JArray;
+            var validationWarnings = graphQuality["validationWarnings"] as JArray;
             if (!string.Equals(qualityStatus, "accepted", StringComparison.Ordinal) || !fallbackRatio.HasValue || !supportedRatio.HasValue ||
                 fallbackRatio.Value < 0.0 || fallbackRatio.Value > 1.0 || supportedRatio.Value < 0.0 || supportedRatio.Value > 1.0 ||
-                Math.Abs(fallbackRatio.Value + supportedRatio.Value - 1.0) > 0.000001 || supportedRatio.Value < 0.8 || fallbackRatio.Value > 0.2 ||
-                !string.Equals((string)graphQuality["sourceSchemaVersion"], (string)graph["schemaVersion"], StringComparison.Ordinal))
+                Math.Abs(fallbackRatio.Value + supportedRatio.Value - 1.0) > 0.000001 ||
+                !string.Equals((string)graphQuality["qualityContractVersion"], "pedestrian-network-safety-1.0", StringComparison.Ordinal) ||
+                !string.Equals((string)graphQuality["sourceSchemaVersion"], "0.2", StringComparison.Ordinal) ||
+                validationFailures == null || validationFailures.Count != 0 || validationWarnings == null)
                 throw new InvalidOperationException("Sidewalk network quality is not accepted for Runtime package generation.");
             var physicalEdges = graph["physicalEdges"] as JArray ?? throw new InvalidOperationException("Sidewalk network has no physicalEdges.");
             foreach (var physical in physicalEdges.OfType<JObject>())
@@ -178,7 +182,9 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
                     lengthMeters = (double?)physical["lengthMeters"] ?? throw new InvalidOperationException("Physical sidewalk edge has no length."),
                     walkingSeconds = (double?)physical["walkingSeconds"] ?? throw new InvalidOperationException("Physical sidewalk edge has no walking time.") });
             }
-            quality = new EnvironmentCostRuntimeShadeInputQuality { status = qualityStatus, explicitOrDerivedRatio = supportedRatio.Value, fallbackRatio = fallbackRatio.Value, sourceSchemaVersion = (string)graphQuality["sourceSchemaVersion"] };
+            quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = (string)graphQuality["qualityContractVersion"], status = qualityStatus,
+                explicitOrDerivedRatio = supportedRatio.Value, fallbackRatio = fallbackRatio.Value, sourceSchemaVersion = (string)graphQuality["sourceSchemaVersion"],
+                validationFailures = validationFailures.Select(token => (string)token).ToArray(), validationWarnings = validationWarnings.Select(token => (string)token).ToArray() };
             CopyToPackage(path, targetRoot, "sidewalk-network.json", "sidewalk-network-v2", files);
         }
         else foreach (var sourceEdge in sourceEdges.OfType<JObject>())

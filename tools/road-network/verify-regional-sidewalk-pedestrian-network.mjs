@@ -14,7 +14,7 @@ async function main() {
   }
   if (!o.osm) throw new Error('--osm is required for capture contract 0.2')
   const graph = buildGraph(config, JSON.parse(await readFile(resolve(o.osm), 'utf8'))), quality = qualityReport(graph, { areaId: config.areaId, captureContractVersion: '0.2' }, config.representativeOds)
-  const report = { ...base, status: quality.validation.isValid ? 'verified' : 'failed', graphFingerprintSha256: graphFingerprint(graph), quality }
-  await mkdir(dirname(resolve(o.report)), { recursive: true }); await writeFile(resolve(o.report), `${JSON.stringify(report, null, 2)}\n`); if (!quality.validation.isValid) throw new Error(quality.validation.failures.join(', ')); console.log(`SIDEWALK_REGIONAL_VERIFIED area=${config.areaId}`)
+  const report = { ...base, status: quality.validation.status, graphFingerprintSha256: graphFingerprint(graph), quality }
+  await mkdir(dirname(resolve(o.report)), { recursive: true }); await writeFile(resolve(o.report), `${JSON.stringify(report, null, 2)}\n`); if (quality.validation.status === 'rejected') throw new Error(quality.validation.rejectedReasons.join(', ')); console.log(`SIDEWALK_REGIONAL_VERIFIED area=${config.areaId} status=${quality.validation.status}`)
 }
 main().catch((e) => { console.error(e.message); process.exitCode = 1 })

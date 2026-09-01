@@ -59,7 +59,7 @@ const v2Graph = {
 const runtimeEdge = (id, walkingSeconds, shadeRatio) => ({ id, hourly: inputs.environment.settings.hours.map((hour, index) => ({ hour, timestamp: inputs.environment.edges[0].hourly[index].timestamp, status: 'available', exclusionReason: null, shadeRatio, solarExposureSeconds: walkingSeconds * (1 - shadeRatio), sampleCount: 2, validSampleCount: 2, noGroundSampleCount: 0 })) })
 const v2Environment = {
   schemaVersion: 'environment-cost-runtime-shade-result-0.1', status: 'completed', areaId: inputs.graph.areaId, generatedAtUtc: inputs.graph.generatedAt,
-  provenance: { center: inputs.graph.extent.center, radiusMeters: inputs.graph.extent.radiusMeters, analysisDate: '2025-08-01', timezone: 'Asia/Tokyo', hours: inputs.environment.settings.hours, graphFingerprintSha256: v2Graph.graphFingerprintSha256, networkQuality: { status: 'accepted', explicitOrDerivedRatio: 1, fallbackRatio: 0, sourceSchemaVersion: 'environment-cost-pedestrian-network-2.0' }, scenarioId: 'policy', policyFingerprintSha256: '6'.repeat(64), resultFingerprintSha256: '5'.repeat(64) },
+  provenance: { center: inputs.graph.extent.center, radiusMeters: inputs.graph.extent.radiusMeters, analysisDate: '2025-08-01', timezone: 'Asia/Tokyo', hours: inputs.environment.settings.hours, graphFingerprintSha256: v2Graph.graphFingerprintSha256, networkQuality: { qualityContractVersion: 'pedestrian-network-safety-1.0', status: 'accepted', explicitOrDerivedRatio: 1, fallbackRatio: 0, sourceSchemaVersion: '0.2', validationFailures: [], validationWarnings: [] }, scenarioId: 'policy', policyFingerprintSha256: '6'.repeat(64), resultFingerprintSha256: '5'.repeat(64) },
   edges: [runtimeEdge('ped:one', 100, .25), runtimeEdge('ped:two', 50, .5)],
 }
 const v2Bundle = buildServerBundleDocuments(v2Graph, v2Environment, { provenance: 'fixture' })
@@ -72,6 +72,10 @@ const duplicateV2Environment = { ...v2Environment, edges: [v2Environment.edges[0
 assert.throws(() => buildServerBundleDocuments(v2Graph, duplicateV2Environment), /IDs do not exactly match|duplicated/, 'v2 must reject duplicate result IDs that hide a missing physical edge')
 const unverifiedV2Environment = { ...v2Environment, provenance: { ...v2Environment.provenance, networkQuality: { ...v2Environment.provenance.networkQuality, status: 'unverified', fallbackRatio: -1 } } }
 assert.throws(() => buildServerBundleDocuments(v2Graph, unverifiedV2Environment), /network quality is not accepted/, 'v2 must reject an unverified sidewalk network instead of emitting a route bundle')
+const legacyV2Environment = { ...v2Environment, provenance: { ...v2Environment.provenance, networkQuality: { ...v2Environment.provenance.networkQuality, qualityContractVersion: undefined } } }
+assert.throws(() => buildServerBundleDocuments(v2Graph, legacyV2Environment), /legacy-unverified/, 'v2 must reject the retired 80\/20 quality contract')
+const safeLowExplicitV2Environment = { ...v2Environment, provenance: { ...v2Environment.provenance, networkQuality: { ...v2Environment.provenance.networkQuality, explicitOrDerivedRatio: .15, fallbackRatio: .85 } } }
+assert.equal(buildServerBundleDocuments(v2Graph, safeLowExplicitV2Environment).topology.networkQuality.status, 'accepted', 'shared-road ratio must be diagnostic, not a safety rejection')
 const arbitraryDirectedIds = { ...v2Graph, edges: v2Graph.edges.map((edge, index) => ({ ...edge, id: `edge-${index}` })) }
 assert.equal(buildServerBundleDocuments(arbitraryDirectedIds, v2Environment, { provenance: 'fixture' }).topology.directedEdges[1][3], 1, 'v2 direction must derive from endpoints, not an ID suffix')
 const mismatchedDirectedEndpoints = { ...v2Graph, edges: [{ ...v2Graph.edges[0], toNodeId: 'ped:3' }, ...v2Graph.edges.slice(1)] }

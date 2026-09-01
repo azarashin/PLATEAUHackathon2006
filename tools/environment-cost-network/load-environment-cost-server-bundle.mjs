@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { CODE_TO_STATUS, validateCostSlice, validateTopology } from './build-environment-cost-server-bundle.mjs'
 
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
+
 function invariant(condition, message) {
   if (!condition) throw new Error(message)
 }
@@ -23,7 +25,10 @@ function validateManifest(manifest) {
   invariant(manifest.counts?.hourCount === manifest.scenario.availableTimestamps.length, 'server bundle hour count mismatch')
   if (isV2) {
     invariant(manifest.networkQuality && typeof manifest.networkQuality === 'object', 'v2 server bundle network quality is missing')
-    invariant(typeof manifest.networkQuality.sourceSchemaVersion === 'string' && manifest.networkQuality.sourceSchemaVersion === 'environment-cost-pedestrian-network-2.0', 'v2 server bundle network quality source is invalid')
+    invariant(manifest.networkQuality.qualityContractVersion === PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION, 'v2 server bundle network quality contract is missing or legacy-unverified')
+    invariant(manifest.networkQuality.status === 'accepted', 'v2 server bundle network quality is not accepted')
+    invariant(typeof manifest.networkQuality.sourceSchemaVersion === 'string' && manifest.networkQuality.sourceSchemaVersion === '0.2', 'v2 server bundle network quality source contract is invalid')
+    invariant(Array.isArray(manifest.networkQuality.validationFailures) && manifest.networkQuality.validationFailures.length === 0, 'v2 server bundle network quality has safety validation failures')
   }
   invariant(Array.isArray(manifest.costSlices) && manifest.costSlices.length === manifest.counts.hourCount, 'server bundle cost references mismatch')
   invariant(

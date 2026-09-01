@@ -15,6 +15,7 @@ import {
 const STATUS_TO_CODE = Object.freeze({ missing: 0, partial: 1, available: 2 })
 const CODE_TO_STATUS = Object.freeze(['missing', 'partial', 'available'])
 const FORMULA_TOLERANCE_SECONDS = 1e-6
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
 
 function usage() {
   return `Usage: node --max-old-space-size=8192 tools/environment-cost-network/build-environment-cost-server-bundle.mjs \\
@@ -411,14 +412,21 @@ function coordinatesMatch(left, right) {
 function v2Quality(graph, provenance) {
   const quality = provenance.networkQuality
   invariant(quality && typeof quality === 'object', 'v2 environment network quality is missing')
-  invariant(typeof quality.sourceSchemaVersion === 'string' && quality.sourceSchemaVersion === graph.schemaVersion, 'v2 network quality source schema does not match graph')
+  invariant(quality.qualityContractVersion === PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION, 'v2 environment network quality contract is missing or legacy-unverified')
+  invariant(typeof quality.sourceSchemaVersion === 'string' && quality.sourceSchemaVersion === '0.2', 'v2 network quality source contract is invalid')
   invariant(quality.status === 'accepted', 'v2 network quality is not accepted')
-  invariant(Number.isFinite(quality.explicitOrDerivedRatio) && quality.explicitOrDerivedRatio >= .8 && quality.explicitOrDerivedRatio <= 1 && Number.isFinite(quality.fallbackRatio) && quality.fallbackRatio >= 0 && quality.fallbackRatio <= .2, 'v2 network quality ratios do not meet sidewalk thresholds')
+  // Shared Japanese streets may legitimately use representative centerlines. Keep
+  // these ratios as diagnostics, not as a false safety gate.
+  invariant(Number.isFinite(quality.explicitOrDerivedRatio) && quality.explicitOrDerivedRatio >= 0 && quality.explicitOrDerivedRatio <= 1 && Number.isFinite(quality.fallbackRatio) && quality.fallbackRatio >= 0 && quality.fallbackRatio <= 1 && Math.abs(quality.explicitOrDerivedRatio + quality.fallbackRatio - 1) <= 1e-6, 'v2 network quality ratios are invalid')
+  invariant(Array.isArray(quality.validationFailures) && quality.validationFailures.length === 0 && Array.isArray(quality.validationWarnings), 'v2 network quality safety audit is incomplete or has validation failures')
   return {
+    qualityContractVersion: quality.qualityContractVersion,
     status: typeof quality.status === 'string' ? quality.status : 'unverified',
     explicitOrDerivedRatio: quality.explicitOrDerivedRatio,
     fallbackRatio: quality.fallbackRatio,
     sourceSchemaVersion: quality.sourceSchemaVersion,
+    validationFailures: [...quality.validationFailures],
+    validationWarnings: [...quality.validationWarnings],
   }
 }
 

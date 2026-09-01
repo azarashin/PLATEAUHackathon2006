@@ -114,7 +114,7 @@ public static class HourlyEnvironmentCostSelfTests
             {
                 schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
-                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" },
+                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.0", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
                 edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-1", physicalEdgeId = "physical-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f } }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
             };
             physicalRuntimeInput.Validate();
@@ -258,7 +258,7 @@ public static class HourlyEnvironmentCostSelfTests
             {
                 schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
-                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" },
+                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.0", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
                 edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-polyline", physicalEdgeId = "physical-polyline", from = new[] { 0f, 0f }, to = new[] { 10f, 10f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f }, new[] { 10f, 10f } }, lengthMeters = 20.0, walkingSeconds = 20.0 } }
             };
             road.transform.localScale = new Vector3(30f, 1f, 30f);
