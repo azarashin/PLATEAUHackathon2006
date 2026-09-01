@@ -11,17 +11,16 @@ import {
 } from '../../tools/environment-cost-network/load-environment-cost-server-bundle.mjs'
 
 const schemaUrls = {
-  manifest: new URL('../../schemas/environment-cost-server-bundle-v1.schema.json', import.meta.url),
-  topology: new URL('../../schemas/environment-cost-server-topology-v1.schema.json', import.meta.url),
-  cost: new URL('../../schemas/environment-cost-server-cost-slice-v1.schema.json', import.meta.url),
+  v1: {
+    manifest: new URL('../../schemas/environment-cost-server-bundle-v1.schema.json', import.meta.url), topology: new URL('../../schemas/environment-cost-server-topology-v1.schema.json', import.meta.url), cost: new URL('../../schemas/environment-cost-server-cost-slice-v1.schema.json', import.meta.url),
+  },
+  v2: {
+    manifest: new URL('../../schemas/environment-cost-server-bundle-v2.schema.json', import.meta.url), topology: new URL('../../schemas/environment-cost-server-topology-v2.schema.json', import.meta.url), cost: new URL('../../schemas/environment-cost-server-cost-slice-v2.schema.json', import.meta.url),
+  },
 }
-const schemas = Object.fromEntries(await Promise.all(Object.entries(schemaUrls).map(async ([name, url]) => [
-  name,
-  JSON.parse(await readFile(fileURLToPath(url), 'utf8')),
-])))
 const ajv = new Ajv2020({ allErrors: true, strict: true })
 addFormats(ajv)
-const validators = Object.fromEntries(Object.entries(schemas).map(([name, schema]) => [name, ajv.compile(schema)]))
+const validators = Object.fromEntries(await Promise.all(Object.entries(schemaUrls).map(async ([version, urls]) => [version, Object.fromEntries(await Promise.all(Object.entries(urls).map(async ([name, url]) => [name, ajv.compile(JSON.parse(await readFile(fileURLToPath(url), 'utf8')))])))])))
 
 function schemaErrors(validate, document, label) {
   if (validate(document)) return []
@@ -32,13 +31,15 @@ async function validateBundle(path) {
   const absoluteManifestPath = resolve(path)
   const directory = dirname(absoluteManifestPath)
   const manifest = JSON.parse(await readFile(absoluteManifestPath, 'utf8'))
-  const errors = schemaErrors(validators.manifest, manifest, 'manifest')
+  const version = manifest.schemaVersion === 'environment-cost-server-bundle-2.0' ? 'v2' : 'v1'
+  const selected = validators[version]
+  const errors = schemaErrors(selected.manifest, manifest, 'manifest')
   if (errors.length > 0) throw new Error(errors.slice(0, 50).join('; '))
   const topology = JSON.parse(await readFile(safeReferencedPath(directory, manifest.topology.file), 'utf8'))
-  errors.push(...schemaErrors(validators.topology, topology, 'topology'))
+  errors.push(...schemaErrors(selected.topology, topology, 'topology'))
   for (const reference of manifest.costSlices) {
     const cost = JSON.parse(await readFile(safeReferencedPath(directory, reference.file), 'utf8'))
-    errors.push(...schemaErrors(validators.cost, cost, reference.file))
+    errors.push(...schemaErrors(selected.cost, cost, reference.file))
   }
   if (errors.length > 0) throw new Error(errors.slice(0, 50).join('; '))
   const runtime = await loadEnvironmentCostServerBundle(absoluteManifestPath)

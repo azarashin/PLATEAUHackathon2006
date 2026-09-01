@@ -78,10 +78,10 @@ export class RoadEdgeIndex {
       const physicalIndex = runtime.directedPhysicalIndexes[directedEdgeIndex]
       if (this.edges[physicalIndex] !== undefined) continue
       const geometry = runtime.directedEdgeGeometry(directedEdgeIndex)
-      const minimumLongitude = Math.min(geometry[0][0], geometry[1][0])
-      const minimumLatitude = Math.min(geometry[0][1], geometry[1][1])
-      const maximumLongitude = Math.max(geometry[0][0], geometry[1][0])
-      const maximumLatitude = Math.max(geometry[0][1], geometry[1][1])
+      const minimumLongitude = Math.min(...geometry.map((point) => point[0]))
+      const minimumLatitude = Math.min(...geometry.map((point) => point[1]))
+      const maximumLongitude = Math.max(...geometry.map((point) => point[0]))
+      const maximumLatitude = Math.max(...geometry.map((point) => point[1]))
       this.edges[physicalIndex] = {
         id: runtime.physicalEdgeIds[physicalIndex],
         directedEdgeIndex,

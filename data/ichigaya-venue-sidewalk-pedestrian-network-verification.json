@@ -1,17 +1,61 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-08-31T00:20:48.655Z",
+  "verifiedAt": "2026-09-01T03:50:29.621Z",
   "areaId": "ichigaya-venue",
   "captureManifest": {
-    "schemaVersion": "osm-snapshot-manifest-0.1",
-    "captureContractVersion": null,
-    "sha256": "424fac87b6ed446f75613ed7298cd3f12574e3298f5446b94f2a37ae2bb95fbd"
+    "schemaVersion": "osm-snapshot-manifest-0.2",
+    "captureContractVersion": "0.2",
+    "sha256": "29f4ca22b53247295b8be3fabbdb0a7444fc87f424faeadb38658b73cf94bdf5"
   },
-  "status": "blocked",
-  "reason": "capture-contract-0.2-missing",
-  "recommendedVersion": "v1",
-  "validation": {
-    "graphBuilt": false,
-    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  "status": "failed",
+  "graphFingerprintSha256": "fd3c3d66de8b08b80fc5857581a498cb7b0f61da61d0fae3a978c2ddbb641e60",
+  "quality": {
+    "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
+    "generatedAt": "2026-09-01T03:50:32.592Z",
+    "graphFingerprintSha256": "fd3c3d66de8b08b80fc5857581a498cb7b0f61da61d0fae3a978c2ddbb641e60",
+    "input": {
+      "areaId": "ichigaya-venue",
+      "captureContractVersion": "0.2"
+    },
+    "counts": {
+      "nodeCount": 162427,
+      "physicalEdgeCount": 171945,
+      "directedEdgeCount": 343890,
+      "fallbackPhysicalEdgeCount": 68887,
+      "fallbackDirectedEdgeCount": 137774,
+      "sourceWayCount": 48964,
+      "excludedWayCount": 2887,
+      "explicitWayCount": 29288,
+      "derivedSidewalkWayCount": 560,
+      "separateSidewalkSkippedCount": 103,
+      "fallbackWayCount": 16126,
+      "crossingConnectionCount": 7417,
+      "malformedWayCount": 0
+    },
+    "lengthMeters": {
+      "total": 3009085.1138485307,
+      "explicit": 1363999.1123786408,
+      "derived": 150255.42664948702,
+      "explicitOrDerived": 1514254.539028128,
+      "fallback": 1494830.574820394,
+      "explicitOrDerivedRatio": 0.503227553138715,
+      "fallbackRatio": 0.496772446861282
+    },
+    "thresholds": {
+      "explicitOrDerivedMinimumRatio": 0.8,
+      "fallbackMaximumRatio": 0.2
+    },
+    "representativeOds": {
+      "status": "blocked",
+      "reason": "representative-od-not-configured",
+      "routes": []
+    },
+    "validation": {
+      "isValid": false,
+      "failures": [
+        "explicit-derived-length-ratio-below-80-percent",
+        "fallback-length-ratio-above-20-percent"
+      ]
+    }
   }
 }

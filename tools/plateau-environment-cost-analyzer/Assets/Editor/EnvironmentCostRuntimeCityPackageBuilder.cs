@@ -157,22 +157,28 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             graphFingerprint = (string)graph["graphFingerprintSha256"];
             if (string.IsNullOrWhiteSpace(graphFingerprint) || graphFingerprint.Length != 64)
                 throw new InvalidOperationException("Sidewalk network graph fingerprint is invalid.");
+            var graphQuality = graph["quality"] as JObject ?? throw new InvalidOperationException("Sidewalk network has no quality summary.");
+            var qualityStatus = (string)graphQuality["status"];
+            var fallbackRatio = (double?)graphQuality["fallbackRatio"];
+            var supportedRatio = (double?)graphQuality["explicitOrDerivedRatio"];
+            if (!string.Equals(qualityStatus, "accepted", StringComparison.Ordinal) || !fallbackRatio.HasValue || !supportedRatio.HasValue ||
+                fallbackRatio.Value < 0.0 || fallbackRatio.Value > 1.0 || supportedRatio.Value < 0.0 || supportedRatio.Value > 1.0 ||
+                Math.Abs(fallbackRatio.Value + supportedRatio.Value - 1.0) > 0.000001 || supportedRatio.Value < 0.8 || fallbackRatio.Value > 0.2 ||
+                !string.Equals((string)graphQuality["sourceSchemaVersion"], (string)graph["schemaVersion"], StringComparison.Ordinal))
+                throw new InvalidOperationException("Sidewalk network quality is not accepted for Runtime package generation.");
             var physicalEdges = graph["physicalEdges"] as JArray ?? throw new InvalidOperationException("Sidewalk network has no physicalEdges.");
             foreach (var physical in physicalEdges.OfType<JObject>())
             {
                 var geometry = physical["geometry"] as JArray;
                 if (geometry == null || geometry.Count < 2) throw new InvalidOperationException("Physical sidewalk edge has invalid geometry.");
-                // The v2 contract keeps full geometry on the physical edge.  Use only its
-                // endpoints here because the shade sampler owns subdivision deterministically.
                 var id = (string)physical["id"] ?? throw new InvalidOperationException("Physical sidewalk edge has no id.");
                 edges.Add(new EnvironmentCostRuntimeShadeInputEdge { id = id, physicalEdgeId = id,
                     from = ToLocalPoint(localReference, geometry[0] as JArray), to = ToLocalPoint(localReference, geometry[geometry.Count - 1] as JArray),
+                    geometry = geometry.Select(point => ToLocalPoint(localReference, point as JArray)).ToArray(),
                     lengthMeters = (double?)physical["lengthMeters"] ?? throw new InvalidOperationException("Physical sidewalk edge has no length."),
                     walkingSeconds = (double?)physical["walkingSeconds"] ?? throw new InvalidOperationException("Physical sidewalk edge has no walking time.") });
             }
-            var fallbackRatio = (double?)graph.SelectToken("quality.lengthMeters.fallbackRatio") ?? -1.0;
-            var supportedRatio = (double?)graph.SelectToken("quality.lengthMeters.explicitOrDerivedRatio") ?? -1.0;
-            quality = new EnvironmentCostRuntimeShadeInputQuality { status = fallbackRatio >= 0.0 && fallbackRatio <= 0.2 && supportedRatio >= 0.8 ? "accepted" : "unverified", explicitOrDerivedRatio = supportedRatio, fallbackRatio = fallbackRatio, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" };
+            quality = new EnvironmentCostRuntimeShadeInputQuality { status = qualityStatus, explicitOrDerivedRatio = supportedRatio.Value, fallbackRatio = fallbackRatio.Value, sourceSchemaVersion = (string)graphQuality["sourceSchemaVersion"] };
             CopyToPackage(path, targetRoot, "sidewalk-network.json", "sidewalk-network-v2", files);
         }
         else foreach (var sourceEdge in sourceEdges.OfType<JObject>())

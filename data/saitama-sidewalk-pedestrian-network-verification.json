@@ -1,17 +1,61 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-08-31T00:20:07.987Z",
+  "verifiedAt": "2026-09-01T03:50:27.832Z",
   "areaId": "saitama",
   "captureManifest": {
-    "schemaVersion": "osm-snapshot-manifest-0.1",
-    "captureContractVersion": null,
-    "sha256": "0c4ea72d1754e41c668edcdc85f9d57ea6b7814c35fd58684ba9361fe105a915"
+    "schemaVersion": "osm-snapshot-manifest-0.2",
+    "captureContractVersion": "0.2",
+    "sha256": "d9e3a543843cb0e620e4585ef20b9cb0c7e03720458050bbe5f6f2b0a8c9ab92"
   },
-  "status": "blocked",
-  "reason": "capture-contract-0.2-missing",
-  "recommendedVersion": "v1",
-  "validation": {
-    "graphBuilt": false,
-    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  "status": "failed",
+  "graphFingerprintSha256": "a976f4d763c1e0eb0e84d1d2ba49ccb8852e22f185fb5231313514c607b8af68",
+  "quality": {
+    "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
+    "generatedAt": "2026-09-01T03:50:28.808Z",
+    "graphFingerprintSha256": "a976f4d763c1e0eb0e84d1d2ba49ccb8852e22f185fb5231313514c607b8af68",
+    "input": {
+      "areaId": "saitama",
+      "captureContractVersion": "0.2"
+    },
+    "counts": {
+      "nodeCount": 66305,
+      "physicalEdgeCount": 73487,
+      "directedEdgeCount": 146974,
+      "fallbackPhysicalEdgeCount": 55123,
+      "fallbackDirectedEdgeCount": 110246,
+      "sourceWayCount": 17808,
+      "excludedWayCount": 227,
+      "explicitWayCount": 4373,
+      "derivedSidewalkWayCount": 36,
+      "separateSidewalkSkippedCount": 36,
+      "fallbackWayCount": 13136,
+      "crossingConnectionCount": 1153,
+      "malformedWayCount": 0
+    },
+    "lengthMeters": {
+      "total": 2003653.0857901576,
+      "explicit": 294771.15822369826,
+      "derived": 23338.70164884741,
+      "explicitOrDerived": 318109.8598725457,
+      "fallback": 1685543.225917618,
+      "explicitOrDerivedRatio": 0.15876493896501867,
+      "fallbackRatio": 0.8412350610349844
+    },
+    "thresholds": {
+      "explicitOrDerivedMinimumRatio": 0.8,
+      "fallbackMaximumRatio": 0.2
+    },
+    "representativeOds": {
+      "status": "blocked",
+      "reason": "representative-od-not-configured",
+      "routes": []
+    },
+    "validation": {
+      "isValid": false,
+      "failures": [
+        "explicit-derived-length-ratio-below-80-percent",
+        "fallback-length-ratio-above-20-percent"
+      ]
+    }
   }
 }

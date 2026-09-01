@@ -10,17 +10,27 @@
 
 ## 品質とblockedの扱い
 
-v2グラフに品質数値が同梱されない場合、Runtime入力の `quality.status` は必ず `unverified` です。これは解析失敗ではありませんが、歩道品質を確認済みとは扱いません。`sidewalk-pedestrian-network-quality-report-2.0` の `graphFingerprintSha256` と `explicitOrDerivedRatio` / `fallbackRatio` を照合してから、配布用Packageの品質を `accepted` と記録します。
+v2グラフは `quality` 要約として、`accepted` / `unverified`、`explicitOrDerivedRatio`、`fallbackRatio`、生成元schema、検証失敗理由を保持する。Runtime City Package とserver bundleは、`accepted` かつ明示・推定歩道が80%以上、中心線フォールバックが20%以下のグラフだけを受け入れる。品質未達のグラフを日陰解析・経路配布へ進めない。
 
-現時点の5地域はcapture contract 0.2を取得していないためv2再計算は **blocked** です。v0.2の既存結果をv2 verifiedとして再利用してはいけません。再現手順は次の通りです。
+2026-09-01に5地域のcapture contract 0.2を取得した。その結果、全地域でOSM単独の歩道根拠が品質基準に未達だった。したがって、v2の日陰再計算・bundle作成・Viewer配布は **blocked** のままとし、v1を継続利用する。
+
+| 地域 | 明示・推定歩道延長比 | 中心線フォールバック延長比 |
+| --- | ---: | ---: |
+| 市ヶ谷 | 50.3% | 49.7% |
+| 京都 | 35.2% | 64.8% |
+| 舞鶴 | 20.1% | 79.9% |
+| 藤沢 | 19.6% | 80.4% |
+| さいたま | 15.9% | 84.1% |
+
+地域別の機械可読な失敗理由と入力ハッシュは `data/<areaId>-sidewalk-pedestrian-network-verification.json` に記録する。v0.1の中心線結果をv2 verifiedとして再利用してはいけない。次の再現手順で、CityGML交通データまたは根拠付き地域補正を追加した後に再検証する。
 
 ```powershell
 node tools/road-network/capture-osm-snapshot-v2.mjs --config data/analysis-configs/<area>.json --output data/raw/osm/<area>/sidewalk-contract-0.2.json --query data/osm-queries/<area>-sidewalk-contract-0.2.overpassql --manifest data/osm-snapshot-manifests/<area>-sidewalk-contract-0.2.json
 node tools/road-network/build-sidewalk-pedestrian-graph.mjs --config data/analysis-configs/<area>.json --osm data/raw/osm/<area>/sidewalk-contract-0.2.json --output data/generated/<area>-sidewalk-pedestrian-network-v2.json --report data/raw/<area>-sidewalk-pedestrian-network-v2-quality.json
 ```
 
-この後に `sidewalkNetworkPath` を設定してRuntime City Packageを再生成し、Unityの全時刻解析を実行します。品質レポートが閾値未達または代表OD失敗なら、解析結果は出力しても `accepted` / `verified` と報告しません。
+この後に `sidewalkNetworkPath` を設定してRuntime City Packageを再生成し、Unityの全時刻解析を実行します。Runtime入力0.3は物理辺の全ポリライン頂点を保持し、折れ点を直線化せず全線分を重複なくサンプリングする。品質レポートが閾値未達または代表OD失敗なら、Package生成は失敗し、解析結果を `accepted` / `verified` と報告しない。
 
 ## サーバー境界
 
-route serverの現行loaderは server bundle v1だけを実行可能です。`environment-cost-server-bundle-2.0` を検出した場合は、v1として誤読せず「v2を識別したがv2 route engineの明示デプロイが必要」として安全に拒否します。v2 topology/cost/manifestの配備は #65 の後続作業で、v2専用のloader・経路エンジン・Viewerを同時に有効化して行います。
+route serverはserver bundle v1とv2をschemaVersionで分岐して読み込む。v2では文字列node ID、物理辺の完全geometry、歩道品質、グラフfingerprintを保持する。v1/v2間、または異なるグラフfingerprint間のA/B比較は拒否する。v2 bundleは品質ゲートを通過した結果だけを作成でき、配備・有効化の運用自動化は引き続き #65 の対象とする。

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.2",
+  "captureContractVersion": "0.2",
+  "areaId": "maizuru",
+  "localPath": "data/raw/osm/maizuru/sidewalk-contract-0.2.json",
+  "queryPath": "data/osm-queries/maizuru-sidewalk-contract-0.2.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "requestedAt": "2026-09-01T03:46:34.513Z",
+  "osmTimestamp": "2026-09-01T03:45:19Z",
+  "sizeBytes": 3018748,
+  "sha256": "df2ed074fd7c193d3f0d32c72fe040e052812935c01292b8ad1e88dbe420b434",
+  "elementCounts": {
+    "way": 2901,
+    "node": 13293,
+    "relation": 19
+  },
+  "requiredElementTypes": [
+    "way",
+    "node",
+    "relation"
+  ],
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ]
+}

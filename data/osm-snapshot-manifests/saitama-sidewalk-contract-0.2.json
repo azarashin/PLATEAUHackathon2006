@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.2",
+  "captureContractVersion": "0.2",
+  "areaId": "saitama",
+  "localPath": "data/raw/osm/saitama/sidewalk-contract-0.2.json",
+  "queryPath": "data/osm-queries/saitama-sidewalk-contract-0.2.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "requestedAt": "2026-09-01T03:47:57.688Z",
+  "osmTimestamp": "2026-09-01T03:46:21Z",
+  "sizeBytes": 18299342,
+  "sha256": "d9e3a543843cb0e620e4585ef20b9cb0c7e03720458050bbe5f6f2b0a8c9ab92",
+  "elementCounts": {
+    "way": 17808,
+    "node": 63980,
+    "relation": 285
+  },
+  "requiredElementTypes": [
+    "way",
+    "node",
+    "relation"
+  ],
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ]
+}

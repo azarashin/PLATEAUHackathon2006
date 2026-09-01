@@ -115,13 +115,19 @@ public static class HourlyEnvironmentCostSelfTests
                 schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
                 graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" },
-                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-1", physicalEdgeId = "physical-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
+                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-1", physicalEdgeId = "physical-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f } }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
             };
             physicalRuntimeInput.Validate();
             AssertEqual("accepted", EnvironmentCostRuntimeShadeAnalyzer.CreateResult(physicalRuntimeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } }).provenance.networkQuality.status);
             physicalRuntimeInput.edges[0].physicalEdgeId = "";
             AssertThrows<InvalidOperationException>(() => physicalRuntimeInput.Validate());
+            physicalRuntimeInput.edges[0].physicalEdgeId = "different-physical-edge";
+            AssertThrows<InvalidOperationException>(() => physicalRuntimeInput.Validate());
+            physicalRuntimeInput.edges[0].physicalEdgeId = physicalRuntimeInput.edges[0].id;
+            physicalRuntimeInput.edges[0].geometry = null;
+            AssertThrows<InvalidOperationException>(() => physicalRuntimeInput.Validate());
+            physicalRuntimeInput.edges[0].geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f } };
             var affectedEdges = EnvironmentCostRuntimePolicyImpact.FindAffectedEdgeIds(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } },
                 new[] { new EnvironmentCostRuntimePolicyFacility { id = "changed-tree", type = "tree", localPosition = new Vector3(5f, 0f, 0f) } });
@@ -248,6 +254,19 @@ public static class HourlyEnvironmentCostSelfTests
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             AssertEqual("available", result.edges[0].hourly[0].status);
             AssertNear(0.5, result.edges[0].hourly[0].shadeRatio);
+            var physicalInput = new EnvironmentCostRuntimeShadeAnalysisInput
+            {
+                schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
+                coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
+                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "environment-cost-pedestrian-network-2.0" },
+                edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-polyline", physicalEdgeId = "physical-polyline", from = new[] { 0f, 0f }, to = new[] { 10f, 10f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f }, new[] { 10f, 10f } }, lengthMeters = 20.0, walkingSeconds = 20.0 } }
+            };
+            road.transform.localScale = new Vector3(30f, 1f, 30f);
+            Physics.SyncTransforms();
+            var polylineResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(physicalInput,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
+            AssertEqual(3, polylineResult.edges[0].hourly[0].sampleCount);
+            AssertEqual(3, polylineResult.edges[0].hourly[0].validSampleCount);
         }
         finally
         {

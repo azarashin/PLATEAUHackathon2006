@@ -33,11 +33,12 @@
     "point": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } },
     "physicalEdge": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "physicalEdgeId", "from", "to", "lengthMeters", "walkingSeconds"],
+      "required": ["id", "physicalEdgeId", "from", "to", "geometry", "lengthMeters", "walkingSeconds"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "physicalEdgeId": { "type": "string", "minLength": 1 },
         "from": { "$ref": "#/$defs/point" }, "to": { "$ref": "#/$defs/point" },
+        "geometry": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/point" } },
         "lengthMeters": { "type": "number", "exclusiveMinimum": 0 }, "walkingSeconds": { "type": "number", "exclusiveMinimum": 0 }
       }
     }
