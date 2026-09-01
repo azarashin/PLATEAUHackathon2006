@@ -222,6 +222,11 @@ public static class HourlyEnvironmentCostSelfTests
         if (expected != actual) throw new InvalidOperationException($"Expected {expected}, actual {actual}.");
     }
 
+    private static void AssertEqual(int expected, int actual)
+    {
+        if (expected != actual) throw new InvalidOperationException($"Expected {expected}, actual {actual}.");
+    }
+
     private static void AssertGridCodes(string[] expected, System.Collections.Generic.List<string> actual)
     {
         if (expected.Length != actual.Count || !expected.SequenceEqual(actual, StringComparer.Ordinal))
