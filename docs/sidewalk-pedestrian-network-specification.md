@@ -10,15 +10,18 @@ v2 は歩道の線形・接続・品質根拠を追加するが、既存の Unit
 
 ## 2. 入力ソースと優先順位
 
-生成器は同じ地物について次の高い順位の根拠を採用し、採用元を edge ごとに記録する。
+MVPでは、OSMを経路トポロジと歩行可否の正本とする。CityGML `bldg` / `veg` / `dem` は日陰解析に用いる3D環境の正本とし、`tran` の歩道面は経路へ自動結合せず、監査補助証跡として扱う。将来の `tran` 活用候補は edge ごとの根拠として記録するが、位置が近いことだけを理由に既存トポロジへ接続してはならない。
 
-1. CityGML の交通・歩道・横断・橋梁・地下道の明示形状（読込可能で座標系が確定したもの）
-2. OSM の独立歩道・歩行者専用線形（`footway`、`path`、`pedestrian`、`steps`、`crossing`）
-3. OSM の車道 way に付く `sidewalk=left/right/both/separate`、`foot=*`、`crossing=*`、`bridge`、`tunnel`、`layer`、`level` タグ
-4. 管理された `road-network-overrides.geojson` の地域別補正
-5. v1 中心線を明示したフォールバック（歩道としては表示しない）
+OSMの歩行ネットワーク生成で参照する根拠は次の順位とし、採用元を edge ごとに記録する。
 
-現在の snapshot は `way` とその geometry を主に収録するだけで、独立した OSM node 要素のタグ数は **0** である。横断点・信号・段差等の node タグを根拠にできないため、#72 は `capture contract v0.2` を導入し、必要な node と node タグ、way タグ、relation の取得条件を固定する。既存の `out body geom` snapshot は v1 用として保持する。
+1. OSM の独立歩道・歩行者専用線形（`footway`、`path`、`pedestrian`、`steps`、`crossing`）
+2. OSM の車道 way に付く `sidewalk=left/right/both/separate`、`foot=*`、`crossing=*`、`bridge`、`tunnel`、`layer`、`level` タグ
+3. 管理された `road-network-overrides.geojson` の地域別補正
+4. v1 中心線を明示したフォールバック（歩道としては表示しない）
+
+CityGML `tran` の歩道・横断・橋梁・地下道の明示形状は、MVPでは自動統合せず、読込可能性、座標系、地物種別、取得時点を含む監査証跡として記録する。
+
+既存の v0.1 snapshot は `way` とその geometry を主に収録するだけで、独立した OSM node 要素のタグを根拠にできない。v2では `capture contract v0.2` により、横断点・信号・段差等の node タグ、way タグ、relation の取得条件を固定する。既存の `out body geom` snapshot は v1 用として保持する。
 
 ## 3. v2 データモデル（設計契約）
 
@@ -85,7 +88,15 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 
 新しい品質契約 `pedestrian-network-safety-1.0` では、既知の歩行不能道路を除外すること、異なる level や無根拠な横断による誤接続を防止すること、各辺の根拠と不確実性を識別できることを合否の中心とする。狭い生活道路の中心線は、歩道そのものではなく共有空間の代表線として許容し、`fallback=true` として明示する。品質状態は `accepted`（安全性に関する必須検証を通過）、`rejected`（歩行不能道路の混入、誤接続、構造破損、設定済み代表 OD の不達など）、`unverified`（必須監査情報不足）で記録する。旧契約で作成した v2 成果物は新契約に基づき再生成し、旧成果物をそのまま合格扱いしない。
 
-## 8. 5 地域の入力品質基準
+## 8. OSM と CityGML `tran` の責務分離
+
+この分離は、歩道面を持つ CityGML `tran` と、経路接続・歩行可否を持つ OSM の情報を、位置近傍だけで結合すると誤ったネットワークを作る危険があるためである。交差点、並行道路、側道、高架・地下、CRS の違い、データ取得時点の差は、単純な最近傍判定では識別できない。欠損を補うことより、誤った道路へ結合して経路を誤誘導することの方が危険である。
+
+したがってMVPでは、OSMが経路トポロジ・歩行可否を担い、CityGML `bldg` / `veg` / `dem` が日陰解析用の3D環境を担う。`tran` の歩道面は、地物種別、座標系、取得時点、形状の存在を監査報告へ残すが、OSMのノード・edgeを自動的に置換または追加しない。
+
+Post-MVPで統合を検討する場合も、OSMトポロジを正本として維持し、距離、方向、形状の重なり、level、対応の一意性、入力と変換の証跡がすべて揃う高信頼の対応だけを候補とする。条件を満たさない `tran` は欠損として扱い、無理に接続しない。
+
+## 9. 5 地域の入力品質基準
 
 | 地域 | 対象 | CRS | snapshot 現状 | v2 発行の最低条件 | 初期判定 |
 |---|---|---|---|---|---|
@@ -101,7 +112,7 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 
 品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence・根拠分類別集計、歩行不能理由別の除外数、横断数、level分離により拒否した接続数、fallback 延長・比率、`explicit + derived` 延長・比率、代表経路の結果または未設定警告、必須監査情報、既知の制約を記録する。生成器は安全契約に反する成果物を `rejected` とし、必須監査情報が足りない場合は `unverified` とする。
 
-## 9. v1 からの移行とロールバック
+## 10. v1 からの移行とロールバック
 
 1. v1 の raw snapshot、graph、analysis、bundle は変更しない。
 2. capture contract v0.2 で地域ごとの新しい入力を固定し、v2 graph と品質報告を別パスへ出力する。
@@ -109,7 +120,7 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 4. 品質基準を満たさない、又は経路到達性・立体交差テストが失敗した場合、manifest の `recommendedVersion` を v1 とし、消費側は v1 を使用する。
 5. ロールバックは v2 成果物を削除することではなく、v1 manifest を再選択する操作とする。既に出力した v2 のハッシュ付き成果物は監査用に残す。
 
-## 10. #72 の受入テスト
+## 11. #72 の受入テスト
 
 - capture contract v0.2 が way・必要 node タグ・必要 relation を固定し、地域ごとの SHA-256 を出力する。
 - `sidewalk=left/right/both` の fixture で正しい side・オフセット・双方向接続を生成する。
@@ -121,7 +132,7 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 - 同一入力から node / edge ID、geometry、manifest hash が決定的に再現される。
 - 5地域すべてで品質報告を出し、代表経路3本の到達性を検証する。
 
-## 11. #73 への受渡条件
+## 12. #73 への受渡条件
 
 #73 は、#72 が次を満たす v2 graph と品質報告を地域ごとに渡した場合のみ統合を開始する。
 
