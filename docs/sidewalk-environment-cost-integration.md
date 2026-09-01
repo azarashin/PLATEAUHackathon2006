@@ -33,6 +33,23 @@ node tools/road-network/build-sidewalk-pedestrian-graph.mjs --config data/analys
 
 この後に `sidewalkNetworkPath` を設定してRuntime City Packageを再生成し、Unityの全時刻解析を実行します。Runtime入力0.3は物理辺の全ポリライン頂点を保持し、折れ点を直線化せず全線分を重複なくサンプリングする。品質レポートが閾値未達または代表OD失敗なら、Package生成は失敗し、解析結果を `accepted` / `verified` と報告しない。
 
+## 5地域の再現可能な全時刻Runtime解析
+
+`data/runtime-city-packages/<area>-sidewalk-v2.json` はv0.2専用設定である。`sidewalkNetworkPath`（`accepted` の歩行ネットワークv2）と検証Scene、結果JSON、完了markerを必須とし、旧v0.1設定で必須だった道路bundle・基準環境コストは任意である。v2ではBuilderが基準環境コストを読まず、分析設定と物理辺geometryだけから `runtime-shade-input.json` 0.3を作る。指定された任意ファイルだけをパッケージにコピーする。
+
+Unity HubとEditorを完全に終了した後、地域ごとに次を実行する。`<area>` は `ichigaya-venue`、`kyoto`、`maizuru`、`fujisawa`、`saitama` のいずれかである。
+
+```powershell
+$unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.18f1\Editor\Unity.exe'
+& $unity -batchmode -quit -nographics `
+  -projectPath 'tools\plateau-environment-cost-analyzer' `
+  -executeMethod EnvironmentCostRuntimeShadeBatchRunner.Run `
+  -runtimeCityPackageConfig "data\runtime-city-packages\<area>-sidewalk-v2.json" `
+  -logFile "tools\plateau-environment-cost-analyzer\Logs\runtime-shade-v2-<area>.log"
+```
+
+バッチはSceneを開いて `Physics.SyncTransforms()` を実行後、既存の `EnvironmentCostRuntimeShadeAnalyzer` と `EnvironmentCostRuntimeShadeResultStore` を使い0〜23時を解析する。結果は `data/generated/<area>-sidewalk-v2-runtime-shade-result.json`、正常完了markerは同名の `.complete.json` に原子的に保存する。保存前後に全physical edge・24時・areaId・graph fingerprint・品質契約・結果semantic fingerprintの一致を検証する。成功ログは `ENVIRONMENT_COST_RUNTIME_SHADE_BATCH_READY` と `ENVIRONMENT_COST_RUNTIME_SHADE_BATCH_COMPLETE` である。
+
 ## サーバー境界
 
 route serverはserver bundle v1とv2をschemaVersionで分岐して読み込む。v2では文字列node ID、物理辺の完全geometry、歩道品質、グラフfingerprintを保持する。v1/v2間、または異なるグラフfingerprint間のA/B比較は拒否する。v2 bundleは品質ゲートを通過した結果だけを作成でき、配備・有効化の運用自動化は引き続き #65 の対象とする。

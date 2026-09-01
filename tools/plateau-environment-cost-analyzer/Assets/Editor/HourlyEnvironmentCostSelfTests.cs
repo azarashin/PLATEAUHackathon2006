@@ -173,6 +173,13 @@ public static class HourlyEnvironmentCostSelfTests
             }
             reloadedRuntimeEvidence.edges[0].hourly[0].shadeRatio += 0.01;
             AssertEqual(false, runtimeEvidenceFingerprint == EnvironmentCostRuntimeShadeResultStore.CalculateSha256(reloadedRuntimeEvidence));
+            var batchResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(physicalRuntimeInput,
+                new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = Enumerable.Range(0, 24).ToArray() });
+            batchResult.provenance.resultFingerprintAlgorithm = EnvironmentCostRuntimeShadeResultStore.SemanticFingerprintAlgorithm;
+            batchResult.provenance.resultFingerprintSha256 = EnvironmentCostRuntimeShadeResultStore.CalculateSha256(batchResult);
+            EnvironmentCostRuntimeShadeBatchRunner.ValidateBatchResult(physicalRuntimeInput, batchResult);
+            batchResult.provenance.graphFingerprintSha256 = new string('b', 64);
+            AssertThrows<InvalidOperationException>(() => EnvironmentCostRuntimeShadeBatchRunner.ValidateBatchResult(physicalRuntimeInput, batchResult));
             var runtimeShadeResult = EnvironmentCostRuntimeShadeAnalyzer.Analyze(runtimeShadeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } });
             AssertEqual("completed", runtimeShadeResult.status);

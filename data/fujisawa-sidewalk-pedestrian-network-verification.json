@@ -1,49 +1,91 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T03:50:25.819Z",
+  "verifiedAt": "2026-09-01T14:09:33.950Z",
   "areaId": "fujisawa",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
     "captureContractVersion": "0.2",
     "sha256": "04fdb5cce59169a93eb10c00313dbb133d81dd7d0a552c36b8db4d6e485cb89c"
   },
-  "status": "failed",
-  "graphFingerprintSha256": "0e6f123175d13008dffa6756620a4de9f589c4efeea0f338c77424492ed74abb",
+  "status": "accepted",
+  "graphFingerprintSha256": "1e55df9803b77507204e6ef5567dc8368fdc565f66e52d277aabac37170e9f85",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "generatedAt": "2026-09-01T03:50:26.964Z",
-    "graphFingerprintSha256": "0e6f123175d13008dffa6756620a4de9f589c4efeea0f338c77424492ed74abb",
+    "qualityContractVersion": "pedestrian-network-safety-1.0",
+    "generatedAt": "2026-09-01T14:09:35.356Z",
+    "graphFingerprintSha256": "1e55df9803b77507204e6ef5567dc8368fdc565f66e52d277aabac37170e9f85",
     "input": {
       "areaId": "fujisawa",
       "captureContractVersion": "0.2"
     },
     "counts": {
-      "nodeCount": 77241,
-      "physicalEdgeCount": 81001,
-      "directedEdgeCount": 162002,
-      "fallbackPhysicalEdgeCount": 58473,
-      "fallbackDirectedEdgeCount": 116946,
+      "nodeCount": 77980,
+      "physicalEdgeCount": 81935,
+      "directedEdgeCount": 163870,
+      "fallbackPhysicalEdgeCount": 59407,
+      "fallbackDirectedEdgeCount": 118814,
       "sourceWayCount": 14785,
-      "excludedWayCount": 338,
+      "includedWayCount": 14553,
+      "excludedWayCount": 219,
+      "excludedWayCountByReason": {
+        "foot-prohibited": 27,
+        "area-without-linear-walkway": 27,
+        "access-restricted-without-foot-override": 126,
+        "non-pedestrian-highway": 39
+      },
       "explicitWayCount": 4078,
       "derivedSidewalkWayCount": 21,
-      "separateSidewalkSkippedCount": 2,
-      "fallbackWayCount": 10346,
-      "crossingConnectionCount": 816,
+      "separateSidewalkSkippedCount": 13,
+      "fallbackWayCount": 10454,
+      "crossingConnectionCount": 849,
+      "levelSeparatedCrossingConnectionCount": 6,
       "malformedWayCount": 0
     },
-    "lengthMeters": {
-      "total": 1601066.3264246096,
-      "explicit": 302978.15336192877,
-      "derived": 10320.546322800492,
-      "explicitOrDerived": 313298.6996847293,
-      "fallback": 1287767.626739881,
-      "explicitOrDerivedRatio": 0.19568127473167599,
-      "fallbackRatio": 0.8043187252683244
+    "processing": {
+      "sourceWayCount": 14785,
+      "includedWayCount": 14553,
+      "excludedWayCount": 219,
+      "excludedWayCountByReason": {
+        "foot-prohibited": 27,
+        "area-without-linear-walkway": 27,
+        "access-restricted-without-foot-override": 126,
+        "non-pedestrian-highway": 39
+      },
+      "separateSidewalkSkippedCount": 13,
+      "malformedWayCount": 0,
+      "crossingConnectionCount": 849,
+      "levelSeparatedCrossingConnectionCount": 6
     },
-    "thresholds": {
-      "explicitOrDerivedMinimumRatio": 0.8,
-      "fallbackMaximumRatio": 0.2
+    "lengthMeters": {
+      "total": 1639955.3562671635,
+      "explicit": 303122.1724524932,
+      "derived": 10176.527232235956,
+      "explicitOrDerived": 313298.69968472916,
+      "fallback": 1326656.6565824412,
+      "explicitOrDerivedRatio": 0.19104099296815857,
+      "fallbackRatio": 0.8089590070318456
+    },
+    "segmentRationales": {
+      "explicit-crossing": {
+        "physicalEdgeCount": 48,
+        "lengthMeters": 144.01909056453232
+      },
+      "shared-space-representative-line": {
+        "physicalEdgeCount": 59407,
+        "lengthMeters": 1326656.6565824412
+      },
+      "explicit-pedestrian-facility": {
+        "physicalEdgeCount": 22138,
+        "lengthMeters": 302978.15336192877
+      },
+      "derived-sidewalk": {
+        "physicalEdgeCount": 342,
+        "lengthMeters": 10176.527232235956
+      }
+    },
+    "topology": {
+      "isSafe": true,
+      "rejected": []
     },
     "representativeOds": {
       "status": "blocked",
@@ -51,10 +93,12 @@
       "routes": []
     },
     "validation": {
-      "isValid": false,
-      "failures": [
-        "explicit-derived-length-ratio-below-80-percent",
-        "fallback-length-ratio-above-20-percent"
+      "status": "accepted",
+      "isValid": true,
+      "rejectedReasons": [],
+      "unverifiedReasons": [],
+      "warnings": [
+        "representative-od-not-configured"
       ]
     }
   }

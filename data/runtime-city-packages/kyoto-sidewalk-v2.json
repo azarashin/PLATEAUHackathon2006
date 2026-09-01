@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "environment-cost-runtime-city-package-config-0.2",
+  "areaId": "kyoto",
+  "displayName": "京都（歩行ネットワーク v2）",
+  "version": "2026.09.02-sidewalk-v2",
+  "analysisConfigPath": "data/analysis-configs/kyoto.json",
+  "sidewalkNetworkPath": "data/generated/kyoto-sidewalk-pedestrian-network-v2.json",
+  "packageRelativePath": "EnvironmentCostCities/kyoto-sidewalk-v2",
+  "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/kyoto.unity",
+  "runtimeShadeResultOutputPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.json",
+  "runtimeShadeCompleteMarkerPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.complete.json"
+}

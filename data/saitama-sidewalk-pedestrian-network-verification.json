@@ -1,49 +1,91 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T03:50:27.832Z",
+  "verifiedAt": "2026-09-01T14:09:39.787Z",
   "areaId": "saitama",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
     "captureContractVersion": "0.2",
     "sha256": "d9e3a543843cb0e620e4585ef20b9cb0c7e03720458050bbe5f6f2b0a8c9ab92"
   },
-  "status": "failed",
-  "graphFingerprintSha256": "a976f4d763c1e0eb0e84d1d2ba49ccb8852e22f185fb5231313514c607b8af68",
+  "status": "accepted",
+  "graphFingerprintSha256": "ebcc87b0099f762167c5add4547b25e83a63e7b760509fcfb875e65421dc4a8f",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "generatedAt": "2026-09-01T03:50:28.808Z",
-    "graphFingerprintSha256": "a976f4d763c1e0eb0e84d1d2ba49ccb8852e22f185fb5231313514c607b8af68",
+    "qualityContractVersion": "pedestrian-network-safety-1.0",
+    "generatedAt": "2026-09-01T14:09:41.132Z",
+    "graphFingerprintSha256": "ebcc87b0099f762167c5add4547b25e83a63e7b760509fcfb875e65421dc4a8f",
     "input": {
       "areaId": "saitama",
       "captureContractVersion": "0.2"
     },
     "counts": {
-      "nodeCount": 66305,
-      "physicalEdgeCount": 73487,
-      "directedEdgeCount": 146974,
-      "fallbackPhysicalEdgeCount": 55123,
-      "fallbackDirectedEdgeCount": 110246,
+      "nodeCount": 66999,
+      "physicalEdgeCount": 74566,
+      "directedEdgeCount": 149132,
+      "fallbackPhysicalEdgeCount": 55998,
+      "fallbackDirectedEdgeCount": 111996,
       "sourceWayCount": 17808,
-      "excludedWayCount": 227,
+      "includedWayCount": 17645,
+      "excludedWayCount": 116,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 69,
+        "foot-prohibited": 4,
+        "area-without-linear-walkway": 27,
+        "access-restricted-without-foot-override": 16
+      },
       "explicitWayCount": 4373,
-      "derivedSidewalkWayCount": 36,
-      "separateSidewalkSkippedCount": 36,
-      "fallbackWayCount": 13136,
-      "crossingConnectionCount": 1153,
+      "derivedSidewalkWayCount": 44,
+      "separateSidewalkSkippedCount": 47,
+      "fallbackWayCount": 13228,
+      "crossingConnectionCount": 1281,
+      "levelSeparatedCrossingConnectionCount": 2,
       "malformedWayCount": 0
     },
-    "lengthMeters": {
-      "total": 2003653.0857901576,
-      "explicit": 294771.15822369826,
-      "derived": 23338.70164884741,
-      "explicitOrDerived": 318109.8598725457,
-      "fallback": 1685543.225917618,
-      "explicitOrDerivedRatio": 0.15876493896501867,
-      "fallbackRatio": 0.8412350610349844
+    "processing": {
+      "sourceWayCount": 17808,
+      "includedWayCount": 17645,
+      "excludedWayCount": 116,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 69,
+        "foot-prohibited": 4,
+        "area-without-linear-walkway": 27,
+        "access-restricted-without-foot-override": 16
+      },
+      "separateSidewalkSkippedCount": 47,
+      "malformedWayCount": 0,
+      "crossingConnectionCount": 1281,
+      "levelSeparatedCrossingConnectionCount": 2
     },
-    "thresholds": {
-      "explicitOrDerivedMinimumRatio": 0.8,
-      "fallbackMaximumRatio": 0.2
+    "lengthMeters": {
+      "total": 2048886.7032997159,
+      "explicit": 295078.6770759892,
+      "derived": 29799.050886961228,
+      "explicitOrDerived": 324877.7279629504,
+      "fallback": 1724008.9753367726,
+      "explicitOrDerivedRatio": 0.1585630515536742,
+      "fallbackRatio": 0.8414369484463293
+    },
+    "segmentRationales": {
+      "explicit-crossing": {
+        "physicalEdgeCount": 99,
+        "lengthMeters": 307.5188522908731
+      },
+      "shared-space-representative-line": {
+        "physicalEdgeCount": 55998,
+        "lengthMeters": 1724008.9753367726
+      },
+      "explicit-pedestrian-facility": {
+        "physicalEdgeCount": 17574,
+        "lengthMeters": 294771.15822369826
+      },
+      "derived-sidewalk": {
+        "physicalEdgeCount": 895,
+        "lengthMeters": 29799.050886961228
+      }
+    },
+    "topology": {
+      "isSafe": true,
+      "rejected": []
     },
     "representativeOds": {
       "status": "blocked",
@@ -51,10 +93,12 @@
       "routes": []
     },
     "validation": {
-      "isValid": false,
-      "failures": [
-        "explicit-derived-length-ratio-below-80-percent",
-        "fallback-length-ratio-above-20-percent"
+      "status": "accepted",
+      "isValid": true,
+      "rejectedReasons": [],
+      "unverifiedReasons": [],
+      "warnings": [
+        "representative-od-not-configured"
       ]
     }
   }

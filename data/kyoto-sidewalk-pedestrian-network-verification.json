@@ -1,49 +1,91 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T03:50:22.637Z",
+  "verifiedAt": "2026-09-01T14:09:26.245Z",
   "areaId": "kyoto",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
     "captureContractVersion": "0.2",
     "sha256": "158e63f3f274465057dcf16627f1b34083a19bc61a3de23228862be9da420d25"
   },
-  "status": "failed",
-  "graphFingerprintSha256": "be6a53d7aca945053356fd4a357591c6749c95ceb14a4cfeaa263f66fbcda31e",
+  "status": "accepted",
+  "graphFingerprintSha256": "5fe000d08fd2851f55a3ad1605b695502ced0c47f624f7c1463d883496da479c",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "generatedAt": "2026-09-01T03:50:24.096Z",
-    "graphFingerprintSha256": "be6a53d7aca945053356fd4a357591c6749c95ceb14a4cfeaa263f66fbcda31e",
+    "qualityContractVersion": "pedestrian-network-safety-1.0",
+    "generatedAt": "2026-09-01T14:09:28.347Z",
+    "graphFingerprintSha256": "5fe000d08fd2851f55a3ad1605b695502ced0c47f624f7c1463d883496da479c",
     "input": {
       "areaId": "kyoto",
       "captureContractVersion": "0.2"
     },
     "counts": {
-      "nodeCount": 96320,
-      "physicalEdgeCount": 101979,
-      "directedEdgeCount": 203958,
-      "fallbackPhysicalEdgeCount": 54293,
-      "fallbackDirectedEdgeCount": 108586,
+      "nodeCount": 97499,
+      "physicalEdgeCount": 103693,
+      "directedEdgeCount": 207386,
+      "fallbackPhysicalEdgeCount": 55895,
+      "fallbackDirectedEdgeCount": 111790,
       "sourceWayCount": 25516,
-      "excludedWayCount": 876,
+      "includedWayCount": 24880,
+      "excludedWayCount": 617,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 131,
+        "foot-prohibited": 61,
+        "access-restricted-without-foot-override": 224,
+        "area-without-linear-walkway": 201
+      },
       "explicitWayCount": 11943,
-      "derivedSidewalkWayCount": 255,
-      "separateSidewalkSkippedCount": 3,
-      "fallbackWayCount": 12439,
-      "crossingConnectionCount": 3568,
+      "derivedSidewalkWayCount": 273,
+      "separateSidewalkSkippedCount": 19,
+      "fallbackWayCount": 12664,
+      "crossingConnectionCount": 3848,
+      "levelSeparatedCrossingConnectionCount": 22,
       "malformedWayCount": 0
     },
-    "lengthMeters": {
-      "total": 2143070.941276183,
-      "explicit": 645374.8466047624,
-      "derived": 108970.93057317563,
-      "explicitOrDerived": 754345.777177938,
-      "fallback": 1388725.1640982428,
-      "explicitOrDerivedRatio": 0.35199291010344746,
-      "fallbackRatio": 0.6480070898965515
+    "processing": {
+      "sourceWayCount": 25516,
+      "includedWayCount": 24880,
+      "excludedWayCount": 617,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 131,
+        "foot-prohibited": 61,
+        "access-restricted-without-foot-override": 224,
+        "area-without-linear-walkway": 201
+      },
+      "separateSidewalkSkippedCount": 19,
+      "malformedWayCount": 0,
+      "crossingConnectionCount": 3848,
+      "levelSeparatedCrossingConnectionCount": 22
     },
-    "thresholds": {
-      "explicitOrDerivedMinimumRatio": 0.8,
-      "fallbackMaximumRatio": 0.2
+    "lengthMeters": {
+      "total": 2197941.5766874915,
+      "explicit": 646466.8784457598,
+      "derived": 111061.09439805023,
+      "explicitOrDerived": 757527.97284381,
+      "fallback": 1440413.603843686,
+      "explicitOrDerivedRatio": 0.34465337062574575,
+      "fallbackRatio": 0.6553466293742563
+    },
+    "segmentRationales": {
+      "explicit-crossing": {
+        "physicalEdgeCount": 440,
+        "lengthMeters": 1092.0318409972886
+      },
+      "shared-space-representative-line": {
+        "physicalEdgeCount": 55895,
+        "lengthMeters": 1440413.603843686
+      },
+      "explicit-pedestrian-facility": {
+        "physicalEdgeCount": 44465,
+        "lengthMeters": 645374.8466047624
+      },
+      "derived-sidewalk": {
+        "physicalEdgeCount": 2893,
+        "lengthMeters": 111061.09439805023
+      }
+    },
+    "topology": {
+      "isSafe": true,
+      "rejected": []
     },
     "representativeOds": {
       "status": "blocked",
@@ -51,10 +93,12 @@
       "routes": []
     },
     "validation": {
-      "isValid": false,
-      "failures": [
-        "explicit-derived-length-ratio-below-80-percent",
-        "fallback-length-ratio-above-20-percent"
+      "status": "accepted",
+      "isValid": true,
+      "rejectedReasons": [],
+      "unverifiedReasons": [],
+      "warnings": [
+        "representative-od-not-configured"
       ]
     }
   }
