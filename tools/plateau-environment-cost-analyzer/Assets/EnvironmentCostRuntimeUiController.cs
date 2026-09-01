@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -23,12 +24,14 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         var shade = GetComponent<EnvironmentCostRuntimeShadeAnalysisController>();
         var policy = GetComponent<EnvironmentCostRuntimePolicyScenarioController>();
         var comparison = GetComponent<EnvironmentCostRuntimeRouteComparisonController>();
-        while (solar == null || shade == null || policy == null || comparison == null || policy.Scenario == null)
+        var heatmap = GetComponent<EnvironmentCostRuntimeRoadHeatmapController>();
+        while (solar == null || shade == null || policy == null || comparison == null || heatmap == null || policy.Scenario == null)
         {
             solar ??= GetComponent<EnvironmentCostSolarController>();
             shade ??= GetComponent<EnvironmentCostRuntimeShadeAnalysisController>();
             policy ??= GetComponent<EnvironmentCostRuntimePolicyScenarioController>();
             comparison ??= GetComponent<EnvironmentCostRuntimeRouteComparisonController>();
+            heatmap ??= GetComponent<EnvironmentCostRuntimeRoadHeatmapController>();
             yield return null;
         }
 
@@ -61,8 +64,9 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
         shade.BuildUi(content);
         policy.BuildUi(content);
         comparison.BuildUi(content);
+        heatmap.BuildUi(content);
 
-        var panels = new[] { content.ElementAt(0), content.ElementAt(1), content.ElementAt(2), content.ElementAt(3) };
+        var panels = new[] { content.ElementAt(0), content.ElementAt(1), content.ElementAt(2), content.ElementAt(3), content.ElementAt(4) };
         var tabButtons = new Button[panels.Length];
         void SelectTab(int selectedIndex)
         {
@@ -73,10 +77,13 @@ public sealed class EnvironmentCostRuntimeUiController : MonoBehaviour
             }
         }
         var labels = new[] { "太陽・影", "日陰解析", "施策シナリオ", "経路・KPI比較" };
-        for (var index = 0; index < labels.Length; index++)
+        var tabLabels = new string[5];
+        Array.Copy(labels, tabLabels, labels.Length);
+        tabLabels[4] = "道路別ヒートマップ";
+        for (var index = 0; index < tabLabels.Length; index++)
         {
             var captured = index;
-            tabButtons[index] = new Button(() => SelectTab(captured)) { text = labels[index] };
+            tabButtons[index] = new Button(() => SelectTab(captured)) { text = tabLabels[index] };
             tabButtons[index].AddToClassList("runtime-tab");
             tabs.Add(tabButtons[index]);
         }

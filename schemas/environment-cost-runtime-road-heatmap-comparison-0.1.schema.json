@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/environment-cost-runtime-road-heatmap-comparison-0.1.schema.json",
+  "title": "Runtime road heatmap comparison evidence 0.1",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAtUtc", "areaId", "timestamp", "metric", "profileId", "solarAvoidanceFactor", "routeComparisonFingerprintSha256", "topologyFingerprintSha256", "cityPackageVersion", "cityPackageManifestSha256", "comparisonFingerprintSha256", "baseline", "policy", "edges"],
+  "properties": {
+    "schemaVersion": { "const": "environment-cost-runtime-road-heatmap-comparison-0.1" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "areaId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "metric": { "enum": ["shadeRatio", "solarExposureSeconds", "environmentCostSeconds"] },
+    "profileId": { "enum": ["shortest", "balanced", "shade"] },
+    "solarAvoidanceFactor": { "type": "number", "minimum": 0, "maximum": 100 },
+    "routeComparisonFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "topologyFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "graphFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "bundleFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "cityPackageVersion": { "type": "string", "minLength": 1 },
+    "cityPackageManifestSha256": { "$ref": "#/$defs/sha256" },
+    "comparisonFingerprintSha256": { "$ref": "#/$defs/sha256" },
+    "baseline": { "$ref": "#/$defs/provenance" },
+    "policy": { "$ref": "#/$defs/provenance" },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "coordinate": { "type": "object", "required": ["longitude", "latitude", "nodeIndex"], "properties": { "longitude": { "type": "number" }, "latitude": { "type": "number" }, "nodeIndex": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+    "provenance": { "type": "object", "required": ["id", "label", "kind"], "properties": { "id": { "type": "string" }, "label": { "type": "string" }, "kind": { "enum": ["package-baseline", "runtime-shade"] } }, "additionalProperties": true },
+    "edge": { "type": "object", "required": ["id", "sourceEdgeIds", "from", "to", "walkingSeconds", "baselineStatus", "policyStatus", "baselineValue", "policyValue", "delta", "status"], "properties": { "id": { "type": "string" }, "sourceEdgeIds": { "type": "array", "items": { "type": "string" } }, "from": { "$ref": "#/$defs/coordinate" }, "to": { "$ref": "#/$defs/coordinate" }, "walkingSeconds": { "type": "number", "exclusiveMinimum": 0 }, "baselineStatus": { "enum": ["available", "partial", "missing"] }, "policyStatus": { "enum": ["available", "partial", "missing"] }, "baselineValue": { "type": "number" }, "policyValue": { "type": "number" }, "delta": { "type": "number" }, "status": { "enum": ["improved", "degraded", "unchanged", "partial", "missing"] } }, "additionalProperties": false }
+  }
+}

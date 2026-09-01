@@ -23,6 +23,10 @@ public sealed class EnvironmentCostRuntimeRouteComparison
 
     private readonly Package package;
     private readonly List<int>[] outgoing;
+    // Each physical edge has one or two directed representations.  The road heatmap
+    // needs only one representative geometry, so resolve it once at package load
+    // instead of searching every directed edge for every physical edge.
+    private readonly int[] representativeDirectedEdges;
     private readonly object baselineCostCacheLock = new object();
 
     private EnvironmentCostRuntimeRouteComparison(Package package)
@@ -30,7 +34,18 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         this.package = package;
         outgoing = new List<int>[package.nodes.Length];
         for (var index = 0; index < outgoing.Length; index++) outgoing[index] = new List<int>();
-        for (var index = 0; index < package.directedEdges.Length; index++) outgoing[package.directedEdges[index].fromNodeIndex].Add(index);
+        representativeDirectedEdges = new int[package.physicalEdges.Length];
+        for (var index = 0; index < representativeDirectedEdges.Length; index++) representativeDirectedEdges[index] = -1;
+        for (var index = 0; index < package.directedEdges.Length; index++)
+        {
+            var edge = package.directedEdges[index];
+            outgoing[edge.fromNodeIndex].Add(index);
+            if (representativeDirectedEdges[edge.physicalEdgeIndex] < 0)
+                representativeDirectedEdges[edge.physicalEdgeIndex] = index;
+        }
+        for (var index = 0; index < representativeDirectedEdges.Length; index++)
+            if (representativeDirectedEdges[index] < 0)
+                throw new InvalidOperationException("A physical edge has no representative directed edge.");
     }
 
     /// <summary>Loads manifest.json, road-network/manifest.json, topology and its baseline cost slice.</summary>
@@ -108,6 +123,111 @@ public sealed class EnvironmentCostRuntimeRouteComparison
     {
         ValidateRequest(request);
         return EvaluateScenario(CreateCostSource(scenario, request.timestamp, null), request, Snap(request.start), Snap(request.end));
+    }
+
+    /// <summary>
+    /// Compares every physical road edge for the same city package, timestamp and policy evidence
+    /// used by Runtime route comparison.  A route-comparison result is required deliberately: it
+    /// prevents a heatmap from being presented beside a route/KPI comparison made under different
+    /// conditions.
+    /// </summary>
+    public EnvironmentCostRuntimeRoadHeatmapComparisonResult CompareRoadHeatmap(
+        EnvironmentCostRuntimeRoadHeatmapComparisonRequest request,
+        EnvironmentCostRuntimeRouteComparisonResult routeComparison,
+        EnvironmentCostRuntimeShadeAnalysisResult policy)
+    {
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        ValidateRoadHeatmapRequest(request, routeComparison, policy);
+        var baseline = CreateCostSource(null, request.timestamp, "baseline");
+        var policySource = CreateCostSource(policy, request.timestamp, null);
+        var result = new EnvironmentCostRuntimeRoadHeatmapComparisonResult
+        {
+            schemaVersion = EnvironmentCostRuntimeRoadHeatmapComparison.ResultSchema,
+            generatedAtUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            areaId = package.areaId,
+            timestamp = request.timestamp,
+            metric = request.metric,
+            profileId = request.profileId,
+            solarAvoidanceFactor = request.solarAvoidanceFactor,
+            routeComparisonFingerprintSha256 = routeComparison.comparisonFingerprintSha256,
+            topologyFingerprintSha256 = package.topologyFingerprintSha256,
+            graphFingerprintSha256 = package.graphFingerprintSha256,
+            bundleFingerprintSha256 = package.bundleFingerprintSha256,
+            cityPackageVersion = package.cityPackageVersion,
+            cityPackageManifestSha256 = package.cityPackageManifestSha256,
+            baseline = baseline.provenance,
+            policy = policySource.provenance
+        };
+        for (var index = 0; index < package.physicalEdges.Length; index++)
+        {
+            var directed = package.directedEdges[representativeDirectedEdges[index]];
+            var before = baseline.costs[index];
+            var after = policySource.costs[index];
+            var road = new EnvironmentCostRuntimeRoadHeatmapEdge
+            {
+                id = package.physicalEdges[index].id,
+                sourceEdgeIds = package.physicalEdges[index].sourceEdgeIds,
+                from = CoordinateForNode(directed.fromNodeIndex), to = CoordinateForNode(directed.toNodeIndex),
+                walkingSeconds = package.physicalWalkingSeconds[index],
+                baselineStatus = before.status, policyStatus = after.status,
+                baselineValue = MetricValue(before, request.metric, package.physicalWalkingSeconds[index], request.solarAvoidanceFactor),
+                policyValue = MetricValue(after, request.metric, package.physicalWalkingSeconds[index], request.solarAvoidanceFactor)
+            };
+            road.status = DetermineRoadHeatmapStatus(before, after, request.metric, package.physicalWalkingSeconds[index], request.solarAvoidanceFactor, out var delta);
+            road.delta = delta;
+            result.edges.Add(road);
+        }
+        result.comparisonFingerprintSha256 = EnvironmentCostRuntimeRoadHeatmapComparison.CalculateFingerprint(result);
+        return result;
+    }
+
+    private void ValidateRoadHeatmapRequest(EnvironmentCostRuntimeRoadHeatmapComparisonRequest request,
+        EnvironmentCostRuntimeRouteComparisonResult routeComparison, EnvironmentCostRuntimeShadeAnalysisResult policy)
+    {
+        if (routeComparison == null || policy == null) throw new ArgumentException("A completed Runtime route comparison and its policy result are required.");
+        if (!string.Equals(request.areaId, package.areaId, StringComparison.Ordinal) ||
+            !string.Equals(request.timestamp, routeComparison.timestamp, StringComparison.Ordinal) ||
+            !string.Equals(routeComparison.areaId, package.areaId, StringComparison.Ordinal) ||
+            !string.Equals(routeComparison.topologyFingerprintSha256, package.topologyFingerprintSha256, StringComparison.Ordinal) ||
+            !string.Equals(routeComparison.cityPackageManifestSha256, package.cityPackageManifestSha256, StringComparison.Ordinal) ||
+            !string.Equals(routeComparison.comparisonFingerprintSha256, CalculateComparisonFingerprint(routeComparison), StringComparison.Ordinal))
+            throw new InvalidOperationException("Road heatmap conditions do not match the completed Runtime route comparison.");
+        if (request.metric != "shadeRatio" && request.metric != "solarExposureSeconds" && request.metric != "environmentCostSeconds")
+            throw new ArgumentException("Road heatmap metric is invalid.");
+        if (!Finite(request.solarAvoidanceFactor) || request.solarAvoidanceFactor < 0 || request.solarAvoidanceFactor > 100)
+            throw new ArgumentException("Road heatmap solar avoidance factor is invalid.");
+        var expectedFactor = request.profileId == "shortest" ? 0.0 : request.profileId == "balanced" ? 0.5 : request.profileId == "shade" ? 2.0 : double.NaN;
+        if (!Finite(expectedFactor) || Math.Abs(request.solarAvoidanceFactor - expectedFactor) > Tolerance)
+            throw new ArgumentException("Road heatmap profile and solar avoidance factor are inconsistent.");
+        ValidateRuntimeResult(policy, request.timestamp);
+        if (!routeComparison.policies.Any(item => item?.scenario?.resultFingerprintSha256 == policy.provenance.resultFingerprintSha256))
+            throw new InvalidOperationException("The selected policy result was not used by the completed Runtime route comparison.");
+    }
+
+    private EnvironmentCostRuntimeRouteCoordinate CoordinateForNode(int index) => new EnvironmentCostRuntimeRouteCoordinate
+    {
+        longitude = package.nodes[index].longitude, latitude = package.nodes[index].latitude, nodeIndex = index
+    };
+
+    private static double MetricValue(Cost cost, string metric, double walkingSeconds, double solarAvoidanceFactor)
+    {
+        if (cost == null || cost.status == "missing") return -1.0;
+        if (metric == "shadeRatio") return cost.shadeRatio;
+        if (metric == "solarExposureSeconds") return cost.solarExposureSeconds;
+        return walkingSeconds + cost.solarExposureSeconds * solarAvoidanceFactor;
+    }
+
+    private static string DetermineRoadHeatmapStatus(Cost baseline, Cost policy, string metric, double walkingSeconds, double solarAvoidanceFactor, out double delta)
+    {
+        delta = 0.0;
+        if (baseline == null || policy == null || baseline.status == "missing" || policy.status == "missing") return "missing";
+        if (baseline.status == "partial" || policy.status == "partial") return "partial";
+        // Status direction is independent of the magnitude formula.  Environment cost, like
+        // solar exposure, improves when it decreases.
+        delta = MetricValue(policy, metric, walkingSeconds, solarAvoidanceFactor) - MetricValue(baseline, metric, walkingSeconds, solarAvoidanceFactor);
+        if (Math.Abs(delta) <= Tolerance) return "unchanged";
+        // More shade is an improvement; less solar exposure is an improvement.
+        return metric == "shadeRatio" ? (delta > 0 ? "improved" : "degraded") : (delta < 0 ? "improved" : "degraded");
     }
 
     private EnvironmentCostRuntimeRouteScenarioResult EvaluateScenario(CostSource source, EnvironmentCostRuntimeRouteComparisonRequest request,
@@ -357,3 +477,51 @@ public sealed class EnvironmentCostRuntimeRouteComparison
 [Serializable] public sealed class EnvironmentCostRuntimeRouteScenarioProvenance { public string id, label, kind, policyFingerprintSha256, resultFingerprintSha256, generatedAtUtc; }
 [Serializable] public sealed class EnvironmentCostRuntimeRouteSnap { public int nodeIndex; public string nodeId; public EnvironmentCostRuntimeRouteCoordinate input, snapped; public double distanceMeters; }
 [Serializable] public sealed class EnvironmentCostRuntimeRoute { public EnvironmentCostRuntimeRouteProfile profile; public List<string> edgeIds = new List<string>(); public List<EnvironmentCostRuntimeRouteCoordinate> coordinates = new List<EnvironmentCostRuntimeRouteCoordinate>(); public double distanceMeters, walkingSeconds, solarExposureSeconds, observedSolarExposureSeconds, unknownWalkingSeconds, shadeRatio, observedShadeRatio, routeCostSeconds; public int missingEdgeCount, partialEdgeCount; public string coverageStatus; }
+
+[Serializable] public sealed class EnvironmentCostRuntimeRoadHeatmapComparisonRequest
+{
+    public string areaId;
+    public string timestamp;
+    // shadeRatio (higher is better), solarExposureSeconds, or environmentCostSeconds (lower is better).
+    public string metric = "shadeRatio";
+    public string profileId = "shade";
+    public double solarAvoidanceFactor = 2.0;
+}
+
+[Serializable] public sealed class EnvironmentCostRuntimeRoadHeatmapComparisonResult
+{
+    public string schemaVersion, generatedAtUtc, areaId, timestamp, metric, profileId;
+    public double solarAvoidanceFactor;
+    public string routeComparisonFingerprintSha256, topologyFingerprintSha256, graphFingerprintSha256, bundleFingerprintSha256;
+    public string cityPackageVersion, cityPackageManifestSha256, comparisonFingerprintSha256;
+    public EnvironmentCostRuntimeRouteScenarioProvenance baseline, policy;
+    public List<EnvironmentCostRuntimeRoadHeatmapEdge> edges = new List<EnvironmentCostRuntimeRoadHeatmapEdge>();
+}
+
+[Serializable] public sealed class EnvironmentCostRuntimeRoadHeatmapEdge
+{
+    public string id;
+    public string[] sourceEdgeIds;
+    public EnvironmentCostRuntimeRouteCoordinate from, to;
+    public double walkingSeconds, baselineValue, policyValue, delta;
+    public string baselineStatus, policyStatus, status;
+}
+
+public static class EnvironmentCostRuntimeRoadHeatmapComparison
+{
+    public const string ResultSchema = "environment-cost-runtime-road-heatmap-comparison-0.1";
+
+    public static string CalculateFingerprint(EnvironmentCostRuntimeRoadHeatmapComparisonResult result)
+    {
+        if (result == null) throw new ArgumentNullException(nameof(result));
+        var previous = result.comparisonFingerprintSha256;
+        result.comparisonFingerprintSha256 = null;
+        try
+        {
+            using var sha = SHA256.Create();
+            var json = JsonConvert.SerializeObject(result, Formatting.None);
+            return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(json))).Replace("-", string.Empty).ToLowerInvariant();
+        }
+        finally { result.comparisonFingerprintSha256 = previous; }
+    }
+}
