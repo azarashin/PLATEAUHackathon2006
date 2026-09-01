@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildGraph, graphFingerprint, qualityReport } from './build-sidewalk-pedestrian-graph.mjs'
+import { buildGraph, graphFingerprint, qualityReport, qualitySummary } from './build-sidewalk-pedestrian-graph.mjs'
 
 const config = { areaId: 'fixture', center: [139.7, 35.6], radiusMeters: 1000, coordinateZoneId: 9 }
 const way = (id, nodes, geometry, tags) => ({ type: 'way', id, nodes, geometry: geometry.map(([lon, lat]) => ({ lon, lat })), tags })
@@ -23,6 +23,12 @@ assert.equal(graph.edges.some((e) => e.source.id === '13'), false, 'foot=no must
 assert.ok(graph.edges.some((e) => e.facility === 'crossing' && e.level === 0), 'same-level crossing node connects sidewalk sides')
 assert.ok(graph.nodes.some((n) => n.side === 'left' && n.coordinate[1] > 35.6), 'left sidewalk must offset north for eastbound way')
 const report = qualityReport(graph, {}, [{ id: 'fixture-crossing', startNodeId: 'ped:osm-node:1:left:l0', endNodeId: 'ped:osm-node:2:left:l0' }])
+const summary = qualitySummary({ ...report, input: { captureContractVersion: '0.2' } })
+assert.equal(summary.status, 'accepted')
+assert.equal(summary.explicitOrDerivedRatio, report.lengthMeters.explicitOrDerivedRatio)
+assert.equal(summary.fallbackRatio, report.lengthMeters.fallbackRatio)
+assert.equal(summary.sourceSchemaVersion, '0.2')
+assert.deepEqual(summary.validationFailures, report.validation.failures)
 assert.equal(report.validation.isValid, true)
 assert.equal(report.lengthMeters.fallbackRatio, 0)
 assert.equal(report.representativeOds.status, 'passed')
