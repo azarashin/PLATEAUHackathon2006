@@ -32,7 +32,7 @@ v2 の `physicalEdges` は道路・歩道の実体 geometry を一度だけ保�
 
 ## 地域品質状態
 
-現在コミット済みの市ヶ谷・京都・舞鶴・藤沢・さいたまのsnapshotは0.1（way-only）のため、各 `*-sidewalk-pedestrian-network-verification.json` は `status: "blocked"`、`reason: "capture-contract-0.2-missing"`、`recommendedVersion: "v1"` を出力する。これはv2へ不正に流用しないための意図的な保留であり、再取得は #73 で扱う。
+市ヶ谷・京都・舞鶴・藤沢・さいたまの capture contract 0.2 snapshot はローカルの `data/raw/osm/<areaId>/sidewalk-contract-0.2.json` にある。新しい品質契約で再生成する際は、上記のv2 graph生成コマンドを各地域に対して実行し、後述の地域検証も行う。raw snapshot・生成graph・品質レポートは大容量のローカル成果物でありGit管理しない。
 
 ## テスト
 
