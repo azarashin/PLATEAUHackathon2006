@@ -61,12 +61,15 @@ public static class EnvironmentCostRuntimeShadeBatchRunner
         result.provenance.recalculatedEdgeCount = input.edges.Length;
         result.provenance.cityPackageVersion = JsonUtility.FromJson<EnvironmentCostRuntimeCityPackageManifest>(File.ReadAllText(Path.Combine(packageRoot, "manifest.json"))).version;
         result.provenance.cityPackageManifestSha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(Path.Combine(packageRoot, "manifest.json"));
-        var persistedPath = EnvironmentCostRuntimeShadeResultStore.Save(result, "baseline");
-        var persisted = EnvironmentCostRuntimeShadeResultStore.LoadForRouteComparison(persistedPath);
-        ValidateBatchResult(input, persisted);
+        // Full-city, all-hour evidence can exceed the Runtime comparison UI's
+        // 256 MB loading limit.  The batch contract is an export pipeline, not a
+        // UI comparison save, so fingerprint and validate it in memory instead.
+        result.provenance.resultFingerprintAlgorithm = EnvironmentCostRuntimeShadeResultStore.SemanticFingerprintAlgorithm;
+        result.provenance.resultFingerprintSha256 = EnvironmentCostRuntimeShadeResultStore.CalculateSha256(result);
+        ValidateBatchResult(input, result);
 
         var outputPath = config.ResolvePath(config.runtimeShadeResultOutputPath);
-        AtomicWrite(outputPath, File.ReadAllText(persistedPath));
+        AtomicWrite(outputPath, EnvironmentCostRuntimePolicyJson.Serialize(result, Formatting.Indented));
         var output = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimeShadeAnalysisResult>(File.ReadAllText(outputPath));
         ValidateBatchResult(input, output);
         var marker = new RuntimeShadeBatchCompleteMarker
