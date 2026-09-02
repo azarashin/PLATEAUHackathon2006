@@ -152,7 +152,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         using var worldReference = GeoReference.Create(new PlateauVector3d(0.0, 0.0, 0.0), 1.0f, CoordinateSystem.EUN, analysis.coordinateZoneId);
         var referencePoint = worldReference.Project(new GeoCoordinate(analysis.CenterLatitude, analysis.CenterLongitude, 0.0));
         using var localReference = GeoReference.Create(referencePoint, 1.0f, CoordinateSystem.EUN, analysis.coordinateZoneId);
-        var edges = new List<EnvironmentCostRuntimeShadeInputEdge>(sourceEdges.Count);
+        var edges = new List<EnvironmentCostRuntimeShadeInputEdge>(sourceEdges?.Count ?? 0);
         string graphFingerprint = null;
         EnvironmentCostRuntimeShadeInputQuality quality = null;
         if (!string.IsNullOrWhiteSpace(sidewalkNetworkPath))
