@@ -118,6 +118,10 @@ public static class HourlyEnvironmentCostSelfTests
                 edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-1", physicalEdgeId = "physical-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f } }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
             };
             physicalRuntimeInput.Validate();
+            var reloadedPhysicalRuntimeInput = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimeShadeAnalysisInput>(
+                EnvironmentCostRuntimePolicyJson.Serialize(physicalRuntimeInput));
+            reloadedPhysicalRuntimeInput.Validate();
+            AssertEqual(2, reloadedPhysicalRuntimeInput.edges[0].geometry.Length);
             AssertEqual("accepted", EnvironmentCostRuntimeShadeAnalyzer.CreateResult(physicalRuntimeInput,
                 new EnvironmentCostRuntimeShadeAnalysisRequest { analysisDate = new DateTime(2025, 8, 1), hours = new[] { 12 } }).provenance.networkQuality.status);
             physicalRuntimeInput.edges[0].physicalEdgeId = "";

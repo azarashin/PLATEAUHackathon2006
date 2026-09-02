@@ -215,7 +215,10 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         input.Validate();
         var relativePath = "runtime-shade-input.json";
         var target = Path.Combine(targetRoot, relativePath);
-        File.WriteAllText(target, JsonUtility.ToJson(input));
+        // JsonUtility silently drops jagged float[][] geometry.  Runtime shade input
+        // is a portable evidence file, so preserve every physical-edge vertex with
+        // the shared Newtonsoft-based serializer instead.
+        File.WriteAllText(target, EnvironmentCostRuntimePolicyJson.Serialize(input));
         files.Add(new EnvironmentCostRuntimeCityPackageFile
         {
             kind = "runtime-shade-input", relativePath = relativePath, bytes = new FileInfo(target).Length,

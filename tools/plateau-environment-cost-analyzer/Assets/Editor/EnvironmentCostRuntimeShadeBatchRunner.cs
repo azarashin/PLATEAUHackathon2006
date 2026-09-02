@@ -43,7 +43,7 @@ public static class EnvironmentCostRuntimeShadeBatchRunner
         Physics.SyncTransforms();
 
         var inputPath = Path.Combine(packageRoot, "runtime-shade-input.json");
-        var input = JsonUtility.FromJson<EnvironmentCostRuntimeShadeAnalysisInput>(File.ReadAllText(inputPath));
+        var input = EnvironmentCostRuntimePolicyJson.Deserialize<EnvironmentCostRuntimeShadeAnalysisInput>(File.ReadAllText(inputPath));
         input.Validate();
         if (!string.Equals(input.areaId, config.areaId, StringComparison.Ordinal) || input.quality == null ||
             !string.Equals(input.quality.status, "accepted", StringComparison.Ordinal))
