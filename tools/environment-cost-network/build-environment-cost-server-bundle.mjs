@@ -810,7 +810,7 @@ export async function writeV2ServerBundleFromRuntimeFile(bundleDirectory, graph,
       invariant(['available', 'partial', 'missing'].includes(hourly.status), `v2 environment status is invalid: ${edge.id}`)
       invariant([hourly.sampleCount, hourly.validSampleCount, hourly.noGroundSampleCount].every(Number.isInteger) && hourly.sampleCount >= 0 && hourly.validSampleCount >= 0 && hourly.noGroundSampleCount >= 0 && hourly.validSampleCount + hourly.noGroundSampleCount === hourly.sampleCount, `v2 environment coverage is invalid: ${edge.id}`)
       const status = hourly.status
-      if (status === 'missing') invariant(hourly.shadeRatio === null && hourly.solarExposureSeconds === null, `invalid missing cost: ${hourly.timestamp} ${edge.id}`)
+      if (status === 'missing') invariant((hourly.shadeRatio === null || hourly.shadeRatio === -1) && (hourly.solarExposureSeconds === null || hourly.solarExposureSeconds === -1), `invalid missing cost: ${hourly.timestamp} ${edge.id}`)
       else {
         invariant(Number.isFinite(hourly.shadeRatio) && hourly.shadeRatio >= 0 && hourly.shadeRatio <= 1 && Number.isFinite(hourly.solarExposureSeconds), `invalid calculated cost: ${hourly.timestamp} ${edge.id}`)
         invariant(status === (hourly.noGroundSampleCount === 0 ? 'available' : 'partial'), `cost status and coverage disagree: ${hourly.timestamp} ${edge.id}`)
