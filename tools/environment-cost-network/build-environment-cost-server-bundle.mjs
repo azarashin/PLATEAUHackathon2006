@@ -277,7 +277,10 @@ function validateCostSlice(slice, topology, walkingByPhysical) {
     invariant([sampleCount, validSampleCount, noGroundSampleCount].every(Number.isInteger), `non-integer sample coverage: ${slice.timestamp} ${index}`)
     invariant(sampleCount >= 0 && validSampleCount >= 0 && noGroundSampleCount >= 0 && validSampleCount + noGroundSampleCount === sampleCount, `invalid sample coverage: ${slice.timestamp} ${index}`)
     if (status === 'missing') {
-      invariant(validSampleCount === 0 && shadeRatio === null && solarExposureSeconds === null, `invalid missing cost: ${slice.timestamp} ${index}`)
+      // A Runtime result is also missing at night: ground samples can be valid,
+      // but sunlight has no meaningful shade/exposure value.  Preserve coverage
+      // separately from cost availability.
+      invariant(shadeRatio === null && solarExposureSeconds === null, `invalid missing cost: ${slice.timestamp} ${index}`)
       continue
     }
     invariant(Number.isFinite(shadeRatio) && shadeRatio >= 0 && shadeRatio <= 1 && Number.isFinite(solarExposureSeconds), `invalid calculated cost: ${slice.timestamp} ${index}`)
