@@ -24,6 +24,8 @@ assert.equal(graph.physicalEdges.filter((e) => e.source.id === '10').length, 2, 
 assert.ok(graph.edges.every((edge) => typeof edge.physicalEdgeId === 'string' && Number.isFinite(edge.walkingSeconds)), 'directed edges must identify their physical segment and walking time')
 assert.ok(graph.edges.every((edge) => !('geometry' in edge)), 'directed edges must not duplicate physical geometry')
 assert.ok(graph.physicalEdges.every((edge) => Array.isArray(edge.geometry) && Number.isFinite(edge.walkingSeconds)), 'physical segments must carry deterministic geometry and walking time')
+const nodesById = new Map(graph.nodes.map((node) => [node.id, node]))
+assert.ok(graph.physicalEdges.every((edge) => JSON.stringify(edge.geometry[0]) === JSON.stringify(nodesById.get(edge.fromNodeId).coordinate) && JSON.stringify(edge.geometry.at(-1)) === JSON.stringify(nodesById.get(edge.toNodeId).coordinate)), 'physical geometry endpoints must exactly match canonical nodes')
 assert.equal(graph.edges.filter((e) => e.source.id === '11').length, 0, 'sidewalk=separate must not derive duplicate sidewalks')
 assert.equal(graph.edges.filter((e) => e.source.id === '12').length, 2, 'independent footway has priority')
 assert.equal(graph.edges.some((e) => e.source.id === '13'), false, 'foot=no must be excluded')

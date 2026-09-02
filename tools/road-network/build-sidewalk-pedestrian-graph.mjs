@@ -70,7 +70,10 @@ export function buildGraph(config, osm) {
       const bb = (() => { if (variant.side !== 'left' && variant.side !== 'right') return b; const pa = geographicToPlane(a, config.coordinateZoneId), pb = geographicToPlane(b, config.coordinateZoneId), shifted = geographicToPlane(aa, config.coordinateZoneId); return planeToGeographic({ eastingMeters: pb.eastingMeters + shifted.eastingMeters - pa.eastingMeters, northingMeters: pb.northingMeters + shifted.northingMeters - pa.northingMeters }, config.coordinateZoneId) })()
       const from = addNode(`ped:osm-node:${way.nodes[i]}:${variant.side}:l${z}`, aa, way.nodes[i], variant.side, z, variant.facility === 'centerline' ? 'fallback-junction' : 'sidewalk-junction', sourceFor(variant.fallback ? 'v1-centerline' : 'osm-node', way.nodes[i], variant.rule, variant.fallback))
       const to = addNode(`ped:osm-node:${way.nodes[i + 1]}:${variant.side}:l${z}`, bb, way.nodes[i + 1], variant.side, z, variant.facility === 'centerline' ? 'fallback-junction' : 'sidewalk-junction', sourceFor(variant.fallback ? 'v1-centerline' : 'osm-node', way.nodes[i + 1], variant.rule, variant.fallback))
-      addBidirectional(`ped:way:${way.id}:${variant.side}:${i}`, from, to, [aa, bb], { facility: variant.facility, side: variant.side, level: z, crossing: null, source: sourceFor(variant.fallback ? 'v1-centerline' : 'osm-way', way.id, variant.rule, variant.fallback), fallback: variant.fallback })
+      // A node shared by differently oriented source segments has one canonical
+      // coordinate.  Physical-edge endpoints must use it too, otherwise a few-cm
+      // offset mismatch makes the graph non-portable to the server bundle.
+      addBidirectional(`ped:way:${way.id}:${variant.side}:${i}`, from, to, [nodes.get(from).coordinate, nodes.get(to).coordinate], { facility: variant.facility, side: variant.side, level: z, crossing: null, source: sourceFor(variant.fallback ? 'v1-centerline' : 'osm-way', way.id, variant.rule, variant.fallback), fallback: variant.fallback })
     }
   }
   // A tagged crossing node may connect different side variants, but never different levels.
@@ -97,12 +100,14 @@ function representativeOdResults(graph, definitions = []) {
   return { status: routes.every((route) => route.status === 'passed') ? 'passed' : 'failed', reason: null, routes }
 }
 function topologyAudit(graph) {
-  const rejected = [], nodeIds = new Set(graph.nodes.map((node) => node.id)), physicalById = new Map(), directedByPhysical = new Map(), edgeIds = new Set()
+  const rejected = [], nodeIds = new Set(graph.nodes.map((node) => node.id)), nodesById = new Map(graph.nodes.map((node) => [node.id, node])), physicalById = new Map(), directedByPhysical = new Map(), edgeIds = new Set()
   for (const edge of graph.physicalEdges) {
     if (physicalById.has(edge.id)) rejected.push('topology-duplicate-physical-edge-id')
     physicalById.set(edge.id, edge)
     if (!nodeIds.has(edge.fromNodeId) || !nodeIds.has(edge.toNodeId) || edge.fromNodeId === edge.toNodeId) rejected.push('topology-invalid-physical-edge-endpoint')
-    if (!Array.isArray(edge.geometry) || edge.geometry.length < 2 || !edge.geometry.every((point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)) || !Number.isFinite(edge.lengthMeters) || edge.lengthMeters <= 0 || !Number.isFinite(edge.walkingSeconds) || edge.walkingSeconds <= 0) rejected.push('topology-invalid-physical-edge-geometry')
+    const from = nodesById.get(edge.fromNodeId), to = nodesById.get(edge.toNodeId)
+    const endpointsMatch = from && to && edge.geometry?.length >= 2 && edge.geometry[0]?.every((value, index) => Math.abs(value - from.coordinate[index]) <= 1e-9) && edge.geometry[edge.geometry.length - 1]?.every((value, index) => Math.abs(value - to.coordinate[index]) <= 1e-9)
+    if (!Array.isArray(edge.geometry) || edge.geometry.length < 2 || !edge.geometry.every((point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)) || !endpointsMatch || !Number.isFinite(edge.lengthMeters) || edge.lengthMeters <= 0 || !Number.isFinite(edge.walkingSeconds) || edge.walkingSeconds <= 0) rejected.push('topology-invalid-physical-edge-geometry')
     if (!edge.source?.rationale || !edge.source?.confidence) rejected.push('missing-segment-rationale')
   }
   for (const edge of graph.edges) {
