@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildServerBundleDocuments, writeServerBundle } from './build-environment-cost-server-bundle.mjs'
+import { buildServerBundleDocuments, writeServerBundle, writeV2ServerBundleFromRuntimeFile } from './build-environment-cost-server-bundle.mjs'
 import { createFixtureInputs } from './fixture-inputs.mjs'
 import { loadEnvironmentCostServerBundle, safeReferencedPath } from './load-environment-cost-server-bundle.mjs'
 import { validateBundle } from '../../viewer/scripts/validate-environment-cost-server-bundle.mjs'
@@ -116,6 +116,19 @@ try {
     /Scenario conditions do not match/,
     'v1/v2 bundles must not be used in one A/B comparison even if their area matches',
   )
+
+  // v2 Runtime output can exceed Node's maximum string length.  Exercise the
+  // file-oriented path with a header that crosses a read-stream chunk and
+  // verify it produces the exact same bundle documents as the in-memory API.
+  const streamedEnvironmentPath = join(directory, 'runtime-result.json')
+  const streamedEnvironment = { ...v2Environment, provenance: { ...v2Environment.provenance, parserContractPadding: 'x'.repeat(128 * 1024) } }
+  await writeFile(streamedEnvironmentPath, JSON.stringify(streamedEnvironment))
+  const streamedDirectory = join(directory, 'v2-streamed')
+  const streamedWrite = await writeV2ServerBundleFromRuntimeFile(streamedDirectory, v2Graph, streamedEnvironmentPath, { provenance: 'fixture' })
+  assert.equal(streamedWrite.manifest.bundleFingerprintSha256, (await writeServerBundle(join(directory, 'v2-reference'), v2Bundle)).manifest.bundleFingerprintSha256, 'streamed v2 output must preserve the existing bundle schema and fingerprints')
+  for (const file of ['topology.json', 'cost-08.json', 'cost-09.json']) {
+    assert.deepEqual(JSON.parse(await readFile(join(streamedDirectory, file), 'utf8')), JSON.parse(await readFile(join(directory, 'v2-reference', file), 'utf8')), `streamed v2 ${file} must match the in-memory bundle`)
+  }
 
   const v2ManifestPath = join(v2Directory, 'manifest.json')
   const v2Manifest = JSON.parse(await readFile(v2ManifestPath, 'utf8'))
