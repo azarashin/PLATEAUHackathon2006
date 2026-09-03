@@ -1,17 +1,103 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-08-31T00:20:07.739Z",
+  "verifiedAt": "2026-09-01T14:09:30.115Z",
   "areaId": "maizuru",
   "captureManifest": {
-    "schemaVersion": "osm-snapshot-manifest-0.1",
-    "captureContractVersion": null,
-    "sha256": "dad86c1381d5880176b0d0b498308c10600b38f2e6d5373cbdf90d118ca63187"
+    "schemaVersion": "osm-snapshot-manifest-0.2",
+    "captureContractVersion": "0.2",
+    "sha256": "df2ed074fd7c193d3f0d32c72fe040e052812935c01292b8ad1e88dbe420b434"
   },
-  "status": "blocked",
-  "reason": "capture-contract-0.2-missing",
-  "recommendedVersion": "v1",
-  "validation": {
-    "graphBuilt": false,
-    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  "status": "accepted",
+  "graphFingerprintSha256": "5c329a4f7edccbe8f9c3a5dc83d55fba9f50a060625ad05bc40d4084b18ecdfa",
+  "quality": {
+    "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
+    "qualityContractVersion": "pedestrian-network-safety-1.0",
+    "generatedAt": "2026-09-01T14:09:30.361Z",
+    "graphFingerprintSha256": "5c329a4f7edccbe8f9c3a5dc83d55fba9f50a060625ad05bc40d4084b18ecdfa",
+    "input": {
+      "areaId": "maizuru",
+      "captureContractVersion": "0.2"
+    },
+    "counts": {
+      "nodeCount": 13879,
+      "physicalEdgeCount": 15073,
+      "directedEdgeCount": 30146,
+      "fallbackPhysicalEdgeCount": 11150,
+      "fallbackDirectedEdgeCount": 22300,
+      "sourceWayCount": 2901,
+      "includedWayCount": 2850,
+      "excludedWayCount": 51,
+      "excludedWayCountByReason": {
+        "access-restricted-without-foot-override": 21,
+        "foot-prohibited": 2,
+        "non-pedestrian-highway": 28
+      },
+      "explicitWayCount": 519,
+      "derivedSidewalkWayCount": 14,
+      "separateSidewalkSkippedCount": 0,
+      "fallbackWayCount": 2317,
+      "crossingConnectionCount": 228,
+      "levelSeparatedCrossingConnectionCount": 0,
+      "malformedWayCount": 0
+    },
+    "processing": {
+      "sourceWayCount": 2901,
+      "includedWayCount": 2850,
+      "excludedWayCount": 51,
+      "excludedWayCountByReason": {
+        "access-restricted-without-foot-override": 21,
+        "foot-prohibited": 2,
+        "non-pedestrian-highway": 28
+      },
+      "separateSidewalkSkippedCount": 0,
+      "malformedWayCount": 0,
+      "crossingConnectionCount": 228,
+      "levelSeparatedCrossingConnectionCount": 0
+    },
+    "lengthMeters": {
+      "total": 453258.77082956606,
+      "explicit": 78171.65771684538,
+      "derived": 10285.709073862768,
+      "explicitOrDerived": 88457.36679070815,
+      "fallback": 364801.40403886006,
+      "explicitOrDerivedRatio": 0.19515864332599933,
+      "fallbackRatio": 0.8048413566740054
+    },
+    "segmentRationales": {
+      "explicit-crossing": {
+        "physicalEdgeCount": 134,
+        "lengthMeters": 377.8868787894077
+      },
+      "shared-space-representative-line": {
+        "physicalEdgeCount": 11150,
+        "lengthMeters": 364801.40403886006
+      },
+      "explicit-pedestrian-facility": {
+        "physicalEdgeCount": 3501,
+        "lengthMeters": 77793.77083805598
+      },
+      "derived-sidewalk": {
+        "physicalEdgeCount": 288,
+        "lengthMeters": 10285.709073862768
+      }
+    },
+    "topology": {
+      "isSafe": true,
+      "rejected": []
+    },
+    "representativeOds": {
+      "status": "blocked",
+      "reason": "representative-od-not-configured",
+      "routes": []
+    },
+    "validation": {
+      "status": "accepted",
+      "isValid": true,
+      "rejectedReasons": [],
+      "unverifiedReasons": [],
+      "warnings": [
+        "representative-od-not-configured"
+      ]
+    }
   }
 }

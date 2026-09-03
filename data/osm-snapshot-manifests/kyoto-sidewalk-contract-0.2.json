@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.2",
+  "captureContractVersion": "0.2",
+  "areaId": "kyoto",
+  "localPath": "data/raw/osm/kyoto/sidewalk-contract-0.2.json",
+  "queryPath": "data/osm-queries/kyoto-sidewalk-contract-0.2.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "requestedAt": "2026-09-01T03:45:36.239Z",
+  "osmTimestamp": "2026-09-01T03:44:20Z",
+  "sizeBytes": 33078182,
+  "sha256": "158e63f3f274465057dcf16627f1b34083a19bc61a3de23228862be9da420d25",
+  "elementCounts": {
+    "way": 25516,
+    "node": 91017,
+    "relation": 514
+  },
+  "requiredElementTypes": [
+    "way",
+    "node",
+    "relation"
+  ],
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ]
+}

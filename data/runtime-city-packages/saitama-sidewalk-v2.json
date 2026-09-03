@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "environment-cost-runtime-city-package-config-0.2",
+  "areaId": "saitama",
+  "displayName": "さいたま（歩行ネットワーク v2）",
+  "version": "2026.09.02-sidewalk-v2",
+  "analysisConfigPath": "data/analysis-configs/saitama.json",
+  "sidewalkNetworkPath": "data/generated/saitama-sidewalk-pedestrian-network-v2.json",
+  "packageRelativePath": "EnvironmentCostCities/saitama-sidewalk-v2",
+  "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/saitama.unity",
+  "runtimeShadeResultOutputPath": "data/generated/saitama-sidewalk-v2-runtime-shade-result.json",
+  "runtimeShadeCompleteMarkerPath": "data/generated/saitama-sidewalk-v2-runtime-shade-result.complete.json"
+}

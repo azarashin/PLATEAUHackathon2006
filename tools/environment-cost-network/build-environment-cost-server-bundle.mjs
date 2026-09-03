@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateHourlyOutput } from '../hourly-environment-cost/validate-hourly-output.mjs'
@@ -15,6 +16,7 @@ import {
 const STATUS_TO_CODE = Object.freeze({ missing: 0, partial: 1, available: 2 })
 const CODE_TO_STATUS = Object.freeze(['missing', 'partial', 'available'])
 const FORMULA_TOLERANCE_SECONDS = 1e-6
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
 
 function usage() {
   return `Usage: node --max-old-space-size=8192 tools/environment-cost-network/build-environment-cost-server-bundle.mjs \\
@@ -68,6 +70,127 @@ function validateInputCompatibility(graph, environment) {
   invariant(graph.coordinateSystems.unity.japanPlaneRectangularZoneId === environment.coordinateZoneId, 'graph and environment coordinate zones do not match')
   invariant(Math.abs(graph.walking.defaultSpeedMetersPerSecond - environment.settings.walkingSpeedMetersPerSecond) <= 1e-12, 'graph and environment walking speeds do not match')
   return environmentSummary
+}
+
+// The Runtime result for a full city can be larger than Node's maximum string
+// length.  The v2 CLI path deliberately parses its `edges` array one JSON
+// object at a time; keep the in-memory public API below for v1 and fixtures.
+async function streamRuntimeShadeResult(path, onHeader, onEdge) {
+  let buffer = ''
+  let position = 0
+  let state = 'start'
+  let propertyName = null
+  let headerNotified = false
+  const result = {}
+
+  const whitespace = () => {
+    while (position < buffer.length && /\s/.test(buffer[position])) position += 1
+  }
+  const stringEnd = (start) => {
+    let escaped = false
+    for (let index = start + 1; index < buffer.length; index += 1) {
+      const character = buffer[index]
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') return index + 1
+    }
+    return null
+  }
+  const valueEnd = (start) => {
+    const first = buffer[start]
+    if (first === '"') return stringEnd(start)
+    if (first !== '{' && first !== '[') {
+      for (let index = start; index < buffer.length; index += 1) {
+        if (buffer[index] === ',' || buffer[index] === '}' || buffer[index] === ']') return index
+      }
+      return null
+    }
+    const stack = [first]
+    let escaped = false
+    let inString = false
+    for (let index = start + 1; index < buffer.length; index += 1) {
+      const character = buffer[index]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (character === '\\') escaped = true
+        else if (character === '"') inString = false
+        continue
+      }
+      if (character === '"') { inString = true; continue }
+      if (character === '{' || character === '[') stack.push(character)
+      else if (character === '}' || character === ']') {
+        const opening = stack.pop()
+        if ((opening === '{' && character !== '}') || (opening === '[' && character !== ']')) throw new Error('runtime shade result has mismatched JSON delimiters')
+        if (stack.length === 0) return index + 1
+      }
+    }
+    return null
+  }
+  const compact = () => {
+    if (position > 0) { buffer = buffer.slice(position); position = 0 }
+  }
+  const consume = async (final = false) => {
+    while (true) {
+      whitespace()
+      if (state === 'start') {
+        if (buffer[position] === undefined) break
+        if (buffer[position] !== '{') throw new Error('runtime shade result root must be an object')
+        position += 1; state = 'property'
+      } else if (state === 'property') {
+        whitespace()
+        if (buffer[position] === '}') { position += 1; state = 'done'; continue }
+        if (buffer[position] === undefined) break
+        if (buffer[position] !== '"') throw new Error('runtime shade result property name is invalid')
+        const end = stringEnd(position); if (end === null) break
+        propertyName = JSON.parse(buffer.slice(position, end)); position = end; state = 'colon'
+      } else if (state === 'colon') {
+        whitespace(); if (buffer[position] === undefined) break
+        if (buffer[position] !== ':') throw new Error('runtime shade result property separator is invalid')
+        position += 1
+        if (propertyName === 'edges') state = 'edges-start'
+        else state = 'value'
+      } else if (state === 'value') {
+        whitespace(); const end = valueEnd(position); if (end === null) break
+        result[propertyName] = JSON.parse(buffer.slice(position, end)); position = end; state = 'separator'
+      } else if (state === 'edges-start') {
+        whitespace(); if (buffer[position] === undefined) break
+        if (buffer[position] !== '[') throw new Error('runtime shade result edges must be an array')
+        if (!headerNotified) { await onHeader(result); headerNotified = true }
+        position += 1; state = 'edge-or-end'
+      } else if (state === 'edge-or-end') {
+        whitespace(); if (buffer[position] === undefined) break
+        if (buffer[position] === ']') { position += 1; state = 'separator'; continue }
+        const end = valueEnd(position); if (end === null) break
+        const edge = JSON.parse(buffer.slice(position, end))
+        if (!edge || Array.isArray(edge) || typeof edge !== 'object') throw new Error('runtime shade result edge is invalid')
+        await onEdge(edge); position = end; state = 'edge-separator'
+      } else if (state === 'edge-separator') {
+        whitespace(); if (buffer[position] === undefined) break
+        if (buffer[position] === ']') { position += 1; state = 'separator'; continue }
+        if (buffer[position] !== ',') throw new Error('runtime shade result edge separator is invalid')
+        position += 1; state = 'edge-or-end'
+      } else if (state === 'separator') {
+        whitespace(); if (buffer[position] === undefined) break
+        if (buffer[position] === '}') { position += 1; state = 'done'; continue }
+        if (buffer[position] !== ',') throw new Error('runtime shade result property separator is invalid')
+        position += 1; state = 'property'
+      } else if (state === 'done') {
+        whitespace(); if (position < buffer.length) throw new Error('runtime shade result has trailing data')
+        break
+      }
+      compact()
+    }
+    compact()
+    if (final && state !== 'done') throw new Error('runtime shade result is incomplete')
+  }
+
+  for await (const chunk of createReadStream(resolve(path), { encoding: 'utf8' })) {
+    buffer += chunk
+    await consume(false)
+  }
+  await consume(true)
+  if (!headerNotified) throw new Error('runtime shade result edges are missing')
+  return result
 }
 
 function policyScenarioMetadata(environment) {
@@ -201,22 +324,33 @@ function buildCostSlices(graph, environment, topology, physicalEdges, allowUnmat
 }
 
 function validateTopology(topology) {
-  invariant(topology.schemaVersion === 'environment-cost-server-topology-1.0', 'server topology schemaVersion is invalid')
+  const isV2 = topology.schemaVersion === 'environment-cost-server-topology-2.0'
+  invariant(isV2 || topology.schemaVersion === 'environment-cost-server-topology-1.0', 'server topology schemaVersion is invalid')
   invariant(topology.nodes.length === topology.counts.nodeCount, 'server topology node count mismatch')
   invariant(topology.physicalEdges.length === topology.counts.physicalEdgeCount, 'server topology physical edge count mismatch')
   invariant(topology.directedEdges.length === topology.counts.directedEdgeCount, 'server topology directed edge count mismatch')
   invariant(topology.contentFingerprintSha256 === contentFingerprint(topology), 'server topology content fingerprint mismatch')
   const nodeSourceIds = new Set()
   for (const [sourceNodeId, longitude, latitude] of topology.nodes) {
-    invariant(Number.isSafeInteger(sourceNodeId) && !nodeSourceIds.has(sourceNodeId), `invalid or duplicate server node: ${sourceNodeId}`)
+    invariant((isV2 ? typeof sourceNodeId === 'string' && sourceNodeId.length > 0 : Number.isSafeInteger(sourceNodeId)) && !nodeSourceIds.has(sourceNodeId), `invalid or duplicate server node: ${sourceNodeId}`)
     nodeSourceIds.add(sourceNodeId)
     invariant(Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90, `invalid server node coordinate: ${sourceNodeId}`)
   }
   const physicalIds = new Set()
-  for (const [physicalEdgeId, sourceEdgeIds] of topology.physicalEdges) {
+  const physicalDirections = isV2 ? new Array(topology.physicalEdges.length).fill(0) : null
+  for (let physicalIndex = 0; physicalIndex < topology.physicalEdges.length; physicalIndex += 1) {
+    const physicalEdge = topology.physicalEdges[physicalIndex]
+    const [physicalEdgeId, sourceOrGeometry] = physicalEdge
     invariant(typeof physicalEdgeId === 'string' && !physicalIds.has(physicalEdgeId), `invalid or duplicate physical edge: ${physicalEdgeId}`)
     physicalIds.add(physicalEdgeId)
-    invariant(Array.isArray(sourceEdgeIds) && sourceEdgeIds.length > 0 && new Set(sourceEdgeIds).size === sourceEdgeIds.length, `invalid source edges: ${physicalEdgeId}`)
+    if (isV2) {
+      const [, fromNodeIndex, toNodeIndex, geometry] = physicalEdge
+      invariant(Number.isInteger(fromNodeIndex) && fromNodeIndex >= 0 && fromNodeIndex < topology.nodes.length && Number.isInteger(toNodeIndex) && toNodeIndex >= 0 && toNodeIndex < topology.nodes.length && fromNodeIndex !== toNodeIndex, `invalid physical edge nodes: ${physicalEdgeId}`)
+      invariant(Array.isArray(geometry) && geometry.length >= 2 && geometry.every((point) => Array.isArray(point) && point.length === 2 && Number.isFinite(point[0]) && Number.isFinite(point[1])), `invalid physical geometry: ${physicalEdgeId}`)
+      invariant(coordinatesMatch(geometry[0], topology.nodes[fromNodeIndex].slice(1)) && coordinatesMatch(geometry[geometry.length - 1], topology.nodes[toNodeIndex].slice(1)), `physical geometry endpoint does not match node: ${physicalEdgeId}`)
+    } else {
+      invariant(Array.isArray(sourceOrGeometry) && sourceOrGeometry.length > 0 && new Set(sourceOrGeometry).size === sourceOrGeometry.length, `invalid source edges: ${physicalEdgeId}`)
+    }
   }
   for (let index = 0; index < topology.directedEdges.length; index += 1) {
     const [physicalIndex, fromNodeIndex, toNodeIndex, directionCode, lengthMeters, walkingSeconds] = topology.directedEdges[index]
@@ -226,7 +360,17 @@ function validateTopology(topology) {
     invariant(fromNodeIndex !== toNodeIndex, `self-loop directed edge: ${index}`)
     invariant(directionCode === 0 || directionCode === 1, `invalid directed edge direction code: ${index}`)
     invariant(Number.isFinite(lengthMeters) && lengthMeters > 0 && Number.isFinite(walkingSeconds) && walkingSeconds > 0, `invalid directed edge measurement: ${index}`)
+    if (isV2) {
+      const [, physicalFromNodeIndex, physicalToNodeIndex] = topology.physicalEdges[physicalIndex]
+      const isForward = fromNodeIndex === physicalFromNodeIndex && toNodeIndex === physicalToNodeIndex
+      const isBackward = fromNodeIndex === physicalToNodeIndex && toNodeIndex === physicalFromNodeIndex
+      invariant(isForward || isBackward, `directed edge does not follow physical endpoints: ${index}`)
+      invariant(directionCode === (isForward ? 0 : 1), `directed edge direction code disagrees with endpoints: ${index}`)
+      physicalDirections[physicalIndex] += 1
+      invariant(physicalDirections[physicalIndex] <= 2, `physical edge has duplicate directed direction: ${physicalIndex}`)
+    }
   }
+  if (isV2) invariant(physicalDirections.every((count) => count > 0), 'a v2 physical edge has no directed edge')
 }
 
 function physicalWalkingSeconds(topology) {
@@ -240,7 +384,8 @@ function physicalWalkingSeconds(topology) {
 }
 
 function validateCostSlice(slice, topology, walkingByPhysical) {
-  invariant(slice.schemaVersion === 'environment-cost-server-cost-slice-1.0', 'server cost slice schemaVersion is invalid')
+  const expectedSchema = topology.schemaVersion === 'environment-cost-server-topology-2.0' ? 'environment-cost-server-cost-slice-2.0' : 'environment-cost-server-cost-slice-1.0'
+  invariant(slice.schemaVersion === expectedSchema, 'server cost slice schemaVersion is invalid')
   invariant(slice.areaId === topology.areaId, `server cost area mismatch: ${slice.timestamp}`)
   invariant(slice.topologyContentFingerprintSha256 === topology.contentFingerprintSha256, `server cost topology fingerprint mismatch: ${slice.timestamp}`)
   invariant(slice.physicalEdgeCount === topology.physicalEdges.length && slice.costs.length === topology.physicalEdges.length, `server cost physical edge count mismatch: ${slice.timestamp}`)
@@ -254,7 +399,10 @@ function validateCostSlice(slice, topology, walkingByPhysical) {
     invariant([sampleCount, validSampleCount, noGroundSampleCount].every(Number.isInteger), `non-integer sample coverage: ${slice.timestamp} ${index}`)
     invariant(sampleCount >= 0 && validSampleCount >= 0 && noGroundSampleCount >= 0 && validSampleCount + noGroundSampleCount === sampleCount, `invalid sample coverage: ${slice.timestamp} ${index}`)
     if (status === 'missing') {
-      invariant(validSampleCount === 0 && shadeRatio === null && solarExposureSeconds === null, `invalid missing cost: ${slice.timestamp} ${index}`)
+      // A Runtime result is also missing at night: ground samples can be valid,
+      // but sunlight has no meaningful shade/exposure value.  Preserve coverage
+      // separately from cost availability.
+      invariant(shadeRatio === null && solarExposureSeconds === null, `invalid missing cost: ${slice.timestamp} ${index}`)
       continue
     }
     invariant(Number.isFinite(shadeRatio) && shadeRatio >= 0 && shadeRatio <= 1 && Number.isFinite(solarExposureSeconds), `invalid calculated cost: ${slice.timestamp} ${index}`)
@@ -266,6 +414,9 @@ function validateCostSlice(slice, topology, walkingByPhysical) {
 }
 
 export function buildServerBundleDocuments(graph, environment, options = {}) {
+  if (graph?.schemaVersion === 'environment-cost-pedestrian-network-2.0') {
+    return buildV2ServerBundleDocuments(graph, environment, options)
+  }
   const environmentSummary = validateInputCompatibility(graph, environment)
   const physicalEdges = normalizedPhysicalEdges(graph)
   const topology = buildTopology(graph, physicalEdges)
@@ -329,6 +480,160 @@ export function buildServerBundleDocuments(graph, environment, options = {}) {
   }
 }
 
+function validateV2Header(graph, result) {
+  invariant(result?.schemaVersion === 'environment-cost-runtime-shade-result-0.1' && result.status === 'completed', 'v2 environment result must be a completed runtime shade result')
+  invariant(typeof graph.areaId === 'string' && graph.areaId === result.areaId, 'v2 graph and environment areaId do not match')
+  invariant(typeof graph.graphFingerprintSha256 === 'string' && /^[0-9a-f]{64}$/.test(graph.graphFingerprintSha256), 'v2 graph fingerprint is invalid')
+  invariant(Array.isArray(graph.nodes) && graph.nodes.length >= 2 && Array.isArray(graph.physicalEdges) && graph.physicalEdges.length > 0 && Array.isArray(graph.edges) && graph.edges.length > 0, 'v2 sidewalk graph is incomplete')
+  const provenance = result.provenance
+  invariant(provenance && provenance.graphFingerprintSha256 === graph.graphFingerprintSha256, 'v2 graph and environment fingerprints do not match')
+  invariant(Array.isArray(provenance.center) && provenance.center.length === 2 && Array.isArray(graph.extent?.center) && equalCoordinate(provenance.center, graph.extent.center), 'v2 graph and environment centers do not match')
+  invariant(Math.abs(provenance.radiusMeters - graph.extent.radiusMeters) <= 1e-9, 'v2 graph and environment radii do not match')
+  invariant(Array.isArray(provenance.hours) && provenance.hours.length > 0 && new Set(provenance.hours).size === provenance.hours.length, 'v2 environment hours are invalid')
+  const physicalIds = new Set(graph.physicalEdges.map((edge) => edge.id))
+  invariant(physicalIds.size === graph.physicalEdges.length && [...physicalIds].every((id) => typeof id === 'string' && id.length > 0), 'v2 physical edge IDs are invalid')
+  const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]))
+  invariant(graphNodes.size === graph.nodes.length && [...graphNodes.keys()].every((id) => typeof id === 'string' && id.length > 0), 'v2 graph node IDs are invalid')
+  const directionKeys = new Set()
+  const directedByPhysical = new Map()
+  const physicalById = new Map()
+  for (const physical of graph.physicalEdges) {
+    invariant(graphNodes.has(physical.fromNodeId) && graphNodes.has(physical.toNodeId) && physical.fromNodeId !== physical.toNodeId, `v2 physical edge nodes are invalid: ${physical.id}`)
+    invariant(Array.isArray(physical.geometry) && physical.geometry.length >= 2, `v2 physical edge geometry is invalid: ${physical.id}`)
+    invariant(coordinatesMatch(physical.geometry[0], graphNodes.get(physical.fromNodeId).coordinate) && coordinatesMatch(physical.geometry[physical.geometry.length - 1], graphNodes.get(physical.toNodeId).coordinate), `v2 physical edge geometry does not match nodes: ${physical.id}`)
+    directedByPhysical.set(physical.id, 0)
+    physicalById.set(physical.id, physical)
+  }
+  for (const edge of graph.edges) {
+    const physical = physicalById.get(edge.physicalEdgeId)
+    invariant(physical, `v2 directed edge physical ID is invalid: ${edge?.physicalEdgeId ?? '<missing>'}`)
+    const forward = edge.fromNodeId === physical.fromNodeId && edge.toNodeId === physical.toNodeId
+    const backward = edge.fromNodeId === physical.toNodeId && edge.toNodeId === physical.fromNodeId
+    invariant(forward || backward, `v2 directed edge does not follow physical edge direction: ${edge?.id ?? '<missing>'}`)
+    const directionCode = forward ? 0 : 1
+    const directionKey = `${physical.id}\u0000${directionCode}`
+    invariant(!directionKeys.has(directionKey), `v2 directed edge duplicates a physical direction: ${physical.id}`)
+    directionKeys.add(directionKey)
+    directedByPhysical.set(physical.id, directedByPhysical.get(physical.id) + 1)
+  }
+  invariant([...directedByPhysical.values()].every((count) => count > 0), 'v2 physical edge has no directed edge')
+  invariant(typeof provenance.resultFingerprintSha256 === 'string' && /^[0-9a-f]{64}$/.test(provenance.resultFingerprintSha256), 'v2 environment result fingerprint is invalid')
+  return { provenance, physicalIds }
+}
+
+function validateV2Inputs(graph, result) {
+  const { provenance, physicalIds } = validateV2Header(graph, result)
+  invariant(Array.isArray(result.edges) && result.edges.length > 0, 'v2 environment edges are missing')
+  invariant(result.edges.length === physicalIds.size, 'v2 environment must contain exactly one result per physical edge')
+  const resultIds = new Set()
+  for (const edge of result.edges) {
+    invariant(typeof edge?.id === 'string' && edge.id.length > 0 && resultIds.add(edge.id), `v2 environment edge ID is invalid or duplicated: ${edge?.id ?? '<missing>'}`)
+    invariant(physicalIds.has(edge.id), `v2 environment edge is not a graph physical edge: ${edge.id}`)
+    invariant(Array.isArray(edge.hourly) && edge.hourly.length === provenance.hours.length, `v2 environment hourly data is incomplete: ${edge.id}`)
+  }
+  invariant(resultIds.size === physicalIds.size && [...physicalIds].every((id) => resultIds.has(id)), 'v2 environment edge IDs do not exactly match graph physical edge IDs')
+  return provenance
+}
+
+function coordinatesMatch(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && left.length === 2 && right.length === 2
+    && Number.isFinite(left[0]) && Number.isFinite(left[1]) && Number.isFinite(right[0]) && Number.isFinite(right[1])
+    && Math.abs(left[0] - right[0]) <= 1e-9 && Math.abs(left[1] - right[1]) <= 1e-9
+}
+
+function v2Quality(graph, provenance) {
+  const quality = provenance.networkQuality
+  invariant(quality && typeof quality === 'object', 'v2 environment network quality is missing')
+  invariant(quality.qualityContractVersion === PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION, 'v2 environment network quality contract is missing or legacy-unverified')
+  invariant(typeof quality.sourceSchemaVersion === 'string' && quality.sourceSchemaVersion === '0.2', 'v2 network quality source contract is invalid')
+  invariant(quality.status === 'accepted', 'v2 network quality is not accepted')
+  // Shared Japanese streets may legitimately use representative centerlines. Keep
+  // these ratios as diagnostics, not as a false safety gate.
+  invariant(Number.isFinite(quality.explicitOrDerivedRatio) && quality.explicitOrDerivedRatio >= 0 && quality.explicitOrDerivedRatio <= 1 && Number.isFinite(quality.fallbackRatio) && quality.fallbackRatio >= 0 && quality.fallbackRatio <= 1 && Math.abs(quality.explicitOrDerivedRatio + quality.fallbackRatio - 1) <= 1e-6, 'v2 network quality ratios are invalid')
+  invariant(Array.isArray(quality.validationFailures) && quality.validationFailures.length === 0 && Array.isArray(quality.validationWarnings), 'v2 network quality safety audit is incomplete or has validation failures')
+  return {
+    qualityContractVersion: quality.qualityContractVersion,
+    status: typeof quality.status === 'string' ? quality.status : 'unverified',
+    explicitOrDerivedRatio: quality.explicitOrDerivedRatio,
+    fallbackRatio: quality.fallbackRatio,
+    sourceSchemaVersion: quality.sourceSchemaVersion,
+    validationFailures: [...quality.validationFailures],
+    validationWarnings: [...quality.validationWarnings],
+  }
+}
+
+function buildV2Topology(graph, quality) {
+  const nodes = [...graph.nodes].sort((left, right) => left.id.localeCompare(right.id))
+  const physicalEdges = [...graph.physicalEdges].sort((left, right) => left.id.localeCompare(right.id))
+  const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]))
+  const physicalIndex = new Map(physicalEdges.map((edge, index) => [edge.id, index]))
+  const physicalById = new Map(physicalEdges.map((edge) => [edge.id, edge]))
+  const topology = {
+    schemaVersion: 'environment-cost-server-topology-2.0', areaId: graph.areaId, graphFingerprintSha256: graph.graphFingerprintSha256,
+    coordinateReferenceSystem: { geometryEpsg: 4326, axisOrder: ['longitude', 'latitude'], ...(graph.coordinateReferenceSystem ?? {}) },
+    networkQuality: quality,
+    counts: { nodeCount: nodes.length, physicalEdgeCount: physicalEdges.length, directedEdgeCount: graph.edges.length },
+    nodes: nodes.map((node) => [node.id, node.coordinate[0], node.coordinate[1]]),
+    physicalEdges: physicalEdges.map((edge) => [edge.id, nodeIndex.get(edge.fromNodeId), nodeIndex.get(edge.toNodeId), edge.geometry, edge.source ?? null, edge.facility ?? null, edge.side ?? null, edge.level ?? null, edge.fallback === true]),
+    directedEdges: [...graph.edges].sort((left, right) => left.id.localeCompare(right.id)).map((edge) => [
+      physicalIndex.get(edge.physicalEdgeId), nodeIndex.get(edge.fromNodeId), nodeIndex.get(edge.toNodeId),
+      edge.fromNodeId === physicalById.get(edge.physicalEdgeId).fromNodeId ? 0 : 1, physicalById.get(edge.physicalEdgeId).lengthMeters, edge.walkingSeconds,
+    ]),
+  }
+  topology.contentFingerprintSha256 = contentFingerprint(topology)
+  validateTopology(topology)
+  return topology
+}
+
+function v2CostSlices(graph, result, topology) {
+  const provenance = result.provenance
+  const byPhysicalId = new Map(result.edges.map((edge) => [edge.id, edge]))
+  const timestamps = byPhysicalId.get(topology.physicalEdges[0][0]).hourly.map((slice) => slice.timestamp)
+  const costSlices = timestamps.map((timestamp, hourIndex) => {
+    const statusCounts = { available: 0, partial: 0, missing: 0 }
+    const costs = topology.physicalEdges.map(([physicalId]) => {
+      const hourly = byPhysicalId.get(physicalId).hourly[hourIndex]
+      invariant(hourly.timestamp === timestamp, `v2 environment timestamps differ: ${physicalId}`)
+      invariant(['available', 'partial', 'missing'].includes(hourly.status), `v2 environment status is invalid: ${physicalId}`)
+      statusCounts[hourly.status] += 1
+      return [STATUS_TO_CODE[hourly.status], hourly.sampleCount, hourly.validSampleCount, hourly.noGroundSampleCount,
+        hourly.status === 'missing' ? null : hourly.shadeRatio, hourly.status === 'missing' ? null : hourly.solarExposureSeconds]
+    })
+    const document = { schemaVersion: 'environment-cost-server-cost-slice-2.0', areaId: graph.areaId, timestamp,
+      topologyContentFingerprintSha256: topology.contentFingerprintSha256, environmentCostFingerprintSha256: provenance.resultFingerprintSha256,
+      physicalEdgeCount: topology.physicalEdges.length, statusCounts, costs }
+    document.contentFingerprintSha256 = contentFingerprint(document)
+    return document
+  })
+  return costSlices
+}
+
+function buildV2ServerBundleDocuments(graph, result, options) {
+  const provenance = validateV2Inputs(graph, result)
+  const quality = v2Quality(graph, provenance)
+  const topology = buildV2Topology(graph, quality)
+  const costSlices = v2CostSlices(graph, result, topology)
+  const walkingByPhysical = physicalWalkingSeconds(topology)
+  for (const slice of costSlices) validateCostSlice(slice, topology, walkingByPhysical)
+  const timestamps = costSlices.map((slice) => slice.timestamp)
+  const scenarioId = provenance.scenarioId || 'baseline'
+  invariant(/^[a-z][a-z0-9-]{0,31}$/.test(scenarioId), 'v2 scenario id is invalid')
+  return {
+    schemaVersion: 'environment-cost-server-bundle-2.0', topology, costSlices,
+    manifestMetadata: {
+      dataset: { id: `${graph.areaId}-environment-cost-server-bundle-v2`, provenance: options.provenance ?? 'analysis', generatedAt: result.generatedAtUtc },
+      inputs: { roadGraphFingerprintSha256: graph.graphFingerprintSha256, environmentCostFingerprintSha256: provenance.resultFingerprintSha256 },
+      area: { areaId: graph.areaId, center: graph.extent.center, radiusMeters: graph.extent.radiusMeters },
+      scenario: { referenceDate: provenance.analysisDate, timezone: provenance.timezone, availableTimestamps: timestamps, defaultTimestamp: timestamps[Math.floor((timestamps.length - 1) / 2)] },
+      policyScenario: { id: scenarioId, label: scenarioId === 'baseline' ? '現状' : `施策 ${scenarioId}`, fingerprintSha256: provenance.policyFingerprintSha256 || provenance.resultFingerprintSha256 },
+      networkQuality: quality,
+      costFormula: { shadeRatioUnit: 'ratio', solarExposureSecondsUnit: 's', solarExposureSeconds: 'walkingSeconds * (1 - shadeRatio)', missingValuePolicy: 'preserve-null' },
+      encoding: { node: ['nodeId', 'longitude', 'latitude'], physicalEdge: ['physicalEdgeId', 'geometry', 'source', 'facility', 'side', 'level', 'fallback'], directedEdge: ['physicalEdgeIndex', 'fromNodeIndex', 'toNodeIndex', 'directionCode', 'lengthMeters', 'walkingSeconds'], directionCodes: { forward: 0, backward: 1 }, cost: ['statusCode', 'sampleCount', 'validSampleCount', 'noGroundSampleCount', 'shadeRatio', 'solarExposureSeconds'], statusCodes: STATUS_TO_CODE },
+    },
+    diagnostics: { sourceEnvironmentEdgeCount: result.edges.length, v2PhysicalEdgeCount: graph.physicalEdges.length },
+  }
+}
+
 function serializedDocument(document) {
   const text = `${JSON.stringify(document)}\n`
   return { text, bytes: Buffer.byteLength(text), sha256: sha256(text) }
@@ -376,7 +681,7 @@ export async function writeServerBundle(bundleDirectory, bundle) {
     })
   }
   const manifest = {
-    schemaVersion: 'environment-cost-server-bundle-1.0',
+    schemaVersion: bundle.schemaVersion ?? 'environment-cost-server-bundle-1.0',
     status: 'completed',
     ...bundle.manifestMetadata,
     counts: {
@@ -406,21 +711,157 @@ export async function writeServerBundle(bundleDirectory, bundle) {
     manifestBytes: manifestSerialized.bytes,
     manifestFileSha256: manifestSerialized.sha256,
     totalBundleBytes: manifestSerialized.bytes + topologySerialized.bytes + costReferences.reduce((sum, item) => sum + item.bytes, 0),
+    diagnostics: bundle.diagnostics,
   }
+}
+
+function v2ManifestMetadata(graph, provenance, quality, timestamps, options) {
+  const scenarioId = provenance.scenarioId || 'baseline'
+  invariant(/^[a-z][a-z0-9-]{0,31}$/.test(scenarioId), 'v2 scenario id is invalid')
+  return {
+    dataset: { id: `${graph.areaId}-environment-cost-server-bundle-v2`, provenance: options.provenance ?? 'analysis', generatedAt: provenance.generatedAtUtc },
+    inputs: { roadGraphFingerprintSha256: graph.graphFingerprintSha256, environmentCostFingerprintSha256: provenance.resultFingerprintSha256 },
+    area: { areaId: graph.areaId, center: graph.extent.center, radiusMeters: graph.extent.radiusMeters },
+    scenario: { referenceDate: provenance.analysisDate, timezone: provenance.timezone, availableTimestamps: timestamps, defaultTimestamp: timestamps[Math.floor((timestamps.length - 1) / 2)] },
+    policyScenario: { id: scenarioId, label: scenarioId === 'baseline' ? '現状' : `施策 ${scenarioId}`, fingerprintSha256: provenance.policyFingerprintSha256 || provenance.resultFingerprintSha256 },
+    networkQuality: quality,
+    costFormula: { shadeRatioUnit: 'ratio', solarExposureSecondsUnit: 's', solarExposureSeconds: 'walkingSeconds * (1 - shadeRatio)', missingValuePolicy: 'preserve-null' },
+    encoding: { node: ['nodeId', 'longitude', 'latitude'], physicalEdge: ['physicalEdgeId', 'geometry', 'source', 'facility', 'side', 'level', 'fallback'], directedEdge: ['physicalEdgeIndex', 'fromNodeIndex', 'toNodeIndex', 'directionCode', 'lengthMeters', 'walkingSeconds'], directionCodes: { forward: 0, backward: 1 }, cost: ['statusCode', 'sampleCount', 'validSampleCount', 'noGroundSampleCount', 'shadeRatio', 'solarExposureSeconds'], statusCodes: STATUS_TO_CODE },
+  }
+}
+
+async function writeV2CostSlice(directory, graph, topology, provenance, timestamp, hourIndex, buffers) {
+  const statusCounts = { available: 0, partial: 0, missing: 0 }
+  for (const statusCode of buffers.status) statusCounts[CODE_TO_STATUS[statusCode]] += 1
+  const prefix = `{"schemaVersion":"environment-cost-server-cost-slice-2.0","areaId":${JSON.stringify(graph.areaId)},"timestamp":${JSON.stringify(timestamp)},"topologyContentFingerprintSha256":${JSON.stringify(topology.contentFingerprintSha256)},"environmentCostFingerprintSha256":${JSON.stringify(provenance.resultFingerprintSha256)},"physicalEdgeCount":${topology.physicalEdges.length},"statusCounts":${JSON.stringify(statusCounts)},"costs":[`
+  const file = timestampFileName(timestamp)
+  const target = join(directory, file)
+  const temporary = `${target}.partial`
+  const fileHash = createHash('sha256')
+  const contentHash = createHash('sha256')
+  let bytes = 0
+  const append = async (handle, text, includeInContent = true) => {
+    await handle.write(text)
+    fileHash.update(text)
+    if (includeInContent) contentHash.update(text)
+    bytes += Buffer.byteLength(text)
+  }
+  try {
+    const handle = await open(temporary, 'w')
+    try {
+      await append(handle, prefix)
+      for (let index = 0; index < topology.physicalEdges.length; index += 1) {
+        if (index > 0) await append(handle, ',')
+        const status = CODE_TO_STATUS[buffers.status[index]]
+        const row = [buffers.status[index], buffers.sampleCount[index], buffers.validSampleCount[index], buffers.noGroundSampleCount[index],
+          status === 'missing' ? null : buffers.shadeRatio[index], status === 'missing' ? null : buffers.solarExposureSeconds[index]]
+        await append(handle, JSON.stringify(row))
+      }
+      contentHash.update(']}')
+      const contentFingerprintSha256 = contentHash.digest('hex')
+      await append(handle, `],"contentFingerprintSha256":"${contentFingerprintSha256}"}\n`, false)
+      return { timestamp, file, bytes, fileSha256: fileHash.digest('hex'), contentFingerprintSha256, statusCounts }
+    } finally { await handle.close() }
+  } catch (error) {
+    await unlink(temporary).catch(() => {})
+    throw error
+  }
+  finally { await rename(temporary, target).catch((error) => { if (error?.code !== 'ENOENT') throw error }) }
+}
+
+export async function writeV2ServerBundleFromRuntimeFile(bundleDirectory, graph, environmentPath, options = {}) {
+  const absoluteDirectory = resolve(bundleDirectory)
+  await mkdir(absoluteDirectory, { recursive: true })
+  const physicalEdges = [...graph.physicalEdges].sort((left, right) => left.id.localeCompare(right.id))
+  const physicalIndex = new Map(physicalEdges.map((edge, index) => [edge.id, index]))
+  let topology
+  let provenance
+  let quality
+  let walkingByPhysical
+  let timestamps
+  let buffers
+  let resultEdgeCount = 0
+  const resultIds = new Set()
+
+  const initialize = async (header) => {
+    const validated = validateV2Header(graph, header)
+    provenance = validated.provenance
+    // Keep only fixed-width values for each hour. This is bounded by
+    // physicalEdgeCount * hourCount and never retains the Runtime edge objects.
+    quality = v2Quality(graph, provenance)
+    topology = buildV2Topology(graph, quality)
+    walkingByPhysical = physicalWalkingSeconds(topology)
+    timestamps = null
+    buffers = null
+  }
+  const consumeEdge = async (edge) => {
+    invariant(topology, 'runtime shade result must declare metadata before edges')
+    invariant(typeof edge.id === 'string' && physicalIndex.has(edge.id) && resultIds.add(edge.id), `v2 environment edge ID is invalid or duplicated: ${edge.id ?? '<missing>'}`)
+    invariant(Array.isArray(edge.hourly) && edge.hourly.length === provenance.hours.length, `v2 environment hourly data is incomplete: ${edge.id}`)
+    if (!timestamps) {
+      timestamps = edge.hourly.map((slice) => slice.timestamp)
+      invariant(timestamps.length > 0 && new Set(timestamps).size === timestamps.length, 'v2 environment timestamps are invalid')
+      buffers = timestamps.map(() => ({ status: new Uint8Array(topology.physicalEdges.length), sampleCount: new Uint32Array(topology.physicalEdges.length), validSampleCount: new Uint32Array(topology.physicalEdges.length), noGroundSampleCount: new Uint32Array(topology.physicalEdges.length), shadeRatio: new Float64Array(topology.physicalEdges.length), solarExposureSeconds: new Float64Array(topology.physicalEdges.length) }))
+    }
+    const index = physicalIndex.get(edge.id)
+    for (let hourIndex = 0; hourIndex < edge.hourly.length; hourIndex += 1) {
+      const hourly = edge.hourly[hourIndex]
+      invariant(hourly.timestamp === timestamps[hourIndex] && hourly.hour === provenance.hours[hourIndex], `v2 environment timestamps differ: ${edge.id}`)
+      invariant(['available', 'partial', 'missing'].includes(hourly.status), `v2 environment status is invalid: ${edge.id}`)
+      invariant([hourly.sampleCount, hourly.validSampleCount, hourly.noGroundSampleCount].every(Number.isInteger) && hourly.sampleCount >= 0 && hourly.validSampleCount >= 0 && hourly.noGroundSampleCount >= 0 && hourly.validSampleCount + hourly.noGroundSampleCount === hourly.sampleCount, `v2 environment coverage is invalid: ${edge.id}`)
+      const status = hourly.status
+      if (status === 'missing') invariant((hourly.shadeRatio === null || hourly.shadeRatio === -1) && (hourly.solarExposureSeconds === null || hourly.solarExposureSeconds === -1), `invalid missing cost: ${hourly.timestamp} ${edge.id}`)
+      else {
+        invariant(Number.isFinite(hourly.shadeRatio) && hourly.shadeRatio >= 0 && hourly.shadeRatio <= 1 && Number.isFinite(hourly.solarExposureSeconds), `invalid calculated cost: ${hourly.timestamp} ${edge.id}`)
+        invariant(status === (hourly.noGroundSampleCount === 0 ? 'available' : 'partial'), `cost status and coverage disagree: ${hourly.timestamp} ${edge.id}`)
+        invariant(Math.abs(walkingByPhysical[index] * (1 - hourly.shadeRatio) - hourly.solarExposureSeconds) <= FORMULA_TOLERANCE_SECONDS, `solar exposure formula mismatch: ${hourly.timestamp} ${edge.id}`)
+      }
+      const buffer = buffers[hourIndex]
+      buffer.status[index] = STATUS_TO_CODE[status]
+      buffer.sampleCount[index] = hourly.sampleCount
+      buffer.validSampleCount[index] = hourly.validSampleCount
+      buffer.noGroundSampleCount[index] = hourly.noGroundSampleCount
+      if (status !== 'missing') { buffer.shadeRatio[index] = hourly.shadeRatio; buffer.solarExposureSeconds[index] = hourly.solarExposureSeconds }
+    }
+    resultEdgeCount += 1
+  }
+
+  const header = await streamRuntimeShadeResult(environmentPath, initialize, consumeEdge)
+  invariant(resultEdgeCount === physicalIndex.size && resultIds.size === physicalIndex.size, 'v2 environment edge IDs do not exactly match graph physical edge IDs')
+  invariant(timestamps && buffers, 'v2 environment edges are missing')
+  invariant(header.generatedAtUtc === provenance.generatedAtUtc || provenance.generatedAtUtc === undefined, 'v2 environment generated time is invalid')
+  const topologySerialized = serializedDocument(topology)
+  await writeTextAtomic(join(absoluteDirectory, 'topology.json'), topologySerialized.text)
+  const costReferences = []
+  for (let hourIndex = 0; hourIndex < timestamps.length; hourIndex += 1) costReferences.push(await writeV2CostSlice(absoluteDirectory, graph, topology, provenance, timestamps[hourIndex], hourIndex, buffers[hourIndex]))
+  const manifestMetadata = v2ManifestMetadata(graph, { ...provenance, generatedAtUtc: header.generatedAtUtc }, quality, timestamps, options)
+  const manifest = {
+    schemaVersion: 'environment-cost-server-bundle-2.0', status: 'completed', ...manifestMetadata,
+    counts: { nodeCount: topology.counts.nodeCount, physicalEdgeCount: topology.counts.physicalEdgeCount, directedEdgeCount: topology.counts.directedEdgeCount, hourCount: timestamps.length },
+    topology: { file: 'topology.json', bytes: topologySerialized.bytes, fileSha256: topologySerialized.sha256, contentFingerprintSha256: topology.contentFingerprintSha256 },
+    costSlices: costReferences,
+    diagnostics: { sourceEnvironmentEdgeCount: resultEdgeCount, v2PhysicalEdgeCount: graph.physicalEdges.length },
+  }
+  manifest.bundleFingerprintSha256 = sha256(JSON.stringify({ inputs: manifest.inputs, topology: manifest.topology, costSlices: manifest.costSlices }))
+  const manifestSerialized = serializedDocument(manifest)
+  await writeTextAtomic(join(absoluteDirectory, 'manifest.json'), manifestSerialized.text)
+  return { manifest, manifestBytes: manifestSerialized.bytes, manifestFileSha256: manifestSerialized.sha256, totalBundleBytes: manifestSerialized.bytes + topologySerialized.bytes + costReferences.reduce((sum, item) => sum + item.bytes, 0), diagnostics: manifest.diagnostics }
 }
 
 async function main() {
   const started = performance.now()
   const options = parseArgs(process.argv.slice(2))
-  const [graphText, environmentText] = await Promise.all([
-    readFile(resolve(options.graph), 'utf8'),
-    readFile(resolve(options.environment), 'utf8'),
-  ])
-  const bundle = buildServerBundleDocuments(JSON.parse(graphText), JSON.parse(environmentText), {
-    allowUnmatchedAsMissing: options.allowUnmatchedAsMissing,
-    provenance: options.provenance,
-  })
-  const written = await writeServerBundle(options['bundle-directory'], bundle)
+  const graph = JSON.parse(await readFile(resolve(options.graph), 'utf8'))
+  const written = graph?.schemaVersion === 'environment-cost-pedestrian-network-2.0'
+    ? await writeV2ServerBundleFromRuntimeFile(options['bundle-directory'], graph, options.environment, { provenance: options.provenance })
+    : await (async () => {
+      const environment = JSON.parse(await readFile(resolve(options.environment), 'utf8'))
+      const bundle = buildServerBundleDocuments(graph, environment, {
+        allowUnmatchedAsMissing: options.allowUnmatchedAsMissing,
+        provenance: options.provenance,
+      })
+      return writeServerBundle(options['bundle-directory'], bundle)
+    })()
   const report = {
     schemaVersion: 'environment-cost-server-bundle-report-1.0',
     status: 'completed',
@@ -433,7 +874,7 @@ async function main() {
     totalBundleBytes: written.totalBundleBytes,
     totalSeconds: (performance.now() - started) / 1000,
     counts: written.manifest.counts,
-    diagnostics: bundle.diagnostics,
+    diagnostics: written.diagnostics,
   }
   await writeTextAtomic(options.report, `${JSON.stringify(report, null, 2)}\n`)
   console.log(`ENVIRONMENT_COST_SERVER_BUNDLE_BUILT area=${written.manifest.area.areaId} nodes=${written.manifest.counts.nodeCount} directedEdges=${written.manifest.counts.directedEdgeCount} hours=${written.manifest.counts.hourCount} bytes=${written.totalBundleBytes} fingerprint=${written.manifest.bundleFingerprintSha256}`)
@@ -447,4 +888,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   })
 }
 
-export { CODE_TO_STATUS, STATUS_TO_CODE, validateCostSlice, validateTopology }
+export { CODE_TO_STATUS, STATUS_TO_CODE, streamRuntimeShadeResult, validateCostSlice, validateTopology }

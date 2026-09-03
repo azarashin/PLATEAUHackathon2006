@@ -69,7 +69,8 @@ function policyScenarioFromManifest(manifest, configuredScenarioId) {
 function sameComparisonConditions(left, right) {
   const leftManifest = left.runtime.manifest
   const rightManifest = right.runtime.manifest
-  return leftManifest.inputs.roadGraphFingerprintSha256 === rightManifest.inputs.roadGraphFingerprintSha256
+  return leftManifest.schemaVersion === rightManifest.schemaVersion
+    && leftManifest.inputs.roadGraphFingerprintSha256 === rightManifest.inputs.roadGraphFingerprintSha256
     && JSON.stringify(leftManifest.area) === JSON.stringify(rightManifest.area)
     && leftManifest.scenario.referenceDate === rightManifest.scenario.referenceDate
     && leftManifest.scenario.timezone === rightManifest.scenario.timezone

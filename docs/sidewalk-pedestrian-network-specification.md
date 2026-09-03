@@ -10,15 +10,18 @@ v2 は歩道の線形・接続・品質根拠を追加するが、既存の Unit
 
 ## 2. 入力ソースと優先順位
 
-生成器は同じ地物について次の高い順位の根拠を採用し、採用元を edge ごとに記録する。
+MVPでは、OSMを経路トポロジと歩行可否の正本とする。CityGML `bldg` / `veg` / `dem` は日陰解析に用いる3D環境の正本とし、`tran` の歩道面は経路へ自動結合せず、監査補助証跡として扱う。将来の `tran` 活用候補は edge ごとの根拠として記録するが、位置が近いことだけを理由に既存トポロジへ接続してはならない。
 
-1. CityGML の交通・歩道・横断・橋梁・地下道の明示形状（読込可能で座標系が確定したもの）
-2. OSM の独立歩道・歩行者専用線形（`footway`、`path`、`pedestrian`、`steps`、`crossing`）
-3. OSM の車道 way に付く `sidewalk=left/right/both/separate`、`foot=*`、`crossing=*`、`bridge`、`tunnel`、`layer`、`level` タグ
-4. 管理された `road-network-overrides.geojson` の地域別補正
-5. v1 中心線を明示したフォールバック（歩道としては表示しない）
+OSMの歩行ネットワーク生成で参照する根拠は次の順位とし、採用元を edge ごとに記録する。
 
-現在の snapshot は `way` とその geometry を主に収録するだけで、独立した OSM node 要素のタグ数は **0** である。横断点・信号・段差等の node タグを根拠にできないため、#72 は `capture contract v0.2` を導入し、必要な node と node タグ、way タグ、relation の取得条件を固定する。既存の `out body geom` snapshot は v1 用として保持する。
+1. OSM の独立歩道・歩行者専用線形（`footway`、`path`、`pedestrian`、`steps`、`crossing`）
+2. OSM の車道 way に付く `sidewalk=left/right/both/separate`、`foot=*`、`crossing=*`、`bridge`、`tunnel`、`layer`、`level` タグ
+3. 管理された `road-network-overrides.geojson` の地域別補正
+4. v1 中心線を明示したフォールバック（歩道としては表示しない）
+
+CityGML `tran` の歩道・横断・橋梁・地下道の明示形状は、MVPでは自動統合せず、読込可能性、座標系、地物種別、取得時点を含む監査証跡として記録する。
+
+既存の v0.1 snapshot は `way` とその geometry を主に収録するだけで、独立した OSM node 要素のタグを根拠にできない。v2では `capture contract v0.2` により、横断点・信号・段差等の node タグ、way タグ、relation の取得条件を固定する。既存の `out body geom` snapshot は v1 用として保持する。
 
 ## 3. v2 データモデル（設計契約）
 
@@ -75,23 +78,41 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 
 ## 6. フォールバックの表示と利用制限
 
-フォールバック edge は経路探索から除外しないが、通常の歩道 edge より低い信頼度として扱う。Viewer / Runtime は経路に `fallback=true` が含まれる場合、区間を破線または警告色にし、「歩道情報不足のため道路中心線を代用」と表示する。品質が `blocked` の地域では v2 を発行せず v1 を維持する。日陰率・環境コストは edge の geometry に対して計算するため、中心線フォールバックの結果を歩道上の精密な評価として扱ってはならない。
+フォールバック edge は経路探索から除外しないが、通常の歩道 edge より低い信頼度として扱う。Viewer / Runtime は経路に `fallback=true` が含まれる場合、区間を破線または警告色にし、「歩道情報不足のため道路中心線を代用」と表示する。品質が `rejected` 又は `unverified` の地域では v2 を発行せず v1 を維持する。日陰率・環境コストは edge の geometry に対して計算するため、中心線フォールバックの結果を歩道上の精密な評価として扱ってはならない。
 
-## 7. 5 地域の入力品質基準
+## 7. 品質基準見直しの経緯
+
+当初の v2 品質ゲートでは、`explicit + derived` を 80%以上、中心線フォールバックを 20%以下とする 80/20 基準を置いていた。この比率は、中心線フォールバックが大半を占める成果物を歩道ネットワークとして扱わないための暫定的・保守的な判定であり、外部標準、法令、実測データに基づくものではない。
+
+その後の確認で、日本の生活道路には車道と歩道が構造上分離されていない狭い道路が多く、歩道の明示率だけを合否条件にすると、実際には歩行可能な共有空間まで不適切に低評価することが分かった。また、CityGML `tran` の歩道面データにも地域差があり、地域によっては歩道面だけで歩行ネットワーク全体を構成できないことを確認した。このため、80/20 は合否判定から外し、地域別のデータ充足度を示す参考指標として記録する。
+
+新しい品質契約 `pedestrian-network-safety-1.0` では、既知の歩行不能道路を除外すること、異なる level や無根拠な横断による誤接続を防止すること、各辺の根拠と不確実性を識別できることを合否の中心とする。狭い生活道路の中心線は、歩道そのものではなく共有空間の代表線として許容し、`fallback=true` として明示する。品質状態は `accepted`（安全性に関する必須検証を通過）、`rejected`（歩行不能道路の混入、誤接続、構造破損、設定済み代表 OD の不達など）、`unverified`（必須監査情報不足）で記録する。旧契約で作成した v2 成果物は新契約に基づき再生成し、旧成果物をそのまま合格扱いしない。
+
+## 8. OSM と CityGML `tran` の責務分離
+
+この分離は、歩道面を持つ CityGML `tran` と、経路接続・歩行可否を持つ OSM の情報を、位置近傍だけで結合すると誤ったネットワークを作る危険があるためである。交差点、並行道路、側道、高架・地下、CRS の違い、データ取得時点の差は、単純な最近傍判定では識別できない。欠損を補うことより、誤った道路へ結合して経路を誤誘導することの方が危険である。
+
+したがってMVPでは、OSMが経路トポロジ・歩行可否を担い、CityGML `bldg` / `veg` / `dem` が日陰解析用の3D環境を担う。`tran` の歩道面は、地物種別、座標系、取得時点、形状の存在を監査報告へ残すが、OSMのノード・edgeを自動的に置換または追加しない。
+
+Post-MVPで統合を検討する場合も、OSMトポロジを正本として維持し、距離、方向、形状の重なり、level、対応の一意性、入力と変換の証跡がすべて揃う高信頼の対応だけを候補とする。条件を満たさない `tran` は欠損として扱い、無理に接続しない。
+
+## 9. 5 地域の入力品質基準
 
 | 地域 | 対象 | CRS | snapshot 現状 | v2 発行の最低条件 | 初期判定 |
 |---|---|---|---|---|---|
-| 市ヶ谷 | 市ヶ谷会場 | EPSG:6677 | way 中心線、node タグ 0 | capture contract v0.2、独立歩道又は `sidewalk` 根拠 80%以上、代表経路の横断確認 | 要再取得 |
+| 市ヶ谷 | 市ヶ谷会場 | EPSG:6677 | way 中心線、node タグ 0 | capture contract v0.2、歩行不能道路の除外、代表経路の横断確認 | 要再取得 |
 | 京都 | 京都駅 | EPSG:6674 | way 中心線、node タグ 0 | 同上。徒歩主要動線 3本を目視照合 | 要再取得 |
 | 舞鶴 | 東舞鶴駅 | EPSG:6674 | way 中心線、node タグ 0 | 同上。駅前横断の level 接続を確認 | 要再取得 |
 | 藤沢 | 藤沢駅 | EPSG:6677 | way 中心線、node タグ 0 | 同上。駅前立体・地下接続を確認 | 要再取得 |
 | さいたま | 大宮区・天沼町2丁目 | EPSG:6677 | way 中心線、node タグ 0 | 同上。幹線道路横断を確認 | 要再取得 |
 
-数値基準は、主要歩行者ネットワークの edge 長に対する `explicit + derived` の比率 80%以上、`fallback` 比率 20%以下、代表経路 3本の到着可能率 100%、異なる level 間の誤接続 0件とする。対象範囲に該当データがないこと自体は欠陥ではないが、`fallback` 又は `blocked` として明示する。
+品質契約 `pedestrian-network-safety-1.0` は、明示歩道率のしきい値ではなく歩行安全性を判定する。高速道路・自動車専用道路、`foot=no`、徒歩許可のない `access=no/private`、`construction` / `proposed` / `raceway` を除外する。`trunk` は一律除外せず、明示的な歩行禁止だけを除外条件とする。物理辺と双方向edgeの対応、異なる level 間の誤接続がないこと、代表ODが設定されている場合の到達可能性を検証する。生活道路の共有空間を表す中心線は許容し、`fallback=true` と根拠分類で明示する。
 
-品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence 別集計、歩行禁止除外数、横断数、立体交差の接続拒否数、fallback 延長・比率、`explicit + derived` 延長・比率、未接続 component 数、代表経路の結果または未設定・入力不足による blocked 理由、目視確認者・日時・既知の制約を記録する。生成器は `explicit + derived >= 80%` かつ `fallback <= 20%` を機械検証し、満たさないv2グラフを正常成果物として扱わない。
+`accepted` は必須の安全検証に通過した状態、`rejected` は既知危険・誤接続・構造破損・設定済み代表ODの不達、`unverified` は必須監査情報の不足を表す。代表OD未設定は警告であり、それだけで `unverified` にはしない。`explicit + derived` 比率と `fallback` 比率は地域別のデータ充足度を読む参考metricsとして記録するが、80/20の合否ゲートには使用しない。
 
-## 8. v1 からの移行とロールバック
+品質報告には少なくとも、入力 snapshot / CityGML / override のハッシュと取得日時、physical edge / directed edge 数・延長、facility・side・source・confidence・根拠分類別集計、歩行不能理由別の除外数、横断数、level分離により拒否した接続数、fallback 延長・比率、`explicit + derived` 延長・比率、代表経路の結果または未設定警告、必須監査情報、既知の制約を記録する。生成器は安全契約に反する成果物を `rejected` とし、必須監査情報が足りない場合は `unverified` とする。
+
+## 10. v1 からの移行とロールバック
 
 1. v1 の raw snapshot、graph、analysis、bundle は変更しない。
 2. capture contract v0.2 で地域ごとの新しい入力を固定し、v2 graph と品質報告を別パスへ出力する。
@@ -99,7 +120,7 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 4. 品質基準を満たさない、又は経路到達性・立体交差テストが失敗した場合、manifest の `recommendedVersion` を v1 とし、消費側は v1 を使用する。
 5. ロールバックは v2 成果物を削除することではなく、v1 manifest を再選択する操作とする。既に出力した v2 のハッシュ付き成果物は監査用に残す。
 
-## 9. #72 の受入テスト
+## 11. #72 の受入テスト
 
 - capture contract v0.2 が way・必要 node タグ・必要 relation を固定し、地域ごとの SHA-256 を出力する。
 - `sidewalk=left/right/both` の fixture で正しい side・オフセット・双方向接続を生成する。
@@ -107,16 +128,16 @@ v2 は、双方向で共用する `physicalEdges` と、有向の `edges` を分
 - 横断タグがある箇所だけで左右歩道を接続し、無根拠の車道横断を生成しない。
 - bridge / tunnel / layer / level が不一致の線形を接続しない。
 - 歩行禁止の辺を探索結果から除外する。
-- 根拠不足では `fallback=true` と source / confidence を記録し、品質閾値で `blocked` 判定できる。
+- 根拠不足では `fallback=true` と source / confidence を記録し、安全契約により `accepted` / `rejected` / `unverified` を判定できる。
 - 同一入力から node / edge ID、geometry、manifest hash が決定的に再現される。
 - 5地域すべてで品質報告を出し、代表経路3本の到達性を検証する。
 
-## 10. #73 への受渡条件
+## 12. #73 への受渡条件
 
 #73 は、#72 が次を満たす v2 graph と品質報告を地域ごとに渡した場合のみ統合を開始する。
 
 - `schemaVersion=environment-cost-pedestrian-network-2.0` と v2 manifest が存在する。
-- CRS、入力ハッシュ、生成器版、fallback / blocked 判定が記録されている。
+- CRS、入力ハッシュ、生成器版、fallback と安全契約の品質状態が記録されている。
 - #72 の受入テストが通り、地域品質表の最低条件を満たす。
 - Unity は v2 geometry を Raycast のサンプル線として使用し、結果に v2 edge ID と graph fingerprint を残せる。
 - server bundle と Viewer は v1 / v2 を混在させず、選択した graph version と品質状態を経路・KPI・ヒートマップに表示する。

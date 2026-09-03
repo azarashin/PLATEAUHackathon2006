@@ -54,32 +54,39 @@ public static class EnvironmentCostRuntimeShadeAnalyzer
         EnvironmentCostRuntimeShadeInputEdge edge, EnvironmentCostRuntimeShadeAnalysisRequest request,
         IReadOnlyDictionary<int, HourlyEnvironmentCostRules.SunPosition> suns, int roadMask, int buildingMask)
     {
-        var from = new Vector3(edge.from[0], 500.0f, edge.from[1]);
-        var to = new Vector3(edge.to[0], 500.0f, edge.to[1]);
-        var subdivisions = Math.Max(1, (int)Math.Ceiling(edge.lengthMeters / input.sampleSpacingMeters));
         var shadeCounts = new Dictionary<int, int>();
         foreach (var hour in request.hours) shadeCounts[hour] = 0;
         var samples = 0;
         var validSamples = 0;
         var noGroundSamples = 0;
-        for (var sampleIndex = 0; sampleIndex <= subdivisions; sampleIndex++)
+        var geometry = edge.geometry ?? new[] { edge.from, edge.to };
+        for (var segmentIndex = 0; segmentIndex < geometry.Length - 1; segmentIndex++)
         {
-            var point = Vector3.Lerp(from, to, sampleIndex / (float)subdivisions);
-            if (new Vector2(point.x, point.z).magnitude > input.radiusMeters) continue;
-            samples++;
-            if (!Physics.Raycast(point, Vector3.down, out var groundHit, 1000.0f, roadMask, QueryTriggerInteraction.Ignore))
+            var from = new Vector3(geometry[segmentIndex][0], 500.0f, geometry[segmentIndex][1]);
+            var to = new Vector3(geometry[segmentIndex + 1][0], 500.0f, geometry[segmentIndex + 1][1]);
+            var subdivisions = Math.Max(1, (int)Math.Ceiling(Vector3.Distance(from, to) / input.sampleSpacingMeters));
+            // A physical edge can have turning points.  Sample every segment and skip each
+            // later segment's first point so a shared vertex is never counted twice.
+            var firstSampleIndex = segmentIndex == 0 ? 0 : 1;
+            for (var sampleIndex = firstSampleIndex; sampleIndex <= subdivisions; sampleIndex++)
             {
-                noGroundSamples++;
-                continue;
-            }
-            validSamples++;
-            var pedestrianPoint = groundHit.point + Vector3.up * input.pedestrianHeightMeters;
-            foreach (var hour in request.hours)
-            {
-                var sun = suns[hour];
-                if (sun.elevationDegrees > 0.0 && Physics.Raycast(pedestrianPoint, sun.direction, 10000.0f, buildingMask,
-                        QueryTriggerInteraction.Ignore))
-                    shadeCounts[hour]++;
+                var point = Vector3.Lerp(from, to, sampleIndex / (float)subdivisions);
+                if (new Vector2(point.x, point.z).magnitude > input.radiusMeters) continue;
+                samples++;
+                if (!Physics.Raycast(point, Vector3.down, out var groundHit, 1000.0f, roadMask, QueryTriggerInteraction.Ignore))
+                {
+                    noGroundSamples++;
+                    continue;
+                }
+                validSamples++;
+                var pedestrianPoint = groundHit.point + Vector3.up * input.pedestrianHeightMeters;
+                foreach (var hour in request.hours)
+                {
+                    var sun = suns[hour];
+                    if (sun.elevationDegrees > 0.0 && Physics.Raycast(pedestrianPoint, sun.direction, 10000.0f, buildingMask,
+                            QueryTriggerInteraction.Ignore))
+                        shadeCounts[hour]++;
+                }
             }
         }
 
@@ -134,14 +141,21 @@ public sealed class EnvironmentCostRuntimeShadeAnalysisInput
             !DateTime.TryParseExact(analysisDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ||
             string.IsNullOrWhiteSpace(timezone) || radiusMeters <= 0 || sampleSpacingMeters <= 0 || pedestrianHeightMeters < 0 || edges == null || edges.Length == 0)
             throw new InvalidOperationException("Runtime shade input is incomplete.");
-        foreach (var edge in edges) edge.Validate();
-        if (string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.3", StringComparison.Ordinal))
+        var requiresPhysicalGeometry = string.Equals(schemaVersion, "environment-cost-runtime-shade-input-0.3", StringComparison.Ordinal);
+        foreach (var edge in edges) edge.Validate(requiresPhysicalGeometry);
+        if (requiresPhysicalGeometry)
         {
             if (string.IsNullOrWhiteSpace(graphFingerprintSha256) || graphFingerprintSha256.Length != 64 || quality == null)
                 throw new InvalidOperationException("Runtime shade input v0.3 is missing sidewalk graph provenance.");
+            if (quality.status != "accepted" || quality.explicitOrDerivedRatio < 0.0 || quality.explicitOrDerivedRatio > 1.0 ||
+                quality.fallbackRatio < 0.0 || quality.fallbackRatio > 1.0 || Math.Abs(quality.explicitOrDerivedRatio + quality.fallbackRatio - 1.0) > 0.000001 ||
+                !string.Equals(quality.qualityContractVersion, "pedestrian-network-safety-1.0", StringComparison.Ordinal) ||
+                !string.Equals(quality.sourceSchemaVersion, "0.2", StringComparison.Ordinal) || quality.validationFailures == null || quality.validationFailures.Length != 0 || quality.validationWarnings == null)
+                throw new InvalidOperationException("Runtime shade input v0.3 has invalid sidewalk graph quality.");
             var physicalIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var edge in edges)
-                if (string.IsNullOrWhiteSpace(edge.physicalEdgeId) || !physicalIds.Add(edge.physicalEdgeId))
+                if (string.IsNullOrWhiteSpace(edge.physicalEdgeId) || !string.Equals(edge.id, edge.physicalEdgeId, StringComparison.Ordinal) ||
+                    !physicalIds.Add(edge.physicalEdgeId))
                     throw new InvalidOperationException("Runtime shade input v0.3 must sample every physical edge exactly once.");
         }
     }
@@ -154,22 +168,44 @@ public sealed class EnvironmentCostRuntimeShadeInputEdge
     public string physicalEdgeId;
     public float[] from;
     public float[] to;
+    /// <summary>Full local physical-edge polyline for v0.3 sidewalk inputs; omitted by legacy v0.1 inputs.</summary>
+    public float[][] geometry;
     public double lengthMeters;
     public double walkingSeconds;
-    public void Validate()
+    public void Validate(bool requireGeometry = false)
     {
-        if (string.IsNullOrWhiteSpace(id) || from == null || from.Length != 2 || to == null || to.Length != 2 ||
+        if (string.IsNullOrWhiteSpace(id) || !IsPoint(from) || !IsPoint(to) ||
             lengthMeters <= 0 || walkingSeconds <= 0) throw new InvalidOperationException("Runtime shade input edge is invalid.");
+        if (!requireGeometry) return;
+        if (geometry == null || geometry.Length < 2 || !SamePoint(from, geometry[0]) || !SamePoint(to, geometry[geometry.Length - 1]))
+            throw new InvalidOperationException("Runtime shade input v0.3 physical edge geometry is invalid.");
+        var hasSegment = false;
+        for (var index = 0; index < geometry.Length; index++)
+        {
+            if (!IsPoint(geometry[index])) throw new InvalidOperationException("Runtime shade input v0.3 physical edge geometry is invalid.");
+            if (index > 0 && Vector2.Distance(new Vector2(geometry[index - 1][0], geometry[index - 1][1]),
+                    new Vector2(geometry[index][0], geometry[index][1])) > 0.0001f) hasSegment = true;
+        }
+        if (!hasSegment) throw new InvalidOperationException("Runtime shade input v0.3 physical edge geometry is invalid.");
     }
+
+    private static bool IsPoint(float[] point) => point != null && point.Length == 2 &&
+        !float.IsNaN(point[0]) && !float.IsInfinity(point[0]) && !float.IsNaN(point[1]) && !float.IsInfinity(point[1]);
+
+    private static bool SamePoint(float[] left, float[] right) => IsPoint(right) &&
+        Mathf.Abs(left[0] - right[0]) <= 0.001f && Mathf.Abs(left[1] - right[1]) <= 0.001f;
 }
 
 [Serializable]
 public sealed class EnvironmentCostRuntimeShadeInputQuality
 {
+    public string qualityContractVersion;
     public string status;
     public double explicitOrDerivedRatio;
     public double fallbackRatio;
     public string sourceSchemaVersion;
+    public string[] validationFailures;
+    public string[] validationWarnings;
 }
 
 [Serializable]

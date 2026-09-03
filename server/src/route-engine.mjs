@@ -70,8 +70,8 @@ function routeGeometry(runtime, edgeIndexes, fallbackNodeIndex) {
   const coordinates = []
   for (const edgeIndex of edgeIndexes) {
     const segment = runtime.directedEdgeGeometry(edgeIndex)
-    if (coordinates.length === 0) coordinates.push(segment[0])
-    coordinates.push(segment[1])
+    if (coordinates.length === 0) coordinates.push(...segment)
+    else coordinates.push(...segment.slice(1))
   }
   return coordinates
 }

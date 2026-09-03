@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "osm-snapshot-manifest-0.2",
+  "captureContractVersion": "0.2",
+  "areaId": "ichigaya-venue",
+  "localPath": "data/raw/osm/ichigaya-venue/sidewalk-contract-0.2.json",
+  "queryPath": "data/osm-queries/ichigaya-venue-sidewalk-contract-0.2.overpassql",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "requestedAt": "2026-09-01T03:44:28.364Z",
+  "osmTimestamp": "2026-09-01T03:43:19Z",
+  "sizeBytes": 56953269,
+  "sha256": "29f4ca22b53247295b8be3fabbdb0a7444fc87f424faeadb38658b73cf94bdf5",
+  "elementCounts": {
+    "way": 48964,
+    "node": 157194,
+    "relation": 1089
+  },
+  "requiredElementTypes": [
+    "way",
+    "node",
+    "relation"
+  ],
+  "requiredWayFields": [
+    "id",
+    "nodes",
+    "geometry",
+    "tags"
+  ]
+}

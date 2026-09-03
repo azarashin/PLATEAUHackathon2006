@@ -1,17 +1,105 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-08-31T00:20:48.655Z",
+  "verifiedAt": "2026-09-01T14:09:16.146Z",
   "areaId": "ichigaya-venue",
   "captureManifest": {
-    "schemaVersion": "osm-snapshot-manifest-0.1",
-    "captureContractVersion": null,
-    "sha256": "424fac87b6ed446f75613ed7298cd3f12574e3298f5446b94f2a37ae2bb95fbd"
+    "schemaVersion": "osm-snapshot-manifest-0.2",
+    "captureContractVersion": "0.2",
+    "sha256": "29f4ca22b53247295b8be3fabbdb0a7444fc87f424faeadb38658b73cf94bdf5"
   },
-  "status": "blocked",
-  "reason": "capture-contract-0.2-missing",
-  "recommendedVersion": "v1",
-  "validation": {
-    "graphBuilt": false,
-    "reason": "The current regional snapshot is a way-only v0.1 capture and must not be used for a v2 sidewalk graph."
+  "status": "accepted",
+  "graphFingerprintSha256": "a61875106a8c4b65b11da0df2ce1488de1189101ea6db1c48587825a97262bc1",
+  "quality": {
+    "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
+    "qualityContractVersion": "pedestrian-network-safety-1.0",
+    "generatedAt": "2026-09-01T14:09:19.974Z",
+    "graphFingerprintSha256": "a61875106a8c4b65b11da0df2ce1488de1189101ea6db1c48587825a97262bc1",
+    "input": {
+      "areaId": "ichigaya-venue",
+      "captureContractVersion": "0.2"
+    },
+    "counts": {
+      "nodeCount": 163715,
+      "physicalEdgeCount": 173614,
+      "directedEdgeCount": 347228,
+      "fallbackPhysicalEdgeCount": 70210,
+      "fallbackDirectedEdgeCount": 140420,
+      "sourceWayCount": 48964,
+      "includedWayCount": 46287,
+      "excludedWayCount": 2569,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 440,
+        "foot-prohibited": 1011,
+        "access-restricted-without-foot-override": 513,
+        "area-without-linear-walkway": 605
+      },
+      "explicitWayCount": 29286,
+      "derivedSidewalkWayCount": 577,
+      "separateSidewalkSkippedCount": 108,
+      "fallbackWayCount": 16424,
+      "crossingConnectionCount": 7708,
+      "levelSeparatedCrossingConnectionCount": 50,
+      "malformedWayCount": 0
+    },
+    "processing": {
+      "sourceWayCount": 48964,
+      "includedWayCount": 46287,
+      "excludedWayCount": 2569,
+      "excludedWayCountByReason": {
+        "non-pedestrian-highway": 440,
+        "foot-prohibited": 1011,
+        "access-restricted-without-foot-override": 513,
+        "area-without-linear-walkway": 605
+      },
+      "separateSidewalkSkippedCount": 108,
+      "malformedWayCount": 0,
+      "crossingConnectionCount": 7708,
+      "levelSeparatedCrossingConnectionCount": 50
+    },
+    "lengthMeters": {
+      "total": 3048419.85560602,
+      "explicit": 1367390.0821603592,
+      "derived": 153331.89971000128,
+      "explicitOrDerived": 1520721.9818703604,
+      "fallback": 1527697.8737356444,
+      "explicitOrDerivedRatio": 0.49885581839186777,
+      "fallbackRatio": 0.5011441816081272
+    },
+    "segmentRationales": {
+      "explicit-crossing": {
+        "physicalEdgeCount": 1264,
+        "lengthMeters": 3621.8347582770484
+      },
+      "shared-space-representative-line": {
+        "physicalEdgeCount": 70210,
+        "lengthMeters": 1527697.8737356444
+      },
+      "explicit-pedestrian-facility": {
+        "physicalEdgeCount": 94769,
+        "lengthMeters": 1363768.247402081
+      },
+      "derived-sidewalk": {
+        "physicalEdgeCount": 7371,
+        "lengthMeters": 153331.89971000128
+      }
+    },
+    "topology": {
+      "isSafe": true,
+      "rejected": []
+    },
+    "representativeOds": {
+      "status": "blocked",
+      "reason": "representative-od-not-configured",
+      "routes": []
+    },
+    "validation": {
+      "status": "accepted",
+      "isValid": true,
+      "rejectedReasons": [],
+      "unverifiedReasons": [],
+      "warnings": [
+        "representative-od-not-configured"
+      ]
+    }
   }
 }

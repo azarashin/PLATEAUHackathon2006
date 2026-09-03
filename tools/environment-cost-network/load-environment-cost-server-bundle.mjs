@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { CODE_TO_STATUS, validateCostSlice, validateTopology } from './build-environment-cost-server-bundle.mjs'
 
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
+
 function invariant(condition, message) {
   if (!condition) throw new Error(message)
 }
@@ -13,19 +15,21 @@ function sha256(value) {
 
 function validateManifest(manifest) {
   invariant(manifest && typeof manifest === 'object', 'server bundle manifest is invalid')
-  // v2 carries sidewalk physical geometry and quality metadata.  The current route engine
-  // deliberately does not silently reinterpret it as v1: a deployment must use the v2
-  // loader/engine together, otherwise route geometry and cost provenance could diverge.
-  if (manifest.schemaVersion === 'environment-cost-server-bundle-2.0') {
-    throw new Error('server bundle v2 was identified but is not supported by this route-server deployment; deploy the v2 route engine explicitly')
-  }
-  invariant(manifest.schemaVersion === 'environment-cost-server-bundle-1.0', `server bundle manifest schemaVersion is invalid: ${manifest.schemaVersion ?? '<missing>'}`)
+  const isV2 = manifest.schemaVersion === 'environment-cost-server-bundle-2.0'
+  invariant(isV2 || manifest.schemaVersion === 'environment-cost-server-bundle-1.0', `server bundle manifest schemaVersion is invalid: ${manifest.schemaVersion ?? '<missing>'}`)
   invariant(manifest.status === 'completed', 'server bundle manifest is not completed')
   invariant(typeof manifest.bundleFingerprintSha256 === 'string' && /^[0-9a-f]{64}$/.test(manifest.bundleFingerprintSha256), 'server bundle fingerprint is invalid')
   invariant(Array.isArray(manifest.scenario?.availableTimestamps) && manifest.scenario.availableTimestamps.length > 0, 'server bundle timestamps are missing')
   invariant(new Set(manifest.scenario.availableTimestamps).size === manifest.scenario.availableTimestamps.length, 'server bundle timestamps are duplicated')
   invariant(manifest.scenario.availableTimestamps.includes(manifest.scenario.defaultTimestamp), 'server bundle default timestamp is not available')
   invariant(manifest.counts?.hourCount === manifest.scenario.availableTimestamps.length, 'server bundle hour count mismatch')
+  if (isV2) {
+    invariant(manifest.networkQuality && typeof manifest.networkQuality === 'object', 'v2 server bundle network quality is missing')
+    invariant(manifest.networkQuality.qualityContractVersion === PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION, 'v2 server bundle network quality contract is missing or legacy-unverified')
+    invariant(manifest.networkQuality.status === 'accepted', 'v2 server bundle network quality is not accepted')
+    invariant(typeof manifest.networkQuality.sourceSchemaVersion === 'string' && manifest.networkQuality.sourceSchemaVersion === '0.2', 'v2 server bundle network quality source contract is invalid')
+    invariant(Array.isArray(manifest.networkQuality.validationFailures) && manifest.networkQuality.validationFailures.length === 0, 'v2 server bundle network quality has safety validation failures')
+  }
   invariant(Array.isArray(manifest.costSlices) && manifest.costSlices.length === manifest.counts.hourCount, 'server bundle cost references mismatch')
   invariant(
     JSON.stringify(manifest.costSlices.map((reference) => reference.timestamp)) === JSON.stringify(manifest.scenario.availableTimestamps),
@@ -59,9 +63,10 @@ async function readVerifiedJson(directory, reference) {
 }
 
 function buildRuntimeTopology(topology) {
+  const isV2 = topology.schemaVersion === 'environment-cost-server-topology-2.0'
   const nodeCount = topology.nodes.length
   const directedEdgeCount = topology.directedEdges.length
-  const nodeSourceIds = new Float64Array(nodeCount)
+  const nodeSourceIds = isV2 ? new Array(nodeCount) : new Float64Array(nodeCount)
   const nodeLongitudes = new Float64Array(nodeCount)
   const nodeLatitudes = new Float64Array(nodeCount)
   for (let index = 0; index < nodeCount; index += 1) {
@@ -89,7 +94,9 @@ function buildRuntimeTopology(topology) {
     nodeLongitudes,
     nodeLatitudes,
     physicalEdgeIds: topology.physicalEdges.map((edge) => edge[0]),
-    physicalSourceEdgeIds: topology.physicalEdges.map((edge) => edge[1]),
+    physicalSourceEdgeIds: isV2 ? topology.physicalEdges.map((edge) => edge[4]) : topology.physicalEdges.map((edge) => edge[1]),
+    physicalGeometries: isV2 ? topology.physicalEdges.map((edge) => edge[3]) : null,
+    isV2,
     directedPhysicalIndexes,
     directedFromNodeIndexes,
     directedToNodeIndexes,
@@ -158,7 +165,7 @@ export async function loadEnvironmentCostServerBundle(manifestPath, options = {}
     costsByTimestamp,
     nodeId(nodeIndex) {
       invariant(Number.isInteger(nodeIndex) && nodeIndex >= 0 && nodeIndex < runtime.nodeSourceIds.length, `node index is out of range: ${nodeIndex}`)
-      return `osm-node-${runtime.nodeSourceIds[nodeIndex]}`
+      return runtime.isV2 ? runtime.nodeSourceIds[nodeIndex] : `osm-node-${runtime.nodeSourceIds[nodeIndex]}`
     },
     directedEdgeId(edgeIndex) {
       invariant(Number.isInteger(edgeIndex) && edgeIndex >= 0 && edgeIndex < runtime.directedPhysicalIndexes.length, `directed edge index is out of range: ${edgeIndex}`)
@@ -169,10 +176,16 @@ export async function loadEnvironmentCostServerBundle(manifestPath, options = {}
       invariant(Number.isInteger(edgeIndex) && edgeIndex >= 0 && edgeIndex < runtime.directedPhysicalIndexes.length, `directed edge index is out of range: ${edgeIndex}`)
       const from = runtime.directedFromNodeIndexes[edgeIndex]
       const to = runtime.directedToNodeIndexes[edgeIndex]
-      return [
+      const fallback = [
         [runtime.nodeLongitudes[from], runtime.nodeLatitudes[from]],
         [runtime.nodeLongitudes[to], runtime.nodeLatitudes[to]],
       ]
+      if (!runtime.isV2) return fallback
+      const geometry = runtime.physicalGeometries[runtime.directedPhysicalIndexes[edgeIndex]]
+      if (!Array.isArray(geometry) || geometry.length < 2) return fallback
+      const first = geometry[0]
+      const forward = Math.abs(first[0] - fallback[0][0]) < 1e-9 && Math.abs(first[1] - fallback[0][1]) < 1e-9
+      return forward ? geometry.map((point) => [...point]) : [...geometry].reverse().map((point) => [...point])
     },
     directedEdgeCost(edgeIndex, timestamp) {
       invariant(Number.isInteger(edgeIndex) && edgeIndex >= 0 && edgeIndex < runtime.directedPhysicalIndexes.length, `directed edge index is out of range: ${edgeIndex}`)

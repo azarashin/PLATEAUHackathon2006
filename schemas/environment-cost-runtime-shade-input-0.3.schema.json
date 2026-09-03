@@ -18,12 +18,15 @@
     "graphFingerprintSha256": { "$ref": "#/$defs/sha256" },
     "quality": {
       "type": "object", "additionalProperties": false,
-      "required": ["status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion"],
+      "required": ["qualityContractVersion", "status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion", "validationFailures", "validationWarnings"],
       "properties": {
-        "status": { "enum": ["accepted", "unverified"] },
-        "explicitOrDerivedRatio": { "type": "number", "minimum": -1, "maximum": 1 },
-        "fallbackRatio": { "type": "number", "minimum": -1, "maximum": 1 },
-        "sourceSchemaVersion": { "const": "environment-cost-pedestrian-network-2.0" }
+        "qualityContractVersion": { "const": "pedestrian-network-safety-1.0" },
+        "status": { "const": "accepted" },
+        "explicitOrDerivedRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fallbackRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sourceSchemaVersion": { "const": "0.2" },
+        "validationFailures": { "type": "array", "maxItems": 0, "items": { "type": "string" } },
+        "validationWarnings": { "type": "array", "items": { "type": "string" } }
       }
     },
     "edges": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/physicalEdge" } }
@@ -33,11 +36,12 @@
     "point": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } },
     "physicalEdge": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "physicalEdgeId", "from", "to", "lengthMeters", "walkingSeconds"],
+      "required": ["id", "physicalEdgeId", "from", "to", "geometry", "lengthMeters", "walkingSeconds"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "physicalEdgeId": { "type": "string", "minLength": 1 },
         "from": { "$ref": "#/$defs/point" }, "to": { "$ref": "#/$defs/point" },
+        "geometry": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/point" } },
         "lengthMeters": { "type": "number", "exclusiveMinimum": 0 }, "walkingSeconds": { "type": "number", "exclusiveMinimum": 0 }
       }
     }
