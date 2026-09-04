@@ -608,7 +608,6 @@ public static class HourlyEnvironmentCostSelfTests
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IdleRefreshIntervalSeconds >= EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds);
         AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(1000f));
         AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(1000f));
-        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.ResolveInitialMapExtentMeters(1000f));
         AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(10f, 1000f));
         AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(2000f, 1000f));
         AssertNear(100.0, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(100f));
@@ -617,6 +616,13 @@ public static class HourlyEnvironmentCostSelfTests
         AssertNear(10.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10f));
         AssertNear(10000.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10000f));
         AssertNear(10000.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(20000f, 10000f));
+        AssertNear(100.3, EnvironmentCostRuntimeOverviewMapController.GetMinimumSourceCameraHeightMeters(100f, 0.3f));
+        AssertNear(1100.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumSourceCameraHeightMeters(100f, 1000f));
+        AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100f, 100.3f, 1100f, 1000f));
+        AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100.3f, 100.3f, 1100f, 1000f));
+        AssertNear(600.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(600.15f, 100.3f, 1100f, 1000f));
+        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(1100f, 100.3f, 1100f, 1000f));
+        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(2000f, 100.3f, 1100f, 1000f));
         AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)));
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(false, 0f, 0f));
         AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 90f, 90.05f));

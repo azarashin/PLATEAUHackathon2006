@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 
 /// <summary>
 /// Renders a north-up, camera-following overview map for Runtime inspection Scenes.
-/// The map is display-only: its slider changes only the displayed range, never the main camera.
+/// The map range follows the main camera height without changing the main camera.
 /// </summary>
 public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
 {
@@ -25,14 +25,15 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private VisualElement mapContainer;
     private VisualElement positionMarker;
     private Button visibilityButton;
-    private Slider scaleSlider;
-    private Label scaleLabel;
     private bool isVisible = true;
     private float nextRefreshTime;
     private Vector3 lastRenderedSourcePosition;
     private bool hasRendered;
     private float mapCameraY;
     private float mapExtentMeters;
+    private float minimumSourceCameraHeight;
+    private float maximumSourceCameraHeight;
+    private bool hasSourceCameraHeightRange;
     private float lastMarkerRotationDegrees;
     private bool hasPositionMarkerRotation;
 
@@ -55,7 +56,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         EnsureOverviewCamera();
     }
 
-    /// <summary>Builds the display-only overview map UI and its map-range control.</summary>
+    /// <summary>Builds the display-only overview map UI.</summary>
     public void BuildUi(VisualElement root)
     {
         metadata ??= GetComponent<EnvironmentCostInspectionMetadata>();
@@ -87,22 +88,10 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         positionMarker.tooltip = "現在地とメインカメラの向き";
         image.Add(positionMarker);
 
-        scaleLabel = new Label();
-        scaleLabel.AddToClassList("runtime-overview-map-scale-label");
-        mapContainer.Add(scaleLabel);
-        scaleSlider = new Slider("表示範囲", GetMinimumMapExtentMeters(GetPackageRadiusMeters()), GetMaximumMapExtentMeters(GetPackageRadiusMeters()))
-        {
-            value = ResolveInitialMapExtentMeters(GetPackageRadiusMeters())
-        };
-        scaleSlider.AddToClassList("runtime-overview-map-scale-slider");
-        scaleSlider.RegisterValueChangedCallback(evt => SetMapExtentMeters(evt.newValue));
-        scaleSlider.RegisterCallback<PointerDownEvent>(OnMapPointerDown);
-        mapContainer.Add(scaleSlider);
         root.Add(mapContainer);
 
         EnsureOverviewCamera();
         image.image = renderTexture;
-        SetMapExtentMeters(scaleSlider.value);
         UpdateVisibilityUi();
     }
 
@@ -110,11 +99,12 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     {
         if (!Application.isPlaying || !isVisible || !EnsureOverviewCamera()) return;
 
+        var sourcePosition = sourceCamera.transform.position;
+        var extentChanged = UpdateMapExtentFromSourceCameraHeight(sourcePosition.y);
         UpdatePositionMarker();
         if (Time.unscaledTime < nextRefreshTime) return;
 
-        var sourcePosition = sourceCamera.transform.position;
-        var moved = !hasRendered || HorizontalDistanceSquared(sourcePosition, lastRenderedSourcePosition) > 0.25f;
+        var moved = !hasRendered || extentChanged || HorizontalDistanceSquared(sourcePosition, lastRenderedSourcePosition) > 0.25f;
         UpdateOverviewCameraTransform(sourcePosition);
         using (OverviewMapRenderMarker.Auto())
             overviewCamera.Render();
@@ -142,6 +132,8 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         overviewCamera.allowHDR = false;
         overviewCamera.allowMSAA = false;
         overviewCamera.cullingMask = CreateOverviewCullingMask(sourceCamera.cullingMask);
+        EnsureSourceCameraHeightRange();
+        UpdateMapExtentFromSourceCameraHeight(sourceCamera.transform.position.y);
         overviewCamera.orthographicSize = ResolveMapExtentMeters();
         overviewCamera.nearClipPlane = 0.1f;
         mapCameraY = ResolveMapCameraY();
@@ -182,34 +174,64 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     public static bool IsUsableSourceCamera(Camera candidate, Camera overview)
         => candidate != null && candidate != overview && candidate.isActiveAndEnabled;
 
-    /// <summary>Smallest selectable map radius for a city package. The visible square is twice this value.</summary>
+    /// <summary>Smallest map radius for a city package. The visible square is twice this value.</summary>
     public static float GetMinimumMapExtentMeters(float packageRadiusMeters)
     {
         var maximum = GetMaximumMapExtentMeters(packageRadiusMeters);
         return Mathf.Min(200f, maximum);
     }
 
-    /// <summary>Largest selectable display radius, initialized from the generated city package coverage.</summary>
+    /// <summary>Largest display radius, limited to the generated city package coverage.</summary>
     public static float GetMaximumMapExtentMeters(float packageRadiusMeters)
         => packageRadiusMeters > 0f
             ? packageRadiusMeters
             : DefaultMapExtentMeters;
 
-    /// <summary>Starts at the complete city package coverage, matching the original overview-map behaviour.</summary>
-    public static float ResolveInitialMapExtentMeters(float packageRadiusMeters)
-        => GetMaximumMapExtentMeters(packageRadiusMeters);
-
-    /// <summary>Clamps a requested map radius to the range supported by the current city package.</summary>
+    /// <summary>Clamps a map radius to the range supported by the current city package.</summary>
     public static float ClampMapExtentMeters(float requestedMeters, float packageRadiusMeters)
         => Mathf.Clamp(requestedMeters, GetMinimumMapExtentMeters(packageRadiusMeters), GetMaximumMapExtentMeters(packageRadiusMeters));
 
     private float GetPackageRadiusMeters() => metadata == null ? 0f : metadata.RadiusMeters;
 
-    private float ResolveMapExtentMeters()
+    /// <summary>Uses the lowest scene geometry and the main camera's configured near clip as the closest valid overview height.</summary>
+    public static float GetMinimumSourceCameraHeightMeters(float sceneMinimumY, float sourceCameraNearClipPlane)
+        => sceneMinimumY + Mathf.Max(0.1f, sourceCameraNearClipPlane);
+
+    /// <summary>Uses one city-package radius above the lowest scene geometry as the farthest valid overview height.</summary>
+    public static float GetMaximumSourceCameraHeightMeters(float sceneMinimumY, float packageRadiusMeters)
+        => sceneMinimumY + GetMaximumMapExtentMeters(packageRadiusMeters);
+
+    /// <summary>Maps a valid source-camera height linearly to the supported overview-map radius.</summary>
+    public static float GetMapExtentMetersForSourceCameraHeight(float sourceCameraHeight, float minimumSourceCameraHeight,
+        float maximumSourceCameraHeight, float packageRadiusMeters)
     {
-        if (mapExtentMeters <= 0f)
-            mapExtentMeters = ResolveInitialMapExtentMeters(GetPackageRadiusMeters());
-        return ClampMapExtentMeters(mapExtentMeters, GetPackageRadiusMeters());
+        var normalizedHeight = Mathf.InverseLerp(minimumSourceCameraHeight, maximumSourceCameraHeight, sourceCameraHeight);
+        return Mathf.Lerp(GetMinimumMapExtentMeters(packageRadiusMeters), GetMaximumMapExtentMeters(packageRadiusMeters), normalizedHeight);
+    }
+
+    private float ResolveMapExtentMeters() => ClampMapExtentMeters(mapExtentMeters, GetPackageRadiusMeters());
+
+    private void EnsureSourceCameraHeightRange()
+    {
+        if (hasSourceCameraHeightRange || sourceCamera == null) return;
+        var sceneMinimumY = ResolveSceneMinimumY();
+        minimumSourceCameraHeight = GetMinimumSourceCameraHeightMeters(sceneMinimumY, sourceCamera.nearClipPlane);
+        maximumSourceCameraHeight = GetMaximumSourceCameraHeightMeters(sceneMinimumY, GetPackageRadiusMeters());
+        hasSourceCameraHeightRange = true;
+    }
+
+    private float ResolveSceneMinimumY()
+    {
+        var minimum = 0f;
+        var hasRenderer = false;
+        var currentScene = gameObject.scene;
+        foreach (var renderer in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (renderer.gameObject.scene != currentScene) continue;
+            minimum = hasRenderer ? Mathf.Min(minimum, renderer.bounds.min.y) : renderer.bounds.min.y;
+            hasRenderer = true;
+        }
+        return minimum;
     }
 
     private float ResolveMapCameraY()
@@ -231,21 +253,21 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         overviewCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
     }
 
-    private void SetMapExtentMeters(float requestedMeters)
+    private bool UpdateMapExtentFromSourceCameraHeight(float sourceCameraHeight)
     {
-        mapExtentMeters = ClampMapExtentMeters(requestedMeters, GetPackageRadiusMeters());
-        if (scaleSlider != null && !Mathf.Approximately(scaleSlider.value, mapExtentMeters))
-            scaleSlider.SetValueWithoutNotify(mapExtentMeters);
-        if (scaleLabel != null)
-            scaleLabel.text = $"表示範囲: 半径 {FormatDistance(mapExtentMeters)}（{FormatDistance(mapExtentMeters * 2f)} × {FormatDistance(mapExtentMeters * 2f)}）";
+        EnsureSourceCameraHeightRange();
+        var nextExtentMeters = GetMapExtentMetersForSourceCameraHeight(sourceCameraHeight, minimumSourceCameraHeight,
+            maximumSourceCameraHeight, GetPackageRadiusMeters());
+        if (Mathf.Approximately(mapExtentMeters, nextExtentMeters)) return false;
+
+        mapExtentMeters = nextExtentMeters;
         if (overviewCamera != null)
         {
             overviewCamera.orthographicSize = mapExtentMeters;
             mapCameraY = ResolveMapCameraY();
             overviewCamera.farClipPlane = Mathf.Max(1000f, mapCameraY + 1000f);
         }
-        hasRendered = false;
-        nextRefreshTime = 0f;
+        return true;
     }
 
     private void UpdatePositionMarker()
@@ -266,9 +288,6 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     /// <summary>Skips a retained-mode style update until the north-up marker rotation visibly changes.</summary>
     public static bool ShouldUpdatePositionMarkerRotation(bool hasPreviousRotation, float previousDegrees, float nextDegrees)
         => !hasPreviousRotation || Mathf.Abs(Mathf.DeltaAngle(previousDegrees, nextDegrees)) >= MarkerRotationUpdateThresholdDegrees;
-
-    private static string FormatDistance(float meters)
-        => meters >= 1000f ? $"{meters / 1000f:0.#} km" : $"{meters:0} m";
 
     private void ToggleVisibility()
     {
