@@ -49,6 +49,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private bool hasPositionMarkerRotation;
     private bool arePlaceLabelsVisible = true;
     private bool arePlaceLabelsLoaded;
+    private string placeLabelStatusText = "地名: 読み込み待ち";
     private bool placeLabelsDirty;
     private readonly List<RuntimePlaceLabel> placeLabels = new List<RuntimePlaceLabel>();
     private readonly Dictionary<string, Label> visiblePlaceLabels = new Dictionary<string, Label>();
@@ -114,7 +115,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         image.Add(positionMarker);
         positionMarker.MarkDirtyRepaint();
 
-        placeLabelStatus = new Label("地名: 読み込み待ち");
+        placeLabelStatus = new Label(placeLabelStatusText);
         placeLabelStatus.AddToClassList("runtime-overview-map-place-label-status");
         mapContainer.Add(placeLabelStatus);
 
@@ -353,6 +354,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
             packageLoader = GetComponent<EnvironmentCostRuntimeCityPackageLoader>();
             yield return null;
         }
+        packageLoader.EnsureLoadStarted();
         while (packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.NotStarted ||
                packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Loading)
             yield return null;
@@ -522,7 +524,8 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private void SetPlaceLabelStatus(string text, bool loaded)
     {
         arePlaceLabelsLoaded = loaded;
-        if (placeLabelStatus != null) placeLabelStatus.text = text;
+        placeLabelStatusText = text;
+        if (placeLabelStatus != null) placeLabelStatus.text = placeLabelStatusText;
         UpdatePlaceLabelUi();
     }
 

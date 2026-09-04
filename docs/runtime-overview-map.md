@@ -21,6 +21,12 @@ Runtime Inspection Sceneでは、右上の「俯瞰地図を表示」から、�
 
 地名ラベルは表示補助であり、日陰解析、経路コスト、道路ネットワーク、都市データパッケージの検証結果を変更しない。
 
+### パッケージの選択と読込状態
+
+Inspection Sceneを新規生成する際は、`RuntimeCityPackageConfig.packageRelativePath` を `EnvironmentCostRuntimeCityPackageLoader` へ明示的に渡す。たとえば市ヶ谷v2では `EnvironmentCostCities/ichigaya-venue-sidewalk-v2` をそのまま読む。`EnvironmentCostCities/<areaId>` を補完するのは、都市パッケージ設定を渡さずに生成した旧Sceneだけである。バージョン名やディレクトリ名をRuntime側で探索・自動選択しない。
+
+既存Sceneに保存済みのLoader設定は書き換わらないため、地名表示を含むv2パッケージを使う場合は、対象の`-runtimeCityPackageConfig`を指定してInspection Sceneを再生成する。UI生成より先に読込状態が確定しても、ステータスを保持して「読込み待ち」のまま残さない。Loaderは待機側からも一度だけ読込開始できるため、`NotStarted`の無限待機をしない。
+
 ### 高度連動縮尺の上限
 
 都市パッケージの範囲は `data/analysis-configs/<areaId>.json` の `radiusMeters` で変更する。この設定値はInspection Scene作成時に `EnvironmentCostInspectionMetadata.radiusMeters` へコピーされ、都市パッケージ作成時にはmanifestの `radiusMeters` にもコピーされる。Runtime loaderは両者の不一致をエラーにするため、高度連動縮尺の上限は、実際に読み込んだ都市パッケージの範囲と一致する。

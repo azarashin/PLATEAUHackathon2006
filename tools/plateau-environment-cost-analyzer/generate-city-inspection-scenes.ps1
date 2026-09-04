@@ -38,9 +38,13 @@ foreach ($areaId in $AreaIds) {
     }
 
     $config = Join-Path $repositoryRoot "data\analysis-configs\$areaId.json"
+    $runtimePackageConfig = Join-Path $repositoryRoot "data\runtime-city-packages\$areaId-sidewalk-v2.json"
     $log = Join-Path $repositoryRoot "data\raw\$areaId-inspection-scene.log"
     if (-not (Test-Path -LiteralPath $config)) {
         throw "Analysis config was not found: $config"
+    }
+    if (-not (Test-Path -LiteralPath $runtimePackageConfig)) {
+        throw "Runtime city package config was not found: $runtimePackageConfig"
     }
 
     Write-Host "ENVIRONMENT_COST_INSPECTION_SCENE_START area=$areaId"
@@ -49,6 +53,7 @@ foreach ($areaId in $AreaIds) {
         '-projectPath', $projectRoot,
         '-executeMethod', 'EnvironmentCostInspectionSceneBuilder.Run',
         '-analysisConfig', $config,
+        '-runtimeCityPackageConfig', $runtimePackageConfig,
         '-logFile', $log
     ) -Wait -PassThru
 

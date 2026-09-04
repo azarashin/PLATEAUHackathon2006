@@ -233,6 +233,7 @@ public static class HourlyEnvironmentCostSelfTests
             AssertRuntimeUiDocumentInputGate();
             AssertRuntimeOverviewMapCullingMask();
             AssertRuntimeOverviewMapSourceCameraSelection();
+            AssertRuntimeCityPackageLoaderPathResolution();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -690,6 +691,14 @@ public static class HourlyEnvironmentCostSelfTests
         AssertEqual(true, EnvironmentCostRuntimeUiInputGate.IsPointerOverUi);
         EnvironmentCostRuntimeUiInputGate.SetAdditionalPointerOverUi(false);
         AssertEqual(false, EnvironmentCostRuntimeUiInputGate.IsPointerOverUi);
+    }
+
+    private static void AssertRuntimeCityPackageLoaderPathResolution()
+    {
+        AssertEqual("C:/Player_Data/StreamingAssets/EnvironmentCostCities/ichigaya-venue",
+            EnvironmentCostRuntimeCityPackageLoader.ResolvePackageRootPath("C:/Player_Data/StreamingAssets", "EnvironmentCostCities", "ichigaya-venue", true).Replace('\\', '/'));
+        AssertEqual("C:/Player_Data/StreamingAssets/EnvironmentCostCities/ichigaya-venue-sidewalk-v2",
+            EnvironmentCostRuntimeCityPackageLoader.ResolvePackageRootPath("C:/Player_Data/StreamingAssets", "EnvironmentCostCities/ichigaya-venue-sidewalk-v2", "ichigaya-venue", false).Replace('\\', '/'));
     }
 
     private static void AssertRuntimeOverviewMapSourceCameraSelection()

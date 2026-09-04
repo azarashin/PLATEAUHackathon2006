@@ -9,10 +9,12 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
     public enum PackageState { NotStarted, Loading, Ready, Missing, Invalid }
 
     [SerializeField] private string packageRoot = "EnvironmentCostCities";
+    [SerializeField] private bool appendAreaIdToPackageRoot = true;
     [SerializeField] private bool verifyOnStart = true;
     [SerializeField] private bool showStatusOverlay = true;
     [SerializeField] private PackageState state;
     [SerializeField, TextArea] private string statusMessage;
+    private bool loadRequested;
 
     public PackageState State => state;
     public string StatusMessage => statusMessage;
@@ -22,6 +24,14 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
     public void Configure(string newPackageRoot)
     {
         packageRoot = newPackageRoot;
+        appendAreaIdToPackageRoot = true;
+    }
+
+    /// <summary>Configures the exact StreamingAssets-relative directory of a generated city package.</summary>
+    public void Configure(string newPackageRoot, bool appendAreaId)
+    {
+        packageRoot = newPackageRoot;
+        appendAreaIdToPackageRoot = appendAreaId;
     }
 
     // Supports inspection Scenes generated before this component was introduced. New Scenes receive the
@@ -36,11 +46,27 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
 
     private void Start()
     {
-        if (verifyOnStart) StartCoroutine(LoadAndVerify());
+        if (verifyOnStart) EnsureLoadStarted();
+    }
+
+    /// <summary>Starts verification once. Consumers can call this safely before waiting for package state.</summary>
+    public void EnsureLoadStarted()
+    {
+        if (state != PackageState.NotStarted || loadRequested) return;
+        loadRequested = true;
+        StartCoroutine(LoadAndVerify());
+    }
+
+    /// <summary>Resolves either the legacy area-root convention or an explicitly configured package directory.</summary>
+    public static string ResolvePackageRootPath(string streamingAssetsPath, string configuredPackageRoot, string areaId, bool appendAreaId)
+    {
+        var root = Path.Combine(streamingAssetsPath, configuredPackageRoot);
+        return appendAreaId ? Path.Combine(root, areaId) : root;
     }
 
     public IEnumerator LoadAndVerify()
     {
+        loadRequested = true;
         state = PackageState.Loading;
         statusMessage = "都市データパッケージを検証中…";
         Manifest = null;
@@ -51,7 +77,7 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
         {
             var metadata = GetComponent<EnvironmentCostInspectionMetadata>();
             if (metadata == null) throw new InvalidOperationException("Inspection metadata is missing from this Runtime scene.");
-            var root = Path.Combine(Application.streamingAssetsPath, packageRoot, metadata.AreaId);
+            var root = ResolvePackageRootPath(Application.streamingAssetsPath, packageRoot, metadata.AreaId, appendAreaIdToPackageRoot);
             var manifestPath = Path.Combine(root, "manifest.json");
             if (!File.Exists(manifestPath))
             {

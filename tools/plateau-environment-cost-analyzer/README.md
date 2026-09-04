@@ -70,12 +70,15 @@ To create a city Scene non-interactively, close Unity Editor and Unity Hub, then
 $unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.18f1\Editor\Unity.exe'
 $project = 'H:\MyDevelopment\PLATEAUHackathon2006\tools\plateau-environment-cost-analyzer'
 $config = 'data/analysis-configs/kyoto.json'
+$runtimePackageConfig = 'data/runtime-city-packages/kyoto-sidewalk-v2.json'
 $log = 'H:\MyDevelopment\PLATEAUHackathon2006\data\raw\kyoto-inspection-scene.log'
 
 $process = Start-Process -FilePath $unity -ArgumentList @(
   '-batchmode', '-projectPath', $project,
   '-executeMethod', 'EnvironmentCostInspectionSceneBuilder.Run',
-  '-analysisConfig', $config, '-logFile', $log
+  '-analysisConfig', $config,
+  '-runtimeCityPackageConfig', $runtimePackageConfig,
+  '-logFile', $log
 ) -Wait -PassThru
 if ($process.ExitCode -ne 0) { exit $process.ExitCode }
 Select-String -Path $log -Pattern 'ENVIRONMENT_COST_INSPECTION_SCENE_READY'
