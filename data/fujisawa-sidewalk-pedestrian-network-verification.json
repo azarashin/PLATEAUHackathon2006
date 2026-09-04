@@ -1,6 +1,6 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T14:09:33.950Z",
+  "verifiedAt": "2026-09-04T00:34:07.478Z",
   "areaId": "fujisawa",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
@@ -8,37 +8,44 @@
     "sha256": "04fdb5cce59169a93eb10c00313dbb133d81dd7d0a552c36b8db4d6e485cb89c"
   },
   "status": "accepted",
-  "graphFingerprintSha256": "1e55df9803b77507204e6ef5567dc8368fdc565f66e52d277aabac37170e9f85",
+  "graphFingerprintSha256": "b5fa2b1450fedd9a6774c235aebaa095adecf5f9305b449fff86c98dfcbfb2e7",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "qualityContractVersion": "pedestrian-network-safety-1.0",
-    "generatedAt": "2026-09-01T14:09:35.356Z",
-    "graphFingerprintSha256": "1e55df9803b77507204e6ef5567dc8368fdc565f66e52d277aabac37170e9f85",
+    "qualityContractVersion": "pedestrian-network-safety-1.1",
+    "generatedAt": "2026-09-04T00:34:09.078Z",
+    "graphFingerprintSha256": "b5fa2b1450fedd9a6774c235aebaa095adecf5f9305b449fff86c98dfcbfb2e7",
     "input": {
       "areaId": "fujisawa",
-      "captureContractVersion": "0.2"
+      "captureContractVersion": "0.2",
+      "requireRepresentativeOds": true
     },
     "counts": {
-      "nodeCount": 77980,
-      "physicalEdgeCount": 81935,
-      "directedEdgeCount": 163870,
+      "nodeCount": 74428,
+      "physicalEdgeCount": 82170,
+      "directedEdgeCount": 164340,
       "fallbackPhysicalEdgeCount": 59407,
       "fallbackDirectedEdgeCount": 118814,
       "sourceWayCount": 14785,
       "includedWayCount": 14553,
-      "excludedWayCount": 219,
       "excludedWayCountByReason": {
         "foot-prohibited": 27,
         "area-without-linear-walkway": 27,
         "access-restricted-without-foot-override": 126,
         "non-pedestrian-highway": 39
       },
+      "excludedWayCount": 219,
       "explicitWayCount": 4078,
       "derivedSidewalkWayCount": 21,
       "separateSidewalkSkippedCount": 13,
       "fallbackWayCount": 10454,
-      "crossingConnectionCount": 849,
-      "levelSeparatedCrossingConnectionCount": 6,
+      "crossingConnectionCount": 61,
+      "levelSeparatedCrossingConnectionCount": 1,
+      "intersectionCornerConnectionCount": 222,
+      "levelSeparatedIntersectionCornerCandidateCount": 54,
+      "canonicalSharedRawNodeMergeCount": 89346,
+      "sharedRawNodeCoordinateVariantCount": 508,
+      "sharedRawNodeLayerTransitionConnectionCount": 0,
+      "layerIncompatibleIntersectionCornerCandidateCount": 3,
       "malformedWayCount": 0
     },
     "processing": {
@@ -53,22 +60,28 @@
       },
       "separateSidewalkSkippedCount": 13,
       "malformedWayCount": 0,
-      "crossingConnectionCount": 849,
-      "levelSeparatedCrossingConnectionCount": 6
+      "crossingConnectionCount": 61,
+      "levelSeparatedCrossingConnectionCount": 1,
+      "intersectionCornerConnectionCount": 222,
+      "levelSeparatedIntersectionCornerCandidateCount": 54
     },
     "lengthMeters": {
-      "total": 1639955.3562671635,
-      "explicit": 303122.1724524932,
-      "derived": 10176.527232235956,
-      "explicitOrDerived": 313298.69968472916,
+      "total": 1640461.17427793,
+      "explicit": 303172.1706243486,
+      "derived": 10632.347071147662,
+      "explicitOrDerived": 313804.51769549627,
       "fallback": 1326656.6565824412,
-      "explicitOrDerivedRatio": 0.19104099296815857,
-      "fallbackRatio": 0.8089590070318456
+      "explicitOrDerivedRatio": 0.19129042650681527,
+      "fallbackRatio": 0.8087095734931893
     },
     "segmentRationales": {
       "explicit-crossing": {
-        "physicalEdgeCount": 48,
-        "lengthMeters": 144.01909056453232
+        "physicalEdgeCount": 61,
+        "lengthMeters": 194.01726241986032
+      },
+      "derived-intersection-corner": {
+        "physicalEdgeCount": 222,
+        "lengthMeters": 455.8187240769565
       },
       "shared-space-representative-line": {
         "physicalEdgeCount": 59407,
@@ -80,7 +93,7 @@
       },
       "derived-sidewalk": {
         "physicalEdgeCount": 342,
-        "lengthMeters": 10176.527232235956
+        "lengthMeters": 10176.5283470707
       }
     },
     "topology": {
@@ -88,18 +101,50 @@
       "rejected": []
     },
     "representativeOds": {
-      "status": "blocked",
-      "reason": "representative-od-not-configured",
-      "routes": []
+      "status": "passed",
+      "reason": null,
+      "routes": [
+        {
+          "id": "core-walkable-corridor",
+          "startNodeId": "ped:osm-node:6162354173:none:l0",
+          "endNodeId": "ped:osm-node:14050045723:none:l0",
+          "startSnapDistanceMeters": 0,
+          "endSnapDistanceMeters": 0,
+          "directDistanceMeters": 488.041425665596,
+          "routeDistanceMeters": 497.07653513695544,
+          "detourRatio": 1.018512997045358,
+          "maxDetourRatio": 1.5,
+          "walkingSeconds": 355.0546679549682,
+          "directedEdgeIds": [
+            "ped:way:1389425929:none:0:forward",
+            "ped:way:1389425929:none:1:forward",
+            "ped:way:678155194:none:8:backward",
+            "ped:way:678155194:none:7:backward",
+            "ped:way:678155194:none:6:backward",
+            "ped:way:678155194:none:5:backward",
+            "ped:way:678155194:none:4:backward",
+            "ped:way:678155194:none:3:backward",
+            "ped:way:678155194:none:2:backward",
+            "ped:way:678155194:none:1:backward",
+            "ped:way:678155194:none:0:backward",
+            "ped:way:1544676857:none:0:forward",
+            "ped:way:1544676857:none:1:forward",
+            "ped:way:1544676857:none:2:forward",
+            "ped:way:1544676857:none:3:forward",
+            "ped:way:1544676857:none:4:forward",
+            "ped:way:1544676857:none:5:forward",
+            "ped:way:1544676857:none:6:forward"
+          ],
+          "status": "passed"
+        }
+      ]
     },
     "validation": {
       "status": "accepted",
       "isValid": true,
       "rejectedReasons": [],
       "unverifiedReasons": [],
-      "warnings": [
-        "representative-od-not-configured"
-      ]
+      "warnings": []
     }
   }
 }

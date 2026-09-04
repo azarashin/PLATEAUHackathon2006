@@ -41,7 +41,7 @@ assert.equal(summary.status, 'accepted')
 assert.equal(summary.explicitOrDerivedRatio, report.lengthMeters.explicitOrDerivedRatio)
 assert.equal(summary.fallbackRatio, report.lengthMeters.fallbackRatio)
 assert.equal(summary.sourceSchemaVersion, '0.2')
-assert.equal(summary.qualityContractVersion, 'pedestrian-network-safety-1.0')
+assert.equal(summary.qualityContractVersion, 'pedestrian-network-safety-1.1')
 assert.deepEqual(summary.validationFailures, report.validation.rejectedReasons)
 assert.equal(report.validation.isValid, true)
 assert.ok(report.lengthMeters.fallbackRatio > 0, 'shared-space fallback is retained as a reference metric')
@@ -54,4 +54,66 @@ const invalidTopology = structuredClone(graph); invalidTopology.edges.pop()
 assert.equal(qualityReport(invalidTopology, { areaId: config.areaId, captureContractVersion: '0.2' }).validation.status, 'rejected', 'topology corruption must be rejected')
 assert.equal(graphFingerprint(graph), graphFingerprint(buildGraph(config, { captureContractVersion: '0.2', elements: [...osm.elements].reverse() })), 'fingerprint must be deterministic')
 assert.throws(() => buildGraph(config, { elements: osm.elements.filter((e) => e.type !== 'relation') }), /capture-contract-0.2/, 'way-only capture is rejected')
+
+const untaggedIntersection = { captureContractVersion: '0.2', elements: [
+  { type: 'node', id: 100, tags: {} }, { type: 'node', id: 101, tags: {} }, { type: 'node', id: 102, tags: {} }, { type: 'relation', id: 199, tags: {}, members: [] },
+  way(100, [100, 101], [[139.71, 35.61], [139.711, 35.61]], { highway: 'residential', sidewalk: 'both' }),
+  way(101, [100, 102], [[139.71, 35.61], [139.71, 35.611]], { highway: 'residential', sidewalk: 'both' })
+] }
+const untaggedGraph = buildGraph(config, untaggedIntersection)
+assert.ok(untaggedGraph.physicalEdges.some((edge) => edge.facility === 'intersection-corner'), 'an untagged, same-level intersection must join nearby sidewalk corners')
+assert.equal(untaggedGraph.physicalEdges.some((edge) => edge.facility === 'crossing'), false, 'an inferred corner must not be reported as an explicit crossing')
+assert.ok(untaggedGraph.diagnostics.intersectionCornerConnectionCount > 0, 'inferred corner count must be recorded')
+
+const separatedIntersection = { captureContractVersion: '0.2', elements: [
+  { type: 'node', id: 200, tags: {} }, { type: 'node', id: 201, tags: {} }, { type: 'node', id: 202, tags: {} }, { type: 'relation', id: 299, tags: {}, members: [] },
+  way(200, [200, 201], [[139.72, 35.62], [139.721, 35.62]], { highway: 'residential', sidewalk: 'both', level: '0' }),
+  way(201, [200, 202], [[139.72, 35.62], [139.72, 35.621]], { highway: 'residential', sidewalk: 'both', level: '1' })
+] }
+const separatedGraph = buildGraph(config, separatedIntersection)
+assert.equal(separatedGraph.physicalEdges.some((edge) => edge.facility === 'intersection-corner'), false, 'different levels must never be joined by inferred corners')
+assert.equal(separatedGraph.diagnostics.levelSeparatedIntersectionCornerCandidateCount, 1, 'level-separated candidate evidence must be recorded')
+
+const drawingLayerContinuity = { captureContractVersion: '0.2', elements: [
+  { type: 'node', id: 300, tags: {} }, { type: 'node', id: 301, tags: {} }, { type: 'node', id: 302, tags: {} }, { type: 'relation', id: 399, tags: {}, members: [] },
+  way(300, [301, 300], [[139.73, 35.63], [139.731, 35.63]], { highway: 'residential', sidewalk: 'left', layer: '0' }),
+  way(301, [300, 302], [[139.731, 35.63], [139.732, 35.63]], { highway: 'residential', sidewalk: 'left', layer: '-1' })
+] }
+const drawingLayerGraph = buildGraph(config, drawingLayerContinuity)
+assert.equal(drawingLayerGraph.nodes.filter((node) => node.rawOsmNodeId === 300 && node.side === 'left').length, 1, 'same raw node with matching coordinates must canonicalize despite a drawing-layer transition')
+assert.ok(drawingLayerGraph.nodes.some((node) => node.id === 'ped:osm-node:300:left:l0'), 'layer must not become the connection level')
+assert.equal(drawingLayerGraph.nodes.some((node) => node.id.includes('l-1')), false, 'drawing layer must not create a separate connection level')
+assert.ok(drawingLayerGraph.diagnostics.canonicalSharedRawNodeMergeCount > 0, 'canonical shared-node merges must be diagnosed')
+assert.ok(drawingLayerGraph.physicalEdges.every((edge) => edge.lengthMeters > .01), 'canonical merges must not emit zero-length physical edges')
+assert.ok(qualityReport(drawingLayerGraph, { areaId: config.areaId, captureContractVersion: '0.2' }).processing.canonicalSharedRawNodeMergeCount > 0, 'quality report must retain canonicalization diagnostics')
+
+const representationMerge = { captureContractVersion: '0.2', elements: [
+  { type: 'node', id: 350, tags: {} }, { type: 'node', id: 351, tags: {} }, { type: 'node', id: 352, tags: {} }, { type: 'relation', id: 349, tags: {}, members: [] },
+  way(350, [350, 351], [[139.735, 35.635], [139.736, 35.635]], { highway: 'residential' }),
+  way(351, [350, 352], [[139.735, 35.635], [139.735, 35.636]], { highway: 'footway' })
+] }
+const representationMergeGraph = buildGraph(config, representationMerge)
+assert.equal(representationMergeGraph.nodes.filter((node) => node.rawOsmNodeId === 350).length, 1, 'coincident centerline and footway representations at one raw node must share a canonical node')
+assert.equal(representationMergeGraph.physicalEdges.some((edge) => edge.lengthMeters <= .01), false, 'cross-representation canonicalization must not create a zero-length edge')
+
+const layerTransitionJunction = { captureContractVersion: '0.2', elements: [
+  { type: 'node', id: 400, tags: {} }, { type: 'node', id: 401, tags: {} }, { type: 'node', id: 402, tags: {} }, { type: 'relation', id: 499, tags: {}, members: [] },
+  way(400, [400, 401], [[139.74, 35.64], [139.741, 35.64]], { highway: 'residential', sidewalk: 'left', layer: '0' }),
+  way(401, [400, 402], [[139.74, 35.64], [139.74, 35.641]], { highway: 'residential', sidewalk: 'left', layer: '1' })
+] }
+const layerTransitionGraph = buildGraph(config, layerTransitionJunction)
+assert.equal(layerTransitionGraph.physicalEdges.some((edge) => edge.facility === 'intersection-corner'), false, 'different drawing layers must not produce an inferred corner connector')
+assert.ok(layerTransitionGraph.diagnostics.layerIncompatibleIntersectionCornerCandidateCount > 0, 'layer-incompatible inferred-corner candidates must be diagnosed')
+assert.ok(layerTransitionGraph.physicalEdges.some((edge) => edge.facility === 'shared-raw-node'), 'a shared raw node must remain connected across a drawing-layer transition')
+assert.ok(layerTransitionGraph.diagnostics.sharedRawNodeLayerTransitionConnectionCount > 0, 'successful shared-node layer-transition connectors must be diagnosed')
+
+const detourGraph = {
+  nodes: [{ id: 'a', coordinate: [139.73, 35.63] }, { id: 'b', coordinate: [139.731, 35.63] }],
+  physicalEdges: [{ id: 'long', fromNodeId: 'a', toNodeId: 'b', geometry: [[139.73, 35.63], [139.731, 35.63]], lengthMeters: 400, walkingSeconds: 400 / 1.4, source: { rationale: 'derived-sidewalk', confidence: 'derived' }, fallback: false }],
+  edges: [{ id: 'long:forward', physicalEdgeId: 'long', fromNodeId: 'a', toNodeId: 'b', walkingSeconds: 400 / 1.4 }, { id: 'long:backward', physicalEdgeId: 'long', fromNodeId: 'b', toNodeId: 'a', walkingSeconds: 400 / 1.4 }],
+  diagnostics: { malformedWayCount: 0 }
+}
+const detourReport = qualityReport(detourGraph, { areaId: 'detour-fixture', captureContractVersion: '0.2', requireRepresentativeOds: true }, [{ id: 'short-direct-distance', start: [139.73, 35.63], end: [139.731, 35.63], maxDetourRatio: 2 }])
+assert.equal(detourReport.representativeOds.routes[0].reason, 'representative-od-excessive-detour', 'coordinate representative ODs must reject an excessive detour')
+assert.equal(detourReport.validation.status, 'rejected', 'excessive representative OD detours must reject the graph')
 console.log('SIDEWALK_GRAPH_TEST_PASSED')

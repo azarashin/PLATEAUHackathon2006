@@ -10,7 +10,7 @@
 
 ## 品質とblockedの扱い
 
-v2グラフは `quality` 要約として、`qualityContractVersion: pedestrian-network-safety-1.0`、`accepted` / `rejected` / `unverified`、明示・推定および共有空間代表線の延長比、検証結果を保持する。Runtime City Package とserver bundleは、この契約の `accepted` グラフだけを受け入れる。`explicitOrDerivedRatio` と `fallbackRatio` は地域のデータ充足度を把握する参考指標であり、単独では合否に使わない。
+v2グラフは `quality` 要約として、`qualityContractVersion: pedestrian-network-safety-1.1`、`accepted` / `rejected` / `unverified`、明示・推定および共有空間代表線の延長比、検証結果を保持する。Runtime City Package とserver bundleは、この契約の `accepted` グラフだけを受け入れる。`explicitOrDerivedRatio` と `fallbackRatio` は地域のデータ充足度を把握する参考指標であり、単独では合否に使わない。
 
 `accepted` は、高速道路・自動車専用道路・徒歩禁止・徒歩許可のない立入制限区間を除外し、物理辺と有向辺の対応・同一levelでの横断接続を検証できた状態である。生活道路や、徒歩が明示禁止されていない `trunk` は共有空間の代表線として残せる。`rejected` は既知の歩行不能区間の混入、誤接続、構造破損、代表ODの到達不能を示す。`unverified` は必須の監査情報（地域ID、取得契約など）が欠ける場合だけに使い、代表ODが未設定であることは警告として記録する。
 

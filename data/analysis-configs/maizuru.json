@@ -10,6 +10,13 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
+  "representativeOds": [{
+    "id": "core-walkable-corridor",
+    "start": [135.3947189, 35.4686521],
+    "end": [135.3922707, 35.4665583],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 1.8
+  }],
   "candidateDatasetIds": ["26202"],
   "datasetRoots": { "26202": "data/raw/plateau/26202-maizuru-2025" },
   "osmInputPath": "data/raw/osm/maizuru/highways-with-nodes.json",

@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { demoAreas, findCoveredArea, geolocationErrorMessage, haversineMeters, shouldDisplayDataset } from '../src/location-domain.ts'
+import { demoAreas, findCoveredArea, geolocationErrorMessage, haversineMeters, shouldDisplayDataset, V2_ANALYSIS_TIMESTAMPS } from '../src/location-domain.ts'
 
 test('5地域を半径4kmとして定義する', () => {
   assert.deepEqual(demoAreas.map((area) => area.id), ['kyoto', 'maizuru', 'fujisawa', 'saitama', 'ichigaya-venue'])
   assert.ok(demoAreas.every((area) => area.radiusMeters === 4000))
-  assert.deepEqual(demoAreas.filter((area) => area.availableTimestamps.length > 0).map((area) => area.id), ['ichigaya-venue'])
+  assert.deepEqual(demoAreas.filter((area) => area.availableTimestamps.length > 0).map((area) => area.id), ['kyoto', 'maizuru', 'fujisawa', 'saitama', 'ichigaya-venue'])
+  assert.equal(V2_ANALYSIS_TIMESTAMPS.length, 24)
+  assert.equal(V2_ANALYSIS_TIMESTAMPS[0], '2025-08-01T00:00:00+09:00')
+  assert.equal(V2_ANALYSIS_TIMESTAMPS.at(-1), '2025-08-01T23:00:00+09:00')
+  assert.ok(demoAreas.every((area) => area.availableTimestamps !== V2_ANALYSIS_TIMESTAMPS))
+  assert.ok(demoAreas.every((area) => JSON.stringify(area.availableTimestamps) === JSON.stringify(V2_ANALYSIS_TIMESTAMPS)))
 })
 
 test('中心点と範囲外のGPS位置を判定する', () => {

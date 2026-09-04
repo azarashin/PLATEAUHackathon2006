@@ -9,6 +9,7 @@ public static class HourlyEnvironmentCostSelfTests
 {
     public static void Run()
     {
+        var disabledAnalysisColliders = DisableExistingAnalysisColliders();
         try
         {
             AssertNear(75.0, HourlyEnvironmentCostRules.CalculateSolarExposureSeconds(100.0, 0.25));
@@ -114,7 +115,7 @@ public static class HourlyEnvironmentCostSelfTests
             {
                 schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
-                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.0", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
+                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.1", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
                 edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-1", physicalEdgeId = "physical-1", from = new[] { 0f, 0f }, to = new[] { 10f, 0f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f } }, lengthMeters = 10.0, walkingSeconds = 10.0 } }
             };
             physicalRuntimeInput.Validate();
@@ -189,6 +190,9 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual("completed", runtimeShadeResult.status);
             AssertEqual("missing", runtimeShadeResult.edges[0].hourly[0].status);
             AssertEqual("road-surface-not-found", runtimeShadeResult.edges[0].hourly[0].exclusionReason);
+            AssertEqual(2, runtimeShadeResult.edges[0].hourly[0].sampleCount);
+            AssertEqual(0, runtimeShadeResult.edges[0].hourly[0].validSampleCount);
+            AssertEqual(2, runtimeShadeResult.edges[0].hourly[0].noGroundSampleCount);
             AssertRuntimeShadeRaycasts();
             AssertRuntimeRouteComparison();
             AssertRuntimeRouteComparisonWithLocalCityPackage();
@@ -202,6 +206,29 @@ public static class HourlyEnvironmentCostSelfTests
             Debug.LogException(exception);
             EditorApplication.Exit(1);
         }
+        finally
+        {
+            RestoreAnalysisColliders(disabledAnalysisColliders);
+        }
+    }
+
+    private static Collider[] DisableExistingAnalysisColliders()
+    {
+        // The command-line self-test can run after Unity restores the last open inspection Scene.
+        // Keep its raycast assertions deterministic without replacing or modifying that Scene.
+        var colliders = UnityEngine.Object.FindObjectsByType<Collider>(FindObjectsSortMode.None)
+            .Where(collider => collider.enabled && (collider.gameObject.layer == 8 || collider.gameObject.layer == 9))
+            .ToArray();
+        foreach (var collider in colliders) collider.enabled = false;
+        Physics.SyncTransforms();
+        return colliders;
+    }
+
+    private static void RestoreAnalysisColliders(Collider[] colliders)
+    {
+        foreach (var collider in colliders)
+            if (collider != null) collider.enabled = true;
+        Physics.SyncTransforms();
     }
 
     private static void AssertNear(double expected, double actual)
@@ -274,7 +301,7 @@ public static class HourlyEnvironmentCostSelfTests
             {
                 schemaVersion = "environment-cost-runtime-shade-input-0.3", areaId = "self-test-city", center = new[] { 139.0, 35.0 },
                 coordinateZoneId = 9, radiusMeters = 100f, analysisDate = "2025-08-01", timezone = "Asia/Tokyo", sampleSpacingMeters = 10f, pedestrianHeightMeters = 1.5f,
-                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.0", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
+                graphFingerprintSha256 = new string('a', 64), quality = new EnvironmentCostRuntimeShadeInputQuality { qualityContractVersion = "pedestrian-network-safety-1.1", status = "accepted", explicitOrDerivedRatio = 1.0, fallbackRatio = 0.0, sourceSchemaVersion = "0.2", validationFailures = Array.Empty<string>(), validationWarnings = Array.Empty<string>() },
                 edges = new[] { new EnvironmentCostRuntimeShadeInputEdge { id = "physical-polyline", physicalEdgeId = "physical-polyline", from = new[] { 0f, 0f }, to = new[] { 10f, 10f }, geometry = new[] { new[] { 0f, 0f }, new[] { 10f, 0f }, new[] { 10f, 10f } }, lengthMeters = 20.0, walkingSeconds = 20.0 } }
             };
             road.transform.localScale = new Vector3(30f, 1f, 30f);

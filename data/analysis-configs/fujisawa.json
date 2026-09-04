@@ -10,6 +10,13 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
+  "representativeOds": [{
+    "id": "core-walkable-corridor",
+    "start": [139.4873657, 35.3391388],
+    "end": [139.482006, 35.3387539],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 1.5
+  }],
   "candidateDatasetIds": ["14205", "14204", "14100"],
   "datasetRoots": {
     "14205": "data/raw/plateau/14205-fujisawa-2025",

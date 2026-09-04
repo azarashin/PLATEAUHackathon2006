@@ -10,6 +10,13 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
+  "representativeOds": [{
+    "id": "core-walkable-corridor",
+    "start": [135.7587768, 34.9862197],
+    "end": [135.7551678, 34.9860648],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 1.5
+  }],
   "candidateDatasetIds": ["26100"],
   "datasetRoots": { "26100": "data/raw/plateau/26100-kyoto-2025" },
   "osmInputPath": "data/raw/osm/kyoto/highways-with-nodes.json",

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
 import { CODE_TO_STATUS, validateCostSlice, validateTopology } from './build-environment-cost-server-bundle.mjs'
 
-const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.1'
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message)

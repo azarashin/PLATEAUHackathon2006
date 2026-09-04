@@ -174,7 +174,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             if (!string.Equals(qualityStatus, "accepted", StringComparison.Ordinal) || !fallbackRatio.HasValue || !supportedRatio.HasValue ||
                 fallbackRatio.Value < 0.0 || fallbackRatio.Value > 1.0 || supportedRatio.Value < 0.0 || supportedRatio.Value > 1.0 ||
                 Math.Abs(fallbackRatio.Value + supportedRatio.Value - 1.0) > 0.000001 ||
-                !string.Equals((string)graphQuality["qualityContractVersion"], "pedestrian-network-safety-1.0", StringComparison.Ordinal) ||
+                !string.Equals((string)graphQuality["qualityContractVersion"], "pedestrian-network-safety-1.1", StringComparison.Ordinal) ||
                 !string.Equals((string)graphQuality["sourceSchemaVersion"], "0.2", StringComparison.Ordinal) ||
                 validationFailures == null || validationFailures.Count != 0 || validationWarnings == null)
                 throw new InvalidOperationException("Sidewalk network quality is not accepted for Runtime package generation.");

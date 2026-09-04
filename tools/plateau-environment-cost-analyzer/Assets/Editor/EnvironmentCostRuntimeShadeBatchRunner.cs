@@ -36,6 +36,16 @@ public static class EnvironmentCostRuntimeShadeBatchRunner
         if (config == null) throw new ArgumentNullException(nameof(config));
         if (!config.IsV2SidewalkPackage) throw new InvalidOperationException("Runtime shade batch requires a v0.2 sidewalk package config.");
 
+        // Normal Editor mode restores the last open inspection Scene before invoking
+        // -executeMethod.  Opening another city directly can temporarily retain both
+        // large CityGML scenes and exhaust native memory, so release the restored scene
+        // through a lightweight empty scene first.
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        EditorUtility.UnloadUnusedAssetsImmediate();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_BATCH_CLEAN_SCENE area={config.areaId}");
+
         EnvironmentCostRuntimeCityPackageBuilder.Create(config);
         var packageRoot = Path.Combine(Application.streamingAssetsPath, config.packageRelativePath);
         EnvironmentCostRuntimeCityPackageBuilder.Verify(packageRoot);
@@ -54,7 +64,12 @@ public static class EnvironmentCostRuntimeShadeBatchRunner
             analysisDate = DateTime.ParseExact(input.analysisDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             hours = Enumerable.Range(0, 24).ToArray()
         };
-        var result = EnvironmentCostRuntimeShadeAnalyzer.Analyze(input, request);
+        var progressInterval = Math.Max(1, input.edges.Length / 100);
+        var result = EnvironmentCostRuntimeShadeAnalyzer.Analyze(input, request, onEdgeCompleted: (completed, total) =>
+        {
+            if (completed == total || completed % progressInterval == 0)
+                Debug.Log($"ENVIRONMENT_COST_RUNTIME_SHADE_BATCH_PROGRESS area={input.areaId} edges={completed}/{total}");
+        });
         result.provenance.scenarioId = "baseline";
         result.provenance.recalculationScope = "batch-full-24-hours";
         result.provenance.totalEdgeCount = input.edges.Length;

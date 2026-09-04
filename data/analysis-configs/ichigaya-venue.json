@@ -10,6 +10,19 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
+  "representativeOds": [{
+    "id": "central-west-short-link",
+    "start": [139.736043, 35.690470],
+    "end": [139.733043, 35.690470],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 2.0
+  }, {
+    "id": "central-north-short-link",
+    "start": [139.736043, 35.690470],
+    "end": [139.736043, 35.693470],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 2.0
+  }],
   "candidateDatasetIds": ["13101", "13102", "13103", "13104", "13105", "13106", "13113"],
   "datasetRoots": {
     "13101": "data/raw/plateau/13101-2025",

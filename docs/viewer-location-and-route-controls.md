@@ -6,7 +6,36 @@ Issue #12でViewerの検索条件UIを実操作へ接続し、Issue #13で3経�
 
 地域セレクターは京都市、舞鶴市、藤沢市、さいたま市、市ヶ谷周辺を表示し、選択時に各中心点から半径4 kmの初期範囲へ地図を移動します。地域変更時には起終点、処理中のリクエスト、以前の経路状態を破棄します。
 
-2026-08-23時点で経路サーバー用実データがあるのは市ヶ谷だけです。京都・舞鶴・藤沢・さいたまは`not-precomputed`と表示し、データがあるように見せません。4地域のデータ生成は#36で行い、生成後に地域定義の`availableTimestamps`へ日時を追加します。
+5地域すべてに、v2歩行ネットワークと`2025-08-01`の0時から23時までのbaseline解析結果を登録しています。Viewerは、経路サーバーが読み込んだ時刻を「計算済み日時」から選択し、地域を問わず単独baselineの`POST /api/v1/routes`と`GET /api/v1/road-edges`で経路・道路別日陰率を表示します。サーバーを`ROUTE_TIMESTAMPS=2025-08-01T12:00:00+09:00`で起動した場合は12時だけを選択してください。全24時刻を選んで利用するには、この資料後半の全時間帯起動手順でサーバーを再起動します。
+
+今回の5地域閲覧では、市ヶ谷の旧`ichigaya-demo-shade`施策バンドルは使用しません。v2歩行ネットワークと互換な施策後バンドルが未生成であるため、A/B比較は対象外です。
+
+### 5地域v2をローカルで閲覧する起動例
+
+リポジトリ直下のPowerShellで、まず経路サーバーを起動します。初回確認ではメモリ使用量を抑えるため、12:00の1時刻だけを読み込みます。
+
+```powershell
+$env:HOST = '127.0.0.1'
+$env:PORT = '3102'
+$env:ROUTE_CORS_ORIGIN = 'http://localhost:5173'
+$env:ROUTE_TIMESTAMPS = '2025-08-01T12:00:00+09:00'
+$env:ROUTE_BUNDLE_MANIFESTS = @(
+  (Resolve-Path 'data/generated/ichigaya-venue-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/kyoto-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/maizuru-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/fujisawa-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/saitama-environment-cost-server-bundle-v2/manifest.json').Path
+) -join ','
+npm --prefix server start
+```
+
+別のPowerShellでViewerを起動し、`http://localhost:5173/`を開きます。
+
+```powershell
+$env:VITE_ROUTE_API_URL = 'http://127.0.0.1:3102/api/v1/routes'
+$env:VITE_ROAD_EDGE_API_URL = 'http://127.0.0.1:3102/api/v1/road-edges'
+npm --prefix viewer run dev -- --host localhost --port 5173 --strictPort
+```
 
 環境コストfixtureの`areaId`と選択地域が一致しない場合、その道路形状は地図へ描画しません。現在の小型fixtureは`tokyo-demo`（東京駅周辺）なので、5つのシミュレーション地域では非表示です。これにより、架空の直線を市ヶ谷の実道路または検索経路と誤認することを防ぎます。
 
@@ -105,4 +134,44 @@ npm run test:route-display
 npm run test:road-edge-display
 ```
 
-ブラウザでは、5地域の選択、市ヶ谷以外の`not-precomputed`、市ヶ谷の日時選択、地図クリック後の起終点切替、解除・入替・リセットに加え、3経路の色分け・選択・表示切替、KPI、同一路線の説明、日陰優先度変更後の再計算を確認します。さらに地図を拡大して日陰・日向・欠測の凡例、道路クリック詳細、選択経路の構成辺強調、日時・係数変更直後の旧表示消去を確認します。GPSの権限結果はHTTPSまたはlocalhost上の実機ブラウザで確認します。
+ブラウザでは、5地域の選択、計算済み日時の選択、地図クリック後の起終点切替、解除・入替・リセットに加え、3経路の色分け・選択・表示切替、KPI、同一路線の説明、日陰優先度変更後の再計算を確認します。さらに地図を拡大して日陰・日向・欠測の凡例、道路クリック詳細、選択経路の構成辺強調、日時・係数変更直後の旧表示消去を確認します。GPSの権限結果はHTTPSまたはlocalhost上の実機ブラウザで確認します。
+
+## 5地域v2バンドルの全時間帯読み込みとメモリ目安
+
+5地域のv2バンドル（市ヶ谷・京都・舞鶴・藤沢・さいたま）を、0時から23時までの全24時間帯で読み込む場合は、リポジトリ直下で次を実行します。`ROUTE_TIMESTAMPS` を設定しないことで、各マニフェストの全コストスライスが読み込まれます。
+
+```powershell
+$env:HOST = '127.0.0.1'
+$env:PORT = '3102'
+$env:ROUTE_CORS_ORIGIN = 'http://localhost:5173'
+$env:NODE_OPTIONS = '--max-old-space-size=4096'
+$env:ROUTE_BUNDLE_MANIFESTS = @(
+  (Resolve-Path 'data/generated/ichigaya-venue-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/kyoto-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/maizuru-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/fujisawa-environment-cost-server-bundle-v2/manifest.json').Path,
+  (Resolve-Path 'data/generated/saitama-environment-cost-server-bundle-v2/manifest.json').Path
+) -join ','
+Remove-Item Env:ROUTE_TIMESTAMPS -ErrorAction SilentlyContinue
+Remove-Item Env:ROUTE_SCENARIO_BUNDLES -ErrorAction SilentlyContinue
+npm --prefix server start
+```
+
+メモリを抑えて動作確認する場合は、次の2行を設定すると5地域の12時だけを読み込みます。
+
+```powershell
+$env:NODE_OPTIONS = '--max-old-space-size=2048'
+$env:ROUTE_TIMESTAMPS = '2025-08-01T12:00:00+09:00'
+```
+
+2026年9月時点の実ファイル計測では、5地域合計は次のとおりです。
+
+| 入力 | サイズ（ディスク上） |
+|---|---:|
+| `topology.json` 5地域 | 約185.4 MiB |
+| 12時のコストスライス×5地域 | 約11.4 MiB |
+| 24個のコストスライス×5地域 | 約225.0 MiB |
+| topology＋12時slice（12時起動の入力） | 約196.8 MiB |
+| topology＋全24時slice（全時間帯起動の入力） | 約410.5 MiB |
+
+これはファイルサイズであり、Node.jsの実RSSを測定した値ではありません。JSONの解析後はオブジェクト、文字列、インデックス等のオーバーヘッドが加わるため、起動時の目安として12時のみは--max-old-space-size=2048（2 GiB）、全24時間帯は--max-old-space-size=4096（4 GiB）を推奨します。OSやViewerの分も含めて同量以上の空きメモリを確保してください。実際のRSSはNode.jsのバージョン、同時に保持するリクエスト、GCのタイミングで変動します。

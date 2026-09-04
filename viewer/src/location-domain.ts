@@ -9,12 +9,17 @@ export interface DemoArea {
   availableTimestamps: string[]
 }
 
+export const V2_ANALYSIS_TIMESTAMPS = Array.from(
+  { length: 24 },
+  (_, hour) => `2025-08-01T${String(hour).padStart(2, '0')}:00:00+09:00`,
+)
+
 export const demoAreas: DemoArea[] = [
-  { id: 'kyoto', name: '京都市', centerName: '京都駅', center: [135.75877, 34.98535], radiusMeters: 4000, availableTimestamps: [] },
-  { id: 'maizuru', name: '舞鶴市', centerName: '東舞鶴駅', center: [135.3946946, 35.4685404], radiusMeters: 4000, availableTimestamps: [] },
-  { id: 'fujisawa', name: '藤沢市', centerName: '藤沢駅', center: [139.487293, 35.338882], radiusMeters: 4000, availableTimestamps: [] },
-  { id: 'saitama', name: 'さいたま市', centerName: '大宮区・天沼町2丁目', center: [139.640025, 35.900757], radiusMeters: 4000, availableTimestamps: [] },
-  { id: 'ichigaya-venue', name: '市ヶ谷周辺', centerName: '五番町グランドビル', center: [139.736043, 35.69047], radiusMeters: 4000, availableTimestamps: ['2025-08-01T12:00:00+09:00'] },
+  { id: 'kyoto', name: '京都市', centerName: '京都駅', center: [135.75877, 34.98535], radiusMeters: 4000, availableTimestamps: [...V2_ANALYSIS_TIMESTAMPS] },
+  { id: 'maizuru', name: '舞鶴市', centerName: '東舞鶴駅', center: [135.3946946, 35.4685404], radiusMeters: 4000, availableTimestamps: [...V2_ANALYSIS_TIMESTAMPS] },
+  { id: 'fujisawa', name: '藤沢市', centerName: '藤沢駅', center: [139.487293, 35.338882], radiusMeters: 4000, availableTimestamps: [...V2_ANALYSIS_TIMESTAMPS] },
+  { id: 'saitama', name: 'さいたま市', centerName: '大宮区・天沼町2丁目', center: [139.640025, 35.900757], radiusMeters: 4000, availableTimestamps: [...V2_ANALYSIS_TIMESTAMPS] },
+  { id: 'ichigaya-venue', name: '市ヶ谷周辺', centerName: '五番町グランドビル', center: [139.736043, 35.69047], radiusMeters: 4000, availableTimestamps: [...V2_ANALYSIS_TIMESTAMPS] },
 ]
 
 export function haversineMeters(left: Coordinate, right: Coordinate): number {
