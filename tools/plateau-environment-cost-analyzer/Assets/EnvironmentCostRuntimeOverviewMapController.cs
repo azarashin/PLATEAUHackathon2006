@@ -13,6 +13,8 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private const int RoadLayer = 9;
     private const int TerrainLayer = 10;
     private const float DefaultMapExtentMeters = 500f;
+    // The overview is deliberately closer than the package coverage so roads and shadows remain legible.
+    private const float OverviewMapZoomMultiplier = 1.5f;
     private const float MarkerRotationUpdateThresholdDegrees = 0.1f;
     private static readonly Color PositionMarkerColor = new Color(13f / 255f, 148f / 255f, 136f / 255f, 1f);
     public const float MovingRefreshIntervalSeconds = 0.2f;
@@ -89,6 +91,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         positionMarker.generateVisualContent += GeneratePositionMarkerVisualContent;
         positionMarker.tooltip = "現在地とメインカメラの向き";
         image.Add(positionMarker);
+        positionMarker.MarkDirtyRepaint();
 
         root.Add(mapContainer);
 
@@ -179,15 +182,12 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     /// <summary>Smallest map radius for a city package. The visible square is twice this value.</summary>
     public static float GetMinimumMapExtentMeters(float packageRadiusMeters)
     {
-        var maximum = GetMaximumMapExtentMeters(packageRadiusMeters);
-        return Mathf.Min(200f, maximum);
+        return Mathf.Min(200f, GetPackageCoverageRadiusMeters(packageRadiusMeters)) / OverviewMapZoomMultiplier;
     }
 
     /// <summary>Largest display radius, limited to the generated city package coverage.</summary>
     public static float GetMaximumMapExtentMeters(float packageRadiusMeters)
-        => packageRadiusMeters > 0f
-            ? packageRadiusMeters
-            : DefaultMapExtentMeters;
+        => GetPackageCoverageRadiusMeters(packageRadiusMeters) / OverviewMapZoomMultiplier;
 
     /// <summary>Clamps a map radius to the range supported by the current city package.</summary>
     public static float ClampMapExtentMeters(float requestedMeters, float packageRadiusMeters)
@@ -201,7 +201,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
 
     /// <summary>Uses one city-package radius above the lowest scene geometry as the farthest valid overview height.</summary>
     public static float GetMaximumSourceCameraHeightMeters(float sceneMinimumY, float packageRadiusMeters)
-        => sceneMinimumY + GetMaximumMapExtentMeters(packageRadiusMeters);
+        => sceneMinimumY + GetPackageCoverageRadiusMeters(packageRadiusMeters);
 
     /// <summary>Maps a valid source-camera height linearly to the supported overview-map radius.</summary>
     public static float GetMapExtentMetersForSourceCameraHeight(float sourceCameraHeight, float minimumSourceCameraHeight,
@@ -212,6 +212,9 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     }
 
     private float ResolveMapExtentMeters() => ClampMapExtentMeters(mapExtentMeters, GetPackageRadiusMeters());
+
+    private static float GetPackageCoverageRadiusMeters(float packageRadiusMeters)
+        => packageRadiusMeters > 0f ? packageRadiusMeters : DefaultMapExtentMeters;
 
     private void EnsureSourceCameraHeightRange()
     {
@@ -309,9 +312,10 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         mesh.SetNextVertex(new Vertex { position = new Vector3(tip.x, tip.y, Vertex.nearZ), tint = PositionMarkerColor });
         mesh.SetNextVertex(new Vertex { position = new Vector3(leftBase.x, leftBase.y, Vertex.nearZ), tint = PositionMarkerColor });
         mesh.SetNextVertex(new Vertex { position = new Vector3(rightBase.x, rightBase.y, Vertex.nearZ), tint = PositionMarkerColor });
+        // UI Toolkit culls back-facing generated meshes. This winding faces the panel camera.
         mesh.SetNextIndex(0);
-        mesh.SetNextIndex(1);
         mesh.SetNextIndex(2);
+        mesh.SetNextIndex(1);
     }
 
     private void ToggleVisibility()

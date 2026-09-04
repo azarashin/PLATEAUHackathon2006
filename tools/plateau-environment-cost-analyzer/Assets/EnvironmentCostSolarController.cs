@@ -9,12 +9,14 @@ using UnityEngine.UIElements;
 /// </summary>
 public sealed class EnvironmentCostSolarController : MonoBehaviour
 {
+    private const float MinimumVisualizationShadowDistanceMeters = 1500f;
+    private const float MaximumVisualizationShadowDistanceMeters = 3000f;
     [SerializeField] private EnvironmentCostInspectionMetadata metadata;
     [SerializeField] private Light directionalLight;
     [SerializeField] private float firstHour = 8f;
     [SerializeField] private float lastHour = 17f;
     [SerializeField] private float localHour = 12f;
-    [SerializeField] private float shadowDistanceMeters = 250f;
+    [SerializeField] private float shadowDistanceMeters = MinimumVisualizationShadowDistanceMeters;
     [SerializeField] private string dateText;
 
     private string validationMessage;
@@ -37,8 +39,28 @@ public sealed class EnvironmentCostSolarController : MonoBehaviour
     private void Start()
     {
         if (string.IsNullOrWhiteSpace(dateText) && metadata != null) dateText = metadata.AnalysisDate;
-        QualitySettings.shadowDistance = Mathf.Max(0f, shadowDistanceMeters);
+        ApplyVisualizationShadowQuality();
         ApplySun();
+    }
+
+    /// <summary>
+    /// Applies display-only shadow settings for inspecting a wide city model.
+    /// These settings never affect hourly analysis JSON or route-cost data.
+    /// </summary>
+    private void ApplyVisualizationShadowQuality()
+    {
+        shadowDistanceMeters = ResolveVisualizationShadowDistanceMeters(shadowDistanceMeters, metadata?.RadiusMeters ?? 0f);
+        QualitySettings.shadowDistance = shadowDistanceMeters;
+        QualitySettings.shadowResolution = ShadowResolution.Low;
+        QualitySettings.shadowCascades = 1;
+        if (directionalLight != null) directionalLight.shadows = LightShadows.Hard;
+    }
+
+    /// <summary>Chooses a low-cost distance that keeps wide-view shadows visible without unbounded quality cost.</summary>
+    public static float ResolveVisualizationShadowDistanceMeters(float configuredMeters, float packageRadiusMeters)
+    {
+        var requestedMeters = Mathf.Max(configuredMeters, packageRadiusMeters);
+        return Mathf.Clamp(requestedMeters, MinimumVisualizationShadowDistanceMeters, MaximumVisualizationShadowDistanceMeters);
     }
 
     public void BuildUi(VisualElement root)
