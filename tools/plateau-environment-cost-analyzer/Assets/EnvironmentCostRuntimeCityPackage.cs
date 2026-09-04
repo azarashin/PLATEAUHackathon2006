@@ -20,9 +20,12 @@ public sealed class EnvironmentCostRuntimeCityPackageManifest
     public EnvironmentCostRuntimeCityPackageSource[] sources;
     public EnvironmentCostRuntimeCityPackageFile[] files;
 
+
     public void ValidateStructure()
     {
-        if (!string.Equals(schemaVersion, "environment-cost-runtime-city-package-0.1", StringComparison.Ordinal))
+        var legacy = string.Equals(schemaVersion, "environment-cost-runtime-city-package-0.1", StringComparison.Ordinal);
+        var current = string.Equals(schemaVersion, "environment-cost-runtime-city-package-0.2", StringComparison.Ordinal);
+        if (!legacy && !current)
             throw new InvalidOperationException($"Unsupported runtime city package schema: {schemaVersion ?? "<null>"}.");
         if (string.IsNullOrWhiteSpace(areaId) || string.IsNullOrWhiteSpace(version) || coordinateZoneId < 1 || coordinateZoneId > 19 ||
             center == null || center.Length != 2 || radiusMeters <= 0.0 || string.IsNullOrWhiteSpace(inspectionSceneAssetPath))
@@ -37,6 +40,16 @@ public sealed class EnvironmentCostRuntimeCityPackageManifest
                 !IsSafeRelativePath(file.relativePath) || !seen.Add(file.relativePath))
                 throw new InvalidOperationException("Runtime city package file inventory is invalid.");
         }
+        if (current && (!HasSingleFile("place-labels", "place-labels.json") || !HasSingleFile("place-label-report", "place-label-report.json")))
+            throw new InvalidOperationException("Runtime city package v0.2 requires place labels and their extraction report.");
+    }
+
+    private bool HasSingleFile(string kind, string path)
+    {
+        var count = 0;
+        foreach (var file in files)
+            if (string.Equals(file.kind, kind, StringComparison.Ordinal) && string.Equals(file.relativePath, path, StringComparison.Ordinal)) count++;
+        return count == 1;
     }
 
     public static bool IsSafeRelativePath(string path)
@@ -52,6 +65,7 @@ public sealed class EnvironmentCostRuntimeCityPackageManifest
         var hash = sha256.ComputeHash(stream);
         return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
     }
+
 
     private static bool IsSha256(string value)
     {
@@ -86,6 +100,10 @@ public sealed class EnvironmentCostRuntimeCityPackageSource
     public string kind;
     public string originalPath;
     public string sha256;
+    public string provider;
+    public int year;
+    public string url;
+    public string acquiredAtUtc;
 }
 
 [Serializable]
@@ -95,4 +113,69 @@ public sealed class EnvironmentCostRuntimeCityPackageFile
     public string relativePath;
     public long bytes;
     public string sha256;
+}
+
+/// <summary>Portable labels extracted from the original CityGML, rather than Scene meshes.</summary>
+[Serializable]
+public sealed class EnvironmentCostPlaceLabels
+{
+    public string schemaVersion;
+    public string areaId;
+    public int coordinateZoneId;
+    public EnvironmentCostPlaceLabel[] labels;
+}
+
+[Serializable]
+public sealed class EnvironmentCostPlaceLabel
+{
+    public string id;
+    public string text;
+    // Always [longitude, latitude]. The extractor never guesses this order from numeric values.
+    public double[] coordinate;
+    public string sourceFile;
+    public string sourceElement;
+    public string sourceKind;
+    public string classification;
+    public int sourceEpsg;
+    public int priority;
+}
+
+[Serializable]
+public sealed class EnvironmentCostPlaceLabelReport
+{
+    public string schemaVersion;
+    public string areaId;
+    public int coordinateZoneId;
+    public int sourceFileCount;
+    public int parsedFileCount;
+    public int labelCount;
+    public string[] reasonCodes;
+    public string[] parseErrors;
+    public int[] sourceEpsgCodes;
+    public string sourceCoordinateAxis;
+    public EnvironmentCostPlaceLabelClassification[] classifications;
+    public string[] examples;
+    public string sourceVersion;
+    public string sourceAcquiredAtUtc;
+    public string[] sourceDatasetIds;
+    public EnvironmentCostPlaceLabelAcquisitionSource[] acquisitionSources;
+}
+
+[Serializable]
+public sealed class EnvironmentCostPlaceLabelAcquisitionSource
+{
+    public string datasetId;
+    public string provider;
+    public int year;
+    public string url;
+    public string acquiredAtUtc;
+    public string acquisitionPlanPath;
+    public string acquisitionPlanSha256;
+}
+
+[Serializable]
+public sealed class EnvironmentCostPlaceLabelClassification
+{
+    public string name;
+    public int count;
 }

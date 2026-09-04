@@ -12,7 +12,8 @@ using UnityEngine;
 /// <summary>Creates the versioned StreamingAssets package consumed by the standalone Runtime player.</summary>
 public static class EnvironmentCostRuntimeCityPackageBuilder
 {
-    private const string PackageSchema = "environment-cost-runtime-city-package-0.1";
+    private const string PackageSchemaLegacy = "environment-cost-runtime-city-package-0.1";
+    private const string PackageSchemaCurrent = "environment-cost-runtime-city-package-0.2";
 
     [MenuItem("PLATEAU/環境コスト/Runtime 都市データパッケージを作成")]
     public static void CreateIchigayaPackageFromMenu()
@@ -61,6 +62,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             if (baselinePath != null)
                 CopyToPackage(baselinePath, stagingRoot, "baseline-environment-cost.json", "baseline-environment-cost", files);
             CreateRuntimeShadeInput(baselinePath, sidewalkPath, analysis, stagingRoot, files);
+            var placeLabelReport = config.IsV2SidewalkPackage ? CreatePlaceLabels(analysis, config, stagingRoot, files) : null;
             if (roadManifestPath != null)
             {
                 var roadDirectory = Path.GetDirectoryName(roadManifestPath) ?? throw new InvalidOperationException("Road bundle directory is missing.");
@@ -77,7 +79,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
 
             var manifest = new EnvironmentCostRuntimeCityPackageManifest
             {
-                schemaVersion = PackageSchema,
+                schemaVersion = config.IsV2SidewalkPackage ? PackageSchemaCurrent : PackageSchemaLegacy,
                 areaId = config.areaId,
                 displayName = config.displayName,
                 version = config.version,
@@ -96,16 +98,14 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
                         new EnvironmentCostRuntimeCityPackageLayer { name = "Terrain", layer = 10, role = "display-and-terrain-surface" }
                     }
                 },
-                sources = BuildSources(config, roadManifestPath, baselinePath, sidewalkPath),
+                sources = BuildSources(config, roadManifestPath, baselinePath, sidewalkPath, placeLabelReport),
                 files = files.ToArray()
             };
             manifest.ValidateStructure();
             File.WriteAllText(Path.Combine(stagingRoot, "manifest.json"), JsonUtility.ToJson(manifest, true));
             Verify(stagingRoot);
 
-            Directory.CreateDirectory(Path.GetDirectoryName(targetRoot) ?? throw new InvalidOperationException("StreamingAssets root is missing."));
-            if (Directory.Exists(targetRoot)) Directory.Delete(targetRoot, true);
-            Directory.Move(stagingRoot, targetRoot);
+            ReplacePackageAtomically(stagingRoot, targetRoot);
             AssetDatabase.Refresh();
             Debug.Log($"ENVIRONMENT_COST_RUNTIME_CITY_PACKAGE_READY area={manifest.areaId} version={manifest.version} files={manifest.files.Length} path={targetRoot}");
         }
@@ -114,6 +114,51 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
             if (Directory.Exists(stagingRoot)) Directory.Delete(stagingRoot, true);
             throw;
         }
+    }
+
+    private static void ReplacePackageAtomically(string stagingRoot, string targetRoot)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(targetRoot) ?? throw new InvalidOperationException("StreamingAssets root is missing."));
+        var backupRoot = targetRoot + ".backup";
+        if (Directory.Exists(backupRoot)) Directory.Delete(backupRoot, true);
+        var movedExisting = false;
+        try
+        {
+            if (Directory.Exists(targetRoot)) { Directory.Move(targetRoot, backupRoot); movedExisting = true; }
+            Directory.Move(stagingRoot, targetRoot);
+            if (movedExisting) Directory.Delete(backupRoot, true);
+        }
+        catch
+        {
+            if (Directory.Exists(targetRoot)) Directory.Delete(targetRoot, true);
+            if (movedExisting && Directory.Exists(backupRoot)) Directory.Move(backupRoot, targetRoot);
+            throw;
+        }
+    }
+
+    private static EnvironmentCostPlaceLabelReport CreatePlaceLabels(AnalysisRunConfig analysis, RuntimeCityPackageConfig config, string targetRoot,
+        List<EnvironmentCostRuntimeCityPackageFile> files)
+    {
+        var labels = EnvironmentCostCityGmlPlaceLabelExtractor.Extract(analysis, config, out var report);
+        WriteGeneratedPackageFile(labels, targetRoot, "place-labels.json", "place-labels", files);
+        WriteGeneratedPackageFile(report, targetRoot, "place-label-report.json", "place-label-report", files);
+        var acquisitionRelative = string.IsNullOrWhiteSpace(config.placeLabelAcquisitionManifestPath) ? $"data/plateau-citygml-manifests/{analysis.areaId}.json" : config.placeLabelAcquisitionManifestPath;
+        var acquisitionPath = config.ResolvePath(acquisitionRelative);
+        if (File.Exists(acquisitionPath)) CopyToPackage(acquisitionPath, targetRoot, "place-label-acquisition-plan.json", "place-label-acquisition-plan", files);
+        Debug.Log($"ENVIRONMENT_COST_PLACE_LABELS area={analysis.areaId} labels={report.labelCount} sources={report.sourceFileCount} parsed={report.parsedFileCount} reasons={string.Join(",", report.reasonCodes)}");
+        return report;
+    }
+
+    private static void WriteGeneratedPackageFile(object value, string targetRoot, string relativePath, string kind,
+        List<EnvironmentCostRuntimeCityPackageFile> files)
+    {
+        var target = Path.Combine(targetRoot, relativePath);
+        File.WriteAllText(target, JsonConvert.SerializeObject(value, Formatting.Indented));
+        files.Add(new EnvironmentCostRuntimeCityPackageFile
+        {
+            kind = kind, relativePath = relativePath, bytes = new FileInfo(target).Length,
+            sha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(target)
+        });
     }
 
     /// <summary>Verifies a package after generation, or independently from an Editor test/menu command.</summary>
@@ -288,7 +333,7 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         return null;
     }
 
-    private static EnvironmentCostRuntimeCityPackageSource[] BuildSources(RuntimeCityPackageConfig config, string roadManifestPath, string baselinePath, string sidewalkPath)
+    private static EnvironmentCostRuntimeCityPackageSource[] BuildSources(RuntimeCityPackageConfig config, string roadManifestPath, string baselinePath, string sidewalkPath, EnvironmentCostPlaceLabelReport placeLabelReport)
     {
         var sources = new List<EnvironmentCostRuntimeCityPackageSource>
         {
@@ -297,6 +342,15 @@ public static class EnvironmentCostRuntimeCityPackageBuilder
         if (roadManifestPath != null) sources.Add(Source("road-network-bundle", config.roadNetworkBundlePath, roadManifestPath));
         if (baselinePath != null) sources.Add(Source("baseline-environment-cost", config.baselineEnvironmentCostPath, baselinePath));
         if (sidewalkPath != null) sources.Add(Source("sidewalk-network-v2", config.sidewalkNetworkPath, sidewalkPath));
+        var acquisitionRelative = string.IsNullOrWhiteSpace(config.placeLabelAcquisitionManifestPath) ? $"data/plateau-citygml-manifests/{config.areaId}.json" : config.placeLabelAcquisitionManifestPath;
+        var acquisitionPath = config.ResolvePath(acquisitionRelative);
+        if (File.Exists(acquisitionPath))
+        {
+            foreach (var acquisition in placeLabelReport?.acquisitionSources ?? Array.Empty<EnvironmentCostPlaceLabelAcquisitionSource>())
+                sources.Add(new EnvironmentCostRuntimeCityPackageSource { kind = "citygml-acquisition-plan", originalPath = acquisitionRelative.Replace('\\', '/'), sha256 = acquisition.acquisitionPlanSha256,
+                    provider = acquisition.provider, year = acquisition.year, url = acquisition.url, acquiredAtUtc = acquisition.acquiredAtUtc });
+        }
+        else sources.Add(new EnvironmentCostRuntimeCityPackageSource { kind = "citygml-acquisition-plan-missing", originalPath = acquisitionRelative.Replace('\\', '/') });
         return sources.ToArray();
     }
 }
@@ -316,6 +370,12 @@ public sealed class RuntimeCityPackageConfig
     public string inspectionSceneAssetPath;
     public string runtimeShadeResultOutputPath;
     public string runtimeShadeCompleteMarkerPath;
+    public string[] placeLabelDatasetIds;
+    // CityGML coordinate axis is explicitly configured; never inferred from coordinate values.
+    public string placeLabelCoordinateAxis = "latitude-longitude";
+    public string placeLabelSourceVersion = "local-citygml";
+    public string placeLabelSourceAcquiredAtUtc = "unknown";
+    public string placeLabelAcquisitionManifestPath;
     [JsonIgnore] public string repositoryRoot;
 
     public static RuntimeCityPackageConfig Load(string path)
@@ -343,7 +403,9 @@ public sealed class RuntimeCityPackageConfig
             string.IsNullOrWhiteSpace(analysisConfigPath) || !EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath(packageRelativePath) ||
             (legacy && (string.IsNullOrWhiteSpace(roadNetworkBundlePath) || string.IsNullOrWhiteSpace(baselineEnvironmentCostPath))) ||
             (v2 && (string.IsNullOrWhiteSpace(sidewalkNetworkPath) || string.IsNullOrWhiteSpace(inspectionSceneAssetPath) ||
-                    string.IsNullOrWhiteSpace(runtimeShadeResultOutputPath) || string.IsNullOrWhiteSpace(runtimeShadeCompleteMarkerPath))))
+                    string.IsNullOrWhiteSpace(runtimeShadeResultOutputPath) || string.IsNullOrWhiteSpace(runtimeShadeCompleteMarkerPath) ||
+                    (placeLabelCoordinateAxis != "latitude-longitude" && placeLabelCoordinateAxis != "northing-easting-up") ||
+                    string.IsNullOrWhiteSpace(placeLabelSourceVersion) || string.IsNullOrWhiteSpace(placeLabelSourceAcquiredAtUtc))))
             throw new InvalidOperationException("Runtime city package config is incomplete or invalid.");
     }
 
