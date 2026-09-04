@@ -24,6 +24,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
     private static EnvironmentCostInspectionSceneBuilder batchRunner;
     private static Task<bool> batchTask;
     private string configPath = "data/analysis-configs/ichigaya-venue.json";
+    private string runtimeCityPackageConfigPath;
     private string status = "検証済みの解析設定を選択して、ローカル検証用 Scene を作成します。";
     private bool isRunning;
     private bool cancelRequested;
@@ -45,7 +46,9 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         {
             var config = AnalysisRunConfig.LoadForCurrentProcess();
             batchRunner = CreateInstance<EnvironmentCostInspectionSceneBuilder>();
-            batchTask = batchRunner.CreateInspectionSceneAsync(config, isBatchMode: true);
+            var runtimePackageConfigPath = FindCommandLineValue("-runtimeCityPackageConfig");
+            var packageConfig = string.IsNullOrWhiteSpace(runtimePackageConfigPath) ? null : RuntimeCityPackageConfig.Load(runtimePackageConfigPath);
+            batchTask = batchRunner.CreateInspectionSceneAsync(config, packageConfig, isBatchMode: true);
             EditorApplication.update += ExitBatchWhenComplete;
         }
         catch (Exception exception)
@@ -65,6 +68,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
 
         using (new EditorGUI.DisabledScope(isRunning))
         {
+            runtimeCityPackageConfigPath = EditorGUILayout.TextField("Runtime 都市パッケージ設定（任意）", runtimeCityPackageConfigPath);
             configPath = EditorGUILayout.TextField("解析設定", configPath);
             if (GUILayout.Button("解析設定を選択"))
             {
@@ -95,7 +99,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         EditorApplication.Exit(succeeded ? 0 : 1);
     }
 
-    private async Task<bool> CreateInspectionSceneAsync(AnalysisRunConfig suppliedConfig = null, bool isBatchMode = false)
+    private async Task<bool> CreateInspectionSceneAsync(AnalysisRunConfig suppliedConfig = null, RuntimeCityPackageConfig suppliedPackageConfig = null, bool isBatchMode = false)
     {
         if (isRunning) return false;
         isRunning = true;
@@ -105,6 +109,9 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         try
         {
             var config = suppliedConfig ?? AnalysisRunConfig.LoadForEditor(configPath);
+            var packageConfig = suppliedPackageConfig ?? (string.IsNullOrWhiteSpace(runtimeCityPackageConfigPath) ? null : RuntimeCityPackageConfig.Load(runtimeCityPackageConfigPath));
+            if (packageConfig != null && !string.Equals(packageConfig.areaId, config.areaId, StringComparison.Ordinal))
+                throw new InvalidOperationException("Runtime city package config areaId must match the inspection Scene analysis config.");
             var sceneAssetPath = GetSceneAssetPath(config.areaId);
             var outputPath = Path.Combine(Application.dataPath, "Scenes", "EnvironmentCostInspection",
                 Path.GetFileName(sceneAssetPath));
@@ -162,7 +169,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             if (layers.building == 0 || layers.road == 0 || layers.terrain == 0)
                 throw new InvalidOperationException($"The inspection Scene is incomplete: Building colliders={layers.building}, Road colliders={layers.road}, Terrain colliders={layers.terrain}.");
 
-            ConfigureRuntimePresentation(root, config, inspectionScene);
+            ConfigureRuntimePresentation(root, config, packageConfig, inspectionScene);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException("Scene directory is missing."));
             EditorSceneManager.SaveScene(inspectionScene, sceneAssetPath, false);
@@ -238,7 +245,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         return string.IsNullOrWhiteSpace(root) ? Application.dataPath : Path.Combine(root, "data", "analysis-configs");
     }
 
-    private static void ConfigureRuntimePresentation(GameObject root, AnalysisRunConfig config, Scene scene)
+    private static void ConfigureRuntimePresentation(GameObject root, AnalysisRunConfig config, RuntimeCityPackageConfig packageConfig, Scene scene)
     {
         EnvironmentCostRuntimeUiAssets.Ensure();
         var bounds = CalculateRenderableBounds(scene);
@@ -264,7 +271,7 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
         metadata.Configure(config.areaId, config.coordinateZoneId, config.CenterLongitude, config.CenterLatitude,
             config.radiusMeters, config.date, config.timezone);
         var packageLoader = root.AddComponent<EnvironmentCostRuntimeCityPackageLoader>();
-        packageLoader.Configure("EnvironmentCostCities");
+        packageLoader.Configure(packageConfig?.packageRelativePath ?? "EnvironmentCostCities", appendAreaId: packageConfig == null);
         root.AddComponent<EnvironmentCostRuntimeShadeAnalysisController>();
         root.AddComponent<EnvironmentCostRuntimePolicyScenarioController>();
         root.AddComponent<EnvironmentCostRuntimeRouteComparisonController>();
@@ -284,6 +291,14 @@ public sealed class EnvironmentCostInspectionSceneBuilder : EditorWindow
             else result.Encapsulate(renderer.bounds);
         }
         return hasBounds ? result : new Bounds(Vector3.zero, new Vector3(100f, 100f, 100f));
+    }
+
+    private static string FindCommandLineValue(string name)
+    {
+        var args = Environment.GetCommandLineArgs();
+        for (var index = 0; index < args.Length - 1; index++)
+            if (string.Equals(args[index], name, StringComparison.OrdinalIgnoreCase)) return args[index + 1];
+        return null;
     }
 
     [Serializable] private sealed class CoverageReport { public List<DatasetCoverage> datasets; }
