@@ -606,6 +606,21 @@ public static class HourlyEnvironmentCostSelfTests
         AssertEqual(true, (mask & (1 << 10)) != 0);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds >= 0.1f);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IdleRefreshIntervalSeconds >= EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds);
+        AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(1000f));
+        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(1000f));
+        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.ResolveInitialMapExtentMeters(1000f));
+        AssertNear(200.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(10f, 1000f));
+        AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(2000f, 1000f));
+        AssertNear(100.0, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(100f));
+        AssertNear(100.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(100f));
+        AssertNear(10.0, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(10f));
+        AssertNear(10.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10f));
+        AssertNear(10000.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10000f));
+        AssertNear(10000.0, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(20000f, 10000f));
+        AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)));
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(false, 0f, 0f));
+        AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 90f, 90.05f));
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 359.95f, 0.1f));
 
         // A detached Runtime overlay (the overview map) can reserve pointer input without
         // making the full-screen UI root block scene interaction.

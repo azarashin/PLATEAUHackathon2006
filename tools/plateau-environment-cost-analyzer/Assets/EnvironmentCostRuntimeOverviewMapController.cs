@@ -5,15 +5,15 @@ using UnityEngine.UIElements;
 
 /// <summary>
 /// Renders a north-up, camera-following overview map for Runtime inspection Scenes.
-/// The map is intentionally display-only; scale controls and place labels are added separately.
+/// The map is display-only: its slider changes only the displayed range, never the main camera.
 /// </summary>
 public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
 {
     private const int BuildingLayer = 8;
     private const int RoadLayer = 9;
     private const int TerrainLayer = 10;
-    private const float MinimumMapExtentMeters = 200f;
-    private const float MaximumMapExtentMeters = 8000f;
+    private const float DefaultMapExtentMeters = 500f;
+    private const float MarkerRotationUpdateThresholdDegrees = 0.1f;
     public const float MovingRefreshIntervalSeconds = 0.2f;
     public const float IdleRefreshIntervalSeconds = 1.0f;
     private static readonly ProfilerMarker OverviewMapRenderMarker = new ProfilerMarker("EnvironmentCost.OverviewMap.Render");
@@ -23,12 +23,18 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private Camera overviewCamera;
     private RenderTexture renderTexture;
     private VisualElement mapContainer;
+    private VisualElement positionMarker;
     private Button visibilityButton;
+    private Slider scaleSlider;
+    private Label scaleLabel;
     private bool isVisible = true;
     private float nextRefreshTime;
     private Vector3 lastRenderedSourcePosition;
     private bool hasRendered;
     private float mapCameraY;
+    private float mapExtentMeters;
+    private float lastMarkerRotationDegrees;
+    private bool hasPositionMarkerRotation;
 
     public bool IsPointerOverMap { get; private set; }
 
@@ -49,9 +55,10 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         EnsureOverviewCamera();
     }
 
-    /// <summary>Builds the display-only overview map UI. This does not add controls for map scale.</summary>
+    /// <summary>Builds the display-only overview map UI and its map-range control.</summary>
     public void BuildUi(VisualElement root)
     {
+        metadata ??= GetComponent<EnvironmentCostInspectionMetadata>();
         var launcher = new VisualElement();
         launcher.AddToClassList("runtime-overview-map-launcher");
         launcher.RegisterCallback<PointerEnterEvent>(_ => SetPointerOverMap(true));
@@ -74,16 +81,37 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         var image = new Image { scaleMode = ScaleMode.ScaleToFit };
         image.AddToClassList("runtime-overview-map-image");
         mapContainer.Add(image);
+
+        positionMarker = new Label("▲");
+        positionMarker.AddToClassList("runtime-overview-map-position-marker");
+        positionMarker.tooltip = "現在地とメインカメラの向き";
+        image.Add(positionMarker);
+
+        scaleLabel = new Label();
+        scaleLabel.AddToClassList("runtime-overview-map-scale-label");
+        mapContainer.Add(scaleLabel);
+        scaleSlider = new Slider("表示範囲", GetMinimumMapExtentMeters(GetPackageRadiusMeters()), GetMaximumMapExtentMeters(GetPackageRadiusMeters()))
+        {
+            value = ResolveInitialMapExtentMeters(GetPackageRadiusMeters())
+        };
+        scaleSlider.AddToClassList("runtime-overview-map-scale-slider");
+        scaleSlider.RegisterValueChangedCallback(evt => SetMapExtentMeters(evt.newValue));
+        scaleSlider.RegisterCallback<PointerDownEvent>(OnMapPointerDown);
+        mapContainer.Add(scaleSlider);
         root.Add(mapContainer);
 
         EnsureOverviewCamera();
         image.image = renderTexture;
+        SetMapExtentMeters(scaleSlider.value);
         UpdateVisibilityUi();
     }
 
     private void LateUpdate()
     {
-        if (!Application.isPlaying || !isVisible || Time.unscaledTime < nextRefreshTime || !EnsureOverviewCamera()) return;
+        if (!Application.isPlaying || !isVisible || !EnsureOverviewCamera()) return;
+
+        UpdatePositionMarker();
+        if (Time.unscaledTime < nextRefreshTime) return;
 
         var sourcePosition = sourceCamera.transform.position;
         var moved = !hasRendered || HorizontalDistanceSquared(sourcePosition, lastRenderedSourcePosition) > 0.25f;
@@ -154,11 +182,34 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     public static bool IsUsableSourceCamera(Camera candidate, Camera overview)
         => candidate != null && candidate != overview && candidate.isActiveAndEnabled;
 
+    /// <summary>Smallest selectable map radius for a city package. The visible square is twice this value.</summary>
+    public static float GetMinimumMapExtentMeters(float packageRadiusMeters)
+    {
+        var maximum = GetMaximumMapExtentMeters(packageRadiusMeters);
+        return Mathf.Min(200f, maximum);
+    }
+
+    /// <summary>Largest selectable display radius, initialized from the generated city package coverage.</summary>
+    public static float GetMaximumMapExtentMeters(float packageRadiusMeters)
+        => packageRadiusMeters > 0f
+            ? packageRadiusMeters
+            : DefaultMapExtentMeters;
+
+    /// <summary>Starts at the complete city package coverage, matching the original overview-map behaviour.</summary>
+    public static float ResolveInitialMapExtentMeters(float packageRadiusMeters)
+        => GetMaximumMapExtentMeters(packageRadiusMeters);
+
+    /// <summary>Clamps a requested map radius to the range supported by the current city package.</summary>
+    public static float ClampMapExtentMeters(float requestedMeters, float packageRadiusMeters)
+        => Mathf.Clamp(requestedMeters, GetMinimumMapExtentMeters(packageRadiusMeters), GetMaximumMapExtentMeters(packageRadiusMeters));
+
+    private float GetPackageRadiusMeters() => metadata == null ? 0f : metadata.RadiusMeters;
+
     private float ResolveMapExtentMeters()
     {
-        var configuredRadius = metadata == null ? 0f : metadata.RadiusMeters;
-        return Mathf.Clamp(configuredRadius > 0f ? configuredRadius : 500f,
-            MinimumMapExtentMeters, MaximumMapExtentMeters);
+        if (mapExtentMeters <= 0f)
+            mapExtentMeters = ResolveInitialMapExtentMeters(GetPackageRadiusMeters());
+        return ClampMapExtentMeters(mapExtentMeters, GetPackageRadiusMeters());
     }
 
     private float ResolveMapCameraY()
@@ -179,6 +230,45 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         // Do not copy source rotation: the overview map remains north-up by design.
         overviewCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
     }
+
+    private void SetMapExtentMeters(float requestedMeters)
+    {
+        mapExtentMeters = ClampMapExtentMeters(requestedMeters, GetPackageRadiusMeters());
+        if (scaleSlider != null && !Mathf.Approximately(scaleSlider.value, mapExtentMeters))
+            scaleSlider.SetValueWithoutNotify(mapExtentMeters);
+        if (scaleLabel != null)
+            scaleLabel.text = $"表示範囲: 半径 {FormatDistance(mapExtentMeters)}（{FormatDistance(mapExtentMeters * 2f)} × {FormatDistance(mapExtentMeters * 2f)}）";
+        if (overviewCamera != null)
+        {
+            overviewCamera.orthographicSize = mapExtentMeters;
+            mapCameraY = ResolveMapCameraY();
+            overviewCamera.farClipPlane = Mathf.Max(1000f, mapCameraY + 1000f);
+        }
+        hasRendered = false;
+        nextRefreshTime = 0f;
+    }
+
+    private void UpdatePositionMarker()
+    {
+        if (positionMarker == null || sourceCamera == null) return;
+        // North is the top of the image. A source yaw of zero looks north (+Z), so use yaw directly.
+        var rotationDegrees = GetPositionMarkerRotationDegrees(sourceCamera.transform.rotation);
+        if (!ShouldUpdatePositionMarkerRotation(hasPositionMarkerRotation, lastMarkerRotationDegrees, rotationDegrees)) return;
+        positionMarker.style.rotate = new Rotate(new Angle(rotationDegrees, AngleUnit.Degree));
+        lastMarkerRotationDegrees = rotationDegrees;
+        hasPositionMarkerRotation = true;
+    }
+
+    /// <summary>Returns the clockwise north-up marker rotation for a source-camera rotation.</summary>
+    public static float GetPositionMarkerRotationDegrees(Quaternion sourceRotation)
+        => sourceRotation.eulerAngles.y;
+
+    /// <summary>Skips a retained-mode style update until the north-up marker rotation visibly changes.</summary>
+    public static bool ShouldUpdatePositionMarkerRotation(bool hasPreviousRotation, float previousDegrees, float nextDegrees)
+        => !hasPreviousRotation || Mathf.Abs(Mathf.DeltaAngle(previousDegrees, nextDegrees)) >= MarkerRotationUpdateThresholdDegrees;
+
+    private static string FormatDistance(float meters)
+        => meters >= 1000f ? $"{meters / 1000f:0.#} km" : $"{meters:0} m";
 
     private void ToggleVisibility()
     {
