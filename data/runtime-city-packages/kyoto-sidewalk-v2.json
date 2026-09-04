@@ -8,5 +8,8 @@
   "packageRelativePath": "EnvironmentCostCities/kyoto-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/kyoto.unity",
   "runtimeShadeResultOutputPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.json",
-  "runtimeShadeCompleteMarkerPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.complete.json"
+  "runtimeShadeCompleteMarkerPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.complete.json",
+  "placeLabelCoordinateAxis": "latitude-longitude"
+  ,"placeLabelSourceVersion": "local CityGML acquisition (26100-kyoto-2025)"
+  ,"placeLabelSourceAcquiredAtUtc": "unknown"
 }
