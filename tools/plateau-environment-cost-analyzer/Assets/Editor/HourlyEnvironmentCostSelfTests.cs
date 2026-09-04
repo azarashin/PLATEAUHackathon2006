@@ -665,6 +665,18 @@ public static class HourlyEnvironmentCostSelfTests
         AssertNear(22.0, markerRightBase.x);
         AssertNear(28.0, markerRightBase.y);
         AssertNear(Vector2.Distance(markerTip, markerLeftBase), Vector2.Distance(markerTip, markerRightBase));
+        AssertEqual(60, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(150f));
+        AssertEqual(70, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(250f));
+        AssertEqual(80, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(500f));
+        AssertEqual(12, EnvironmentCostRuntimeOverviewMapController.GetMaximumVisiblePlaceLabelCount(150f));
+        AssertEqual(10, EnvironmentCostRuntimeOverviewMapController.GetMaximumVisiblePlaceLabelCount(250f));
+        AssertEqual(8, EnvironmentCostRuntimeOverviewMapController.GetMaximumVisiblePlaceLabelCount(500f));
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.TryGetPlaceLabelRect(new Vector2(0f, 0f), Vector3.zero, 100f,
+            new Vector2(260f, 260f), "市ヶ谷", out var centerPlaceLabel));
+        AssertNear(130f, centerPlaceLabel.center.x);
+        AssertNear(130f, centerPlaceLabel.center.y);
+        AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.TryGetPlaceLabelRect(new Vector2(101f, 0f), Vector3.zero, 100f,
+            new Vector2(260f, 260f), "市ヶ谷", out _));
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(false, 0f, 0f));
         AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 90f, 90.05f));
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 359.95f, 0.1f));

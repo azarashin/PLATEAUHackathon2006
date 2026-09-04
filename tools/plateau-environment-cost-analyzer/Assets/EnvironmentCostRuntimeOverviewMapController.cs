@@ -1,4 +1,9 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using PLATEAU.Geometries;
+using PLATEAU.Native;
 using UnityEngine;
 using Unity.Profiling;
 using UnityEngine.UIElements;
@@ -27,7 +32,10 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private RenderTexture renderTexture;
     private VisualElement mapContainer;
     private VisualElement positionMarker;
+    private VisualElement placeLabelLayer;
     private Button visibilityButton;
+    private Button placeLabelButton;
+    private Label placeLabelStatus;
     private bool isVisible = true;
     private float nextRefreshTime;
     private Vector3 lastRenderedSourcePosition;
@@ -39,6 +47,11 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private bool hasSourceCameraHeightRange;
     private float lastMarkerRotationDegrees;
     private bool hasPositionMarkerRotation;
+    private bool arePlaceLabelsVisible = true;
+    private bool arePlaceLabelsLoaded;
+    private bool placeLabelsDirty;
+    private readonly List<RuntimePlaceLabel> placeLabels = new List<RuntimePlaceLabel>();
+    private readonly Dictionary<string, Label> visiblePlaceLabels = new Dictionary<string, Label>();
 
     public bool IsPointerOverMap { get; private set; }
 
@@ -57,6 +70,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
             yield return null;
 
         EnsureOverviewCamera();
+        StartCoroutine(LoadPlaceLabelsWhenReady());
     }
 
     /// <summary>Builds the display-only overview map UI.</summary>
@@ -82,9 +96,16 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         var title = new Label("俯瞰地図（北が上）");
         title.AddToClassList("runtime-overview-map-title");
         mapContainer.Add(title);
+        placeLabelButton = new Button(TogglePlaceLabels);
+        placeLabelButton.AddToClassList("runtime-overview-map-place-label-toggle");
+        mapContainer.Add(placeLabelButton);
         var image = new Image { scaleMode = ScaleMode.ScaleToFit };
         image.AddToClassList("runtime-overview-map-image");
         mapContainer.Add(image);
+
+        placeLabelLayer = new VisualElement { pickingMode = PickingMode.Ignore };
+        placeLabelLayer.AddToClassList("runtime-overview-map-place-label-layer");
+        image.Add(placeLabelLayer);
 
         positionMarker = new VisualElement { pickingMode = PickingMode.Ignore };
         positionMarker.AddToClassList("runtime-overview-map-position-marker");
@@ -93,11 +114,16 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         image.Add(positionMarker);
         positionMarker.MarkDirtyRepaint();
 
+        placeLabelStatus = new Label("地名: 読み込み待ち");
+        placeLabelStatus.AddToClassList("runtime-overview-map-place-label-status");
+        mapContainer.Add(placeLabelStatus);
+
         root.Add(mapContainer);
 
         EnsureOverviewCamera();
         image.image = renderTexture;
         UpdateVisibilityUi();
+        UpdatePlaceLabelUi();
     }
 
     private void LateUpdate()
@@ -115,6 +141,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
             overviewCamera.Render();
         lastRenderedSourcePosition = sourcePosition;
         hasRendered = true;
+        if (moved || placeLabelsDirty) RefreshPlaceLabels(sourcePosition);
         nextRefreshTime = Time.unscaledTime + (moved ? MovingRefreshIntervalSeconds : IdleRefreshIntervalSeconds);
     }
 
@@ -316,6 +343,202 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         mesh.SetNextIndex(0);
         mesh.SetNextIndex(2);
         mesh.SetNextIndex(1);
+    }
+
+    private IEnumerator LoadPlaceLabelsWhenReady()
+    {
+        var packageLoader = GetComponent<EnvironmentCostRuntimeCityPackageLoader>();
+        while (packageLoader == null)
+        {
+            packageLoader = GetComponent<EnvironmentCostRuntimeCityPackageLoader>();
+            yield return null;
+        }
+        while (packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.NotStarted ||
+               packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Loading)
+            yield return null;
+
+        if (packageLoader.State != EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready)
+        {
+            SetPlaceLabelStatus("地名: 都市データパッケージを確認できません", false);
+            yield break;
+        }
+
+        try
+        {
+            var manifest = packageLoader.Manifest;
+            if (!string.Equals(manifest.schemaVersion, "environment-cost-runtime-city-package-0.2", System.StringComparison.Ordinal))
+            {
+                SetPlaceLabelStatus("地名: この都市データパッケージは地名表示に未対応です", false);
+                yield break;
+            }
+
+            var root = packageLoader.PackageRootPath;
+            var labels = JsonUtility.FromJson<EnvironmentCostPlaceLabels>(File.ReadAllText(ResolvePackageFilePath(manifest, root, "place-labels")));
+            var report = JsonUtility.FromJson<EnvironmentCostPlaceLabelReport>(File.ReadAllText(ResolvePackageFilePath(manifest, root, "place-label-report")));
+            if (labels == null || report == null) throw new System.InvalidOperationException("地名データを読み取れません。");
+            LoadPlaceLabels(labels);
+            SetPlaceLabelStatus(BuildPlaceLabelStatus(manifest, report), labels.labels != null && labels.labels.Length > 0);
+        }
+        catch (System.Exception exception)
+        {
+            UnityEngine.Debug.LogException(exception);
+            SetPlaceLabelStatus("地名: 読み込みに失敗しました", false);
+        }
+    }
+
+    private static string ResolvePackageFilePath(EnvironmentCostRuntimeCityPackageManifest manifest, string root, string kind)
+    {
+        var file = manifest.files.FirstOrDefault(candidate => string.Equals(candidate.kind, kind, System.StringComparison.Ordinal));
+        if (file == null) throw new System.InvalidOperationException("都市データパッケージに必要な地名ファイルがありません: " + kind);
+        return Path.Combine(root, file.relativePath);
+    }
+
+    private void LoadPlaceLabels(EnvironmentCostPlaceLabels labels)
+    {
+        placeLabels.Clear();
+        if (labels.labels != null && metadata != null)
+        {
+            using var reference = CreateLocalReference();
+            foreach (var label in labels.labels)
+            {
+                if (label == null || string.IsNullOrWhiteSpace(label.id) || string.IsNullOrWhiteSpace(label.text) ||
+                    label.coordinate == null || label.coordinate.Length != 2) continue;
+                var point = reference.Project(new GeoCoordinate(label.coordinate[1], label.coordinate[0], 0.0));
+                placeLabels.Add(new RuntimePlaceLabel { id = label.id, text = label.text, priority = label.priority,
+                    localPosition = new Vector2((float)point.X, (float)point.Z) });
+            }
+        }
+        placeLabels.Sort((left, right) =>
+        {
+            var priority = right.priority.CompareTo(left.priority);
+            return priority != 0 ? priority : string.CompareOrdinal(left.id, right.id);
+        });
+        arePlaceLabelsLoaded = true;
+        placeLabelsDirty = true;
+    }
+
+    private GeoReference CreateLocalReference()
+    {
+        using var world = GeoReference.Create(new PlateauVector3d(0, 0, 0), 1f, CoordinateSystem.EUN, metadata.CoordinateZoneId);
+        var origin = world.Project(new GeoCoordinate(metadata.Latitude, metadata.Longitude, 0.0));
+        return GeoReference.Create(origin, 1f, CoordinateSystem.EUN, metadata.CoordinateZoneId);
+    }
+
+    private void RefreshPlaceLabels(Vector3 sourcePosition)
+    {
+        if (!arePlaceLabelsLoaded || placeLabelLayer == null) return;
+        var mapSize = placeLabelLayer.contentRect.size;
+        if (mapSize.x <= 0f || mapSize.y <= 0f) return;
+        placeLabelsDirty = false;
+        var needed = new HashSet<string>();
+        if (arePlaceLabelsVisible)
+        {
+            var occupied = new List<Rect> { GetPositionMarkerRect(mapSize) };
+            var minimumPriority = GetMinimumPlaceLabelPriority(mapExtentMeters);
+            var maximumCount = GetMaximumVisiblePlaceLabelCount(mapExtentMeters);
+            foreach (var placeLabel in placeLabels)
+            {
+                if (needed.Count >= maximumCount) break;
+                if (placeLabel.priority < minimumPriority ||
+                    !TryGetPlaceLabelRect(placeLabel.localPosition, sourcePosition, mapExtentMeters, mapSize, placeLabel.text, out var rect) ||
+                    occupied.Any(existing => existing.Overlaps(rect))) continue;
+                occupied.Add(rect);
+                needed.Add(placeLabel.id);
+                if (!visiblePlaceLabels.TryGetValue(placeLabel.id, out var element))
+                {
+                    element = new Label(placeLabel.text) { pickingMode = PickingMode.Ignore };
+                    element.AddToClassList("runtime-overview-map-place-label");
+                    placeLabelLayer.Add(element);
+                    visiblePlaceLabels.Add(placeLabel.id, element);
+                }
+                element.style.left = rect.x;
+                element.style.top = rect.y;
+                element.style.width = rect.width;
+                element.style.height = rect.height;
+            }
+        }
+        foreach (var stale in visiblePlaceLabels.Keys.Where(id => !needed.Contains(id)).ToArray())
+        {
+            visiblePlaceLabels[stale].RemoveFromHierarchy();
+            visiblePlaceLabels.Remove(stale);
+        }
+    }
+
+    /// <summary>Projects a local X/Z coordinate into the north-up overview image and clips its label rectangle.</summary>
+    public static bool TryGetPlaceLabelRect(Vector2 localPosition, Vector3 sourcePosition, float mapExtentMeters, Vector2 mapSize,
+        string text, out Rect rect)
+    {
+        rect = default;
+        if (mapExtentMeters <= 0f || mapSize.x <= 0f || mapSize.y <= 0f || string.IsNullOrWhiteSpace(text)) return false;
+        var center = new Vector2(mapSize.x * 0.5f, mapSize.y * 0.5f);
+        var point = center + new Vector2((localPosition.x - sourcePosition.x) / mapExtentMeters * center.x,
+            -(localPosition.y - sourcePosition.z) / mapExtentMeters * center.y);
+        var width = Mathf.Clamp(text.Length * 9f + 10f, 34f, 118f);
+        rect = new Rect(point.x - width * 0.5f, point.y - 8f, width, 16f);
+        return rect.xMin >= 0f && rect.yMin >= 0f && rect.xMax <= mapSize.x && rect.yMax <= mapSize.y;
+    }
+
+    /// <summary>Uses fewer labels and higher-priority labels as the overview covers a wider area.</summary>
+    public static int GetMinimumPlaceLabelPriority(float mapExtentMeters)
+        => mapExtentMeters <= 160f ? 60 : mapExtentMeters <= 350f ? 70 : 80;
+
+    /// <summary>Caps label count per scale so labels remain readable instead of covering the map.</summary>
+    public static int GetMaximumVisiblePlaceLabelCount(float mapExtentMeters)
+        => mapExtentMeters <= 160f ? 12 : mapExtentMeters <= 350f ? 10 : 8;
+
+    private static Rect GetPositionMarkerRect(Vector2 mapSize) => new Rect(mapSize.x * 0.5f - 11f, mapSize.y * 0.5f - 14f, 22f, 28f);
+
+    private static string BuildPlaceLabelStatus(EnvironmentCostRuntimeCityPackageManifest manifest, EnvironmentCostPlaceLabelReport report)
+    {
+        if (report.labelCount <= 0)
+            return "地名: 不足（" + FormatPlaceLabelReasons(report.reasonCodes) + "）";
+        var acquisition = report.acquisitionSources != null && report.acquisitionSources.Length > 0 ? report.acquisitionSources[0] : null;
+        var source = acquisition == null ? "出典: PLATEAU" : $"出典: {acquisition.provider} {acquisition.year}";
+        var version = string.IsNullOrWhiteSpace(report.sourceVersion) ? manifest.version : report.sourceVersion;
+        var warning = report.reasonCodes == null || report.reasonCodes.Length == 0 ? string.Empty : " / 注意: " + FormatPlaceLabelReasons(report.reasonCodes);
+        return $"地名: {report.labelCount}件 / {source} / 版: {version}{warning}";
+    }
+
+    private static string FormatPlaceLabelReasons(string[] reasonCodes)
+    {
+        if (reasonCodes == null || reasonCodes.Length == 0) return "地名データなし";
+        return string.Join("、", reasonCodes.Select(reason => reason switch
+        {
+            "citygml-source-not-found" => "CityGML未配置",
+            "citygml-acquisition-manifest-missing" => "取得台帳なし",
+            "citygml-parse-errors" => "CityGML読込エラー",
+            "no-place-labels-extracted" => "抽出対象なし",
+            _ => reason
+        }));
+    }
+
+    private void TogglePlaceLabels()
+    {
+        arePlaceLabelsVisible = !arePlaceLabelsVisible;
+        placeLabelsDirty = true;
+        UpdatePlaceLabelUi();
+    }
+
+    private void SetPlaceLabelStatus(string text, bool loaded)
+    {
+        arePlaceLabelsLoaded = loaded;
+        if (placeLabelStatus != null) placeLabelStatus.text = text;
+        UpdatePlaceLabelUi();
+    }
+
+    private void UpdatePlaceLabelUi()
+    {
+        if (placeLabelButton == null) return;
+        placeLabelButton.text = arePlaceLabelsVisible ? "地名を非表示" : "地名を表示";
+        placeLabelButton.SetEnabled(arePlaceLabelsLoaded);
+    }
+
+    private sealed class RuntimePlaceLabel
+    {
+        public string id;
+        public string text;
+        public int priority;
+        public Vector2 localPosition;
     }
 
     private void ToggleVisibility()
