@@ -606,6 +606,38 @@ public static class HourlyEnvironmentCostSelfTests
         AssertEqual(true, (mask & (1 << 10)) != 0);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds >= 0.1f);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IdleRefreshIntervalSeconds >= EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds);
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(1000f));
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(1000f));
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(10f, 1000f));
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(2000f, 1000f));
+        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(100f));
+        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(100f));
+        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(10f));
+        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10f));
+        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10000f));
+        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(20000f, 10000f));
+        AssertNear(100.3, EnvironmentCostRuntimeOverviewMapController.GetMinimumSourceCameraHeightMeters(100f, 0.3f));
+        AssertNear(1100.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumSourceCameraHeightMeters(100f, 1000f));
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100f, 100.3f, 1100f, 1000f));
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100.3f, 100.3f, 1100f, 1000f));
+        AssertNear(600.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(600.15f, 100.3f, 1100f, 1000f));
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(1100f, 100.3f, 1100f, 1000f));
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(2000f, 100.3f, 1100f, 1000f));
+        AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)));
+        EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerTriangleVertices(22f, 28f, out var markerTip, out var markerLeftBase, out var markerRightBase);
+        AssertNear(11.0, markerTip.x);
+        AssertNear(0.0, markerTip.y);
+        AssertNear(0.0, markerLeftBase.x);
+        AssertNear(28.0, markerLeftBase.y);
+        AssertNear(22.0, markerRightBase.x);
+        AssertNear(28.0, markerRightBase.y);
+        AssertNear(Vector2.Distance(markerTip, markerLeftBase), Vector2.Distance(markerTip, markerRightBase));
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(false, 0f, 0f));
+        AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 90f, 90.05f));
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 359.95f, 0.1f));
+        AssertNear(1500.0, EnvironmentCostSolarController.ResolveVisualizationShadowDistanceMeters(250f, 0f));
+        AssertNear(2000.0, EnvironmentCostSolarController.ResolveVisualizationShadowDistanceMeters(250f, 2000f));
+        AssertNear(3000.0, EnvironmentCostSolarController.ResolveVisualizationShadowDistanceMeters(5000f, 1000f));
 
         // A detached Runtime overlay (the overview map) can reserve pointer input without
         // making the full-screen UI root block scene interaction.

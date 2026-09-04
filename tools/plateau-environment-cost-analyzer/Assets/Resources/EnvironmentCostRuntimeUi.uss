@@ -52,7 +52,18 @@
 
 .runtime-overview-map-title { color: rgb(15, 71, 125); font-size: 11px; unity-font-style: bold; margin-bottom: 4px; }
 .runtime-overview-map-image { width: 260px; height: 260px; background-color: rgb(226, 232, 240); }
-
+.runtime-overview-map-position-marker {
+    position: absolute;
+    left: 119px;
+    top: 116px;
+    width: 22px;
+    height: 28px;
+    color: rgb(13, 148, 136);
+    font-size: 24px;
+    unity-font-style: bold;
+    -unity-text-align: middle-center;
+    transform-origin: 50% 50%;
+}
 .runtime-tabs { flex-direction: row; margin-bottom: 8px; gap: 4px; }
 .runtime-tab { background-color: rgb(219, 234, 254); color: rgb(30, 64, 175); border-left-color: rgb(147, 197, 253); border-right-color: rgb(147, 197, 253); border-top-color: rgb(147, 197, 253); border-bottom-color: rgb(147, 197, 253); }
 .runtime-tab.runtime-tab-active { background-color: rgb(37, 99, 235); color: rgb(255, 255, 255); }
