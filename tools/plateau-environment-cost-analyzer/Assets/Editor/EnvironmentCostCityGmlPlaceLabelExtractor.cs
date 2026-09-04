@@ -26,7 +26,7 @@ public static class EnvironmentCostCityGmlPlaceLabelExtractor
         {
             try
             {
-                using var gml = GmlFile.Create(input.path);
+                var gml = GmlFile.Create(input.path);
                 epsgCodes.Add(gml.Epsg);
                 ExtractFile(XDocument.Load(input.path), input, analysis, config.placeLabelCoordinateAxis, gml.Epsg, reference, labels);
                 parsed++;
@@ -48,7 +48,7 @@ public static class EnvironmentCostCityGmlPlaceLabelExtractor
                 .Select(group => new EnvironmentCostPlaceLabelClassification { name = group.Key, count = group.Count() }).ToArray(),
             examples = labels.Take(10).Select(label => label.text).ToArray(), sourceVersion = config.placeLabelSourceVersion,
             sourceAcquiredAtUtc = config.placeLabelSourceAcquiredAtUtc,
-            sourceDatasetIds = (config.placeLabelDatasetIds == null || config.placeLabelDatasetIds.Length == 0 ? analysis.datasetRoots?.Keys : config.placeLabelDatasetIds)?.OrderBy(value => value, StringComparer.Ordinal).ToArray() ?? Array.Empty<string>(),
+            sourceDatasetIds = (config.placeLabelDatasetIds == null || config.placeLabelDatasetIds.Length == 0 ? analysis.datasetRoots?.Keys?.ToArray() : config.placeLabelDatasetIds)?.OrderBy(value => value, StringComparer.Ordinal).ToArray() ?? Array.Empty<string>(),
             acquisitionSources = acquisitionSources.ToArray()
         };
         return new EnvironmentCostPlaceLabels { schemaVersion = "environment-cost-place-labels-0.1", areaId = analysis.areaId, coordinateZoneId = analysis.coordinateZoneId, labels = labels.ToArray() };
