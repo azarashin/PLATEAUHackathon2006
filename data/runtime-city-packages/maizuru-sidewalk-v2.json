@@ -8,5 +8,8 @@
   "packageRelativePath": "EnvironmentCostCities/maizuru-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/maizuru.unity",
   "runtimeShadeResultOutputPath": "data/generated/maizuru-sidewalk-v2-runtime-shade-result.json",
-  "runtimeShadeCompleteMarkerPath": "data/generated/maizuru-sidewalk-v2-runtime-shade-result.complete.json"
+  "runtimeShadeCompleteMarkerPath": "data/generated/maizuru-sidewalk-v2-runtime-shade-result.complete.json",
+  "placeLabelCoordinateAxis": "latitude-longitude"
+  ,"placeLabelSourceVersion": "local CityGML acquisition"
+  ,"placeLabelSourceAcquiredAtUtc": "unknown"
 }

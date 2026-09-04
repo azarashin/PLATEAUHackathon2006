@@ -8,5 +8,8 @@
   "packageRelativePath": "EnvironmentCostCities/fujisawa-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/fujisawa.unity",
   "runtimeShadeResultOutputPath": "data/generated/fujisawa-sidewalk-v2-runtime-shade-result.json",
-  "runtimeShadeCompleteMarkerPath": "data/generated/fujisawa-sidewalk-v2-runtime-shade-result.complete.json"
+  "runtimeShadeCompleteMarkerPath": "data/generated/fujisawa-sidewalk-v2-runtime-shade-result.complete.json",
+  "placeLabelCoordinateAxis": "latitude-longitude"
+  ,"placeLabelSourceVersion": "local CityGML acquisition"
+  ,"placeLabelSourceAcquiredAtUtc": "unknown"
 }

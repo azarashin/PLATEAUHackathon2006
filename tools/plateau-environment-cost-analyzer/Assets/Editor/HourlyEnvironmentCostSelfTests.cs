@@ -4,6 +4,10 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using System.Collections.Generic;
+using System.Xml.Linq;
+using PLATEAU.Geometries;
+using PLATEAU.Native;
 
 public static class HourlyEnvironmentCostSelfTests
 {
@@ -99,6 +103,35 @@ public static class HourlyEnvironmentCostSelfTests
                 files = new[] { new EnvironmentCostRuntimeCityPackageFile { relativePath = "road-network/topology.json", bytes = 1, sha256 = new string('a', 64) } }
             };
             runtimePackage.ValidateStructure();
+            runtimePackage.schemaVersion = "environment-cost-runtime-city-package-0.2";
+            AssertThrows<InvalidOperationException>(() => runtimePackage.ValidateStructure());
+            runtimePackage.files = new[]
+            {
+                new EnvironmentCostRuntimeCityPackageFile { kind = "place-labels", relativePath = "place-labels.json", bytes = 1, sha256 = new string('a', 64) },
+                new EnvironmentCostRuntimeCityPackageFile { kind = "place-label-report", relativePath = "place-label-report.json", bytes = 1, sha256 = new string('b', 64) }
+            };
+            runtimePackage.ValidateStructure();
+            using var placeLabelReference = GeoReference.Create(new PlateauVector3d(0, 0, 0), 1f, CoordinateSystem.EUN, 9);
+            AssertEqual(true, EnvironmentCostCityGmlPlaceLabelExtractor.TryReadCoordinate("35.690470 139.736043 0", "latitude-longitude", placeLabelReference, 6697, out var placeCoordinate));
+            AssertNear(139.736043, placeCoordinate[0]);
+            AssertNear(35.690470, placeCoordinate[1]);
+            AssertEqual(false, EnvironmentCostCityGmlPlaceLabelExtractor.TryReadCoordinate("35.690470 139.736043", "auto", placeLabelReference, 6697, out _));
+            var fixtureLabels = new List<EnvironmentCostPlaceLabel>();
+            EnvironmentCostCityGmlPlaceLabelExtractor.ExtractFile(XDocument.Parse(
+                "<core:CityModel xmlns:core='urn:core' xmlns:gml='urn:gml'><core:cityObjectMember><core:CityObjectGroup gml:id='fixture-place'><gml:name>Fixture Place</gml:name><gml:posList>35.690470 139.736043 0 35.690471 139.736044 0</gml:posList></core:CityObjectGroup></core:cityObjectMember></core:CityModel>"),
+                new EnvironmentCostCityGmlPlaceLabelExtractor.CityGmlInput { datasetId = "fixture", relativePath = "urf/fixture.gml" }, new AnalysisRunConfig { center = new[] { 139.736043, 35.690470 }, radiusMeters = 100.0 }, "latitude-longitude", 6697, placeLabelReference, fixtureLabels);
+            AssertEqual(1, fixtureLabels.Count);
+            AssertEqual("Fixture Place", fixtureLabels[0].text);
+            AssertEqual("fixture:urf/fixture.gml:fixture-place", fixtureLabels[0].id);
+            AssertNear(139.7360435, fixtureLabels[0].coordinate[0], 0.000001);
+            AssertNear(35.6904705, fixtureLabels[0].coordinate[1], 0.000001);
+            var mergedFixtureLabels = EnvironmentCostCityGmlPlaceLabelExtractor.MergeNearbySameNameLabels(new[]
+            {
+                new EnvironmentCostPlaceLabel { text = "同じ地名", coordinate = new[] { 139.736043, 35.690470 }, priority = 60 },
+                new EnvironmentCostPlaceLabel { text = "同じ地名", coordinate = new[] { 139.736044, 35.690470 }, priority = 100 }
+            });
+            AssertEqual(1, mergedFixtureLabels.Count);
+            AssertEqual(100, mergedFixtureLabels[0].priority);
             AssertEqual(true, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("road-network/topology.json"));
             AssertEqual(false, EnvironmentCostRuntimeCityPackageManifest.IsSafeRelativePath("../outside.json"));
             var runtimeShadeInput = new EnvironmentCostRuntimeShadeAnalysisInput

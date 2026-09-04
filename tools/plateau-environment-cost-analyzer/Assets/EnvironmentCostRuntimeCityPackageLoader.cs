@@ -72,6 +72,7 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
                 if (!string.Equals(EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(fullPath), file.sha256, StringComparison.Ordinal))
                     throw new InvalidOperationException($"Package file digest differs: {file.relativePath}");
             }
+            ValidatePlaceLabelFiles(manifest, root);
 
             Manifest = manifest;
             PackageRootPath = root;
@@ -86,6 +87,16 @@ public sealed class EnvironmentCostRuntimeCityPackageLoader : MonoBehaviour
             Debug.LogException(exception);
             Debug.LogError("ENVIRONMENT_COST_RUNTIME_CITY_PACKAGE_FAILED");
         }
+    }
+
+    private static void ValidatePlaceLabelFiles(EnvironmentCostRuntimeCityPackageManifest manifest, string root)
+    {
+        if (!string.Equals(manifest.schemaVersion, "environment-cost-runtime-city-package-0.2", StringComparison.Ordinal)) return;
+        var labels = JsonUtility.FromJson<EnvironmentCostPlaceLabels>(File.ReadAllText(Path.Combine(root, "place-labels.json")));
+        var report = JsonUtility.FromJson<EnvironmentCostPlaceLabelReport>(File.ReadAllText(Path.Combine(root, "place-label-report.json")));
+        if (labels == null || report == null || labels.schemaVersion != "environment-cost-place-labels-0.1" || report.schemaVersion != "environment-cost-place-label-report-0.1" ||
+            labels.areaId != manifest.areaId || report.areaId != manifest.areaId || labels.coordinateZoneId != manifest.coordinateZoneId || report.coordinateZoneId != manifest.coordinateZoneId)
+            throw new InvalidOperationException("Runtime city package place-label metadata does not match its manifest.");
     }
 
     private static void ValidateAgainstScene(EnvironmentCostRuntimeCityPackageManifest manifest, EnvironmentCostInspectionMetadata metadata)

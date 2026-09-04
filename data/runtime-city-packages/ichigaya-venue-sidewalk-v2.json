@@ -8,5 +8,8 @@
   "packageRelativePath": "EnvironmentCostCities/ichigaya-venue-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/ichigaya-venue.unity",
   "runtimeShadeResultOutputPath": "data/generated/ichigaya-venue-sidewalk-v2-runtime-shade-result.json",
-  "runtimeShadeCompleteMarkerPath": "data/generated/ichigaya-venue-sidewalk-v2-runtime-shade-result.complete.json"
+  "runtimeShadeCompleteMarkerPath": "data/generated/ichigaya-venue-sidewalk-v2-runtime-shade-result.complete.json",
+  "placeLabelCoordinateAxis": "latitude-longitude"
+  ,"placeLabelSourceVersion": "local CityGML acquisition (13101-2025..13113-2025)"
+  ,"placeLabelSourceAcquiredAtUtc": "unknown"
 }
