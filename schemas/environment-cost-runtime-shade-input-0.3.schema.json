@@ -20,7 +20,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["qualityContractVersion", "status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion", "validationFailures", "validationWarnings"],
       "properties": {
-        "qualityContractVersion": { "const": "pedestrian-network-safety-1.0" },
+        "qualityContractVersion": { "const": "pedestrian-network-safety-1.1" },
         "status": { "const": "accepted" },
         "explicitOrDerivedRatio": { "type": "number", "minimum": 0, "maximum": 1 },
         "fallbackRatio": { "type": "number", "minimum": 0, "maximum": 1 },

@@ -16,7 +16,7 @@ import {
 const STATUS_TO_CODE = Object.freeze({ missing: 0, partial: 1, available: 2 })
 const CODE_TO_STATUS = Object.freeze(['missing', 'partial', 'available'])
 const FORMULA_TOLERANCE_SECONDS = 1e-6
-const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.0'
+const PEDESTRIAN_NETWORK_SAFETY_CONTRACT_VERSION = 'pedestrian-network-safety-1.1'
 
 function usage() {
   return `Usage: node --max-old-space-size=8192 tools/environment-cost-network/build-environment-cost-server-bundle.mjs \\

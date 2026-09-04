@@ -1,6 +1,6 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T14:09:26.245Z",
+  "verifiedAt": "2026-09-04T00:34:03.405Z",
   "areaId": "kyoto",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
@@ -8,37 +8,44 @@
     "sha256": "158e63f3f274465057dcf16627f1b34083a19bc61a3de23228862be9da420d25"
   },
   "status": "accepted",
-  "graphFingerprintSha256": "5fe000d08fd2851f55a3ad1605b695502ced0c47f624f7c1463d883496da479c",
+  "graphFingerprintSha256": "769842ac7f4307ac31cad883e904775931cdb48ee445e1c5fd297c5f0dbbeeba",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "qualityContractVersion": "pedestrian-network-safety-1.0",
-    "generatedAt": "2026-09-01T14:09:28.347Z",
-    "graphFingerprintSha256": "5fe000d08fd2851f55a3ad1605b695502ced0c47f624f7c1463d883496da479c",
+    "qualityContractVersion": "pedestrian-network-safety-1.1",
+    "generatedAt": "2026-09-04T00:34:05.734Z",
+    "graphFingerprintSha256": "769842ac7f4307ac31cad883e904775931cdb48ee445e1c5fd297c5f0dbbeeba",
     "input": {
       "areaId": "kyoto",
-      "captureContractVersion": "0.2"
+      "captureContractVersion": "0.2",
+      "requireRepresentativeOds": true
     },
     "counts": {
-      "nodeCount": 97499,
-      "physicalEdgeCount": 103693,
-      "directedEdgeCount": 207386,
+      "nodeCount": 90095,
+      "physicalEdgeCount": 107148,
+      "directedEdgeCount": 214296,
       "fallbackPhysicalEdgeCount": 55895,
       "fallbackDirectedEdgeCount": 111790,
       "sourceWayCount": 25516,
       "includedWayCount": 24880,
-      "excludedWayCount": 617,
       "excludedWayCountByReason": {
         "non-pedestrian-highway": 131,
         "foot-prohibited": 61,
         "access-restricted-without-foot-override": 224,
         "area-without-linear-walkway": 201
       },
+      "excludedWayCount": 617,
       "explicitWayCount": 11943,
       "derivedSidewalkWayCount": 273,
       "separateSidewalkSkippedCount": 19,
       "fallbackWayCount": 12664,
-      "crossingConnectionCount": 3848,
-      "levelSeparatedCrossingConnectionCount": 22,
+      "crossingConnectionCount": 525,
+      "levelSeparatedCrossingConnectionCount": 0,
+      "intersectionCornerConnectionCount": 3361,
+      "levelSeparatedIntersectionCornerCandidateCount": 48,
+      "canonicalSharedRawNodeMergeCount": 116411,
+      "sharedRawNodeCoordinateVariantCount": 4126,
+      "sharedRawNodeLayerTransitionConnectionCount": 9,
+      "layerIncompatibleIntersectionCornerCandidateCount": 33,
       "malformedWayCount": 0
     },
     "processing": {
@@ -53,22 +60,32 @@
       },
       "separateSidewalkSkippedCount": 19,
       "malformedWayCount": 0,
-      "crossingConnectionCount": 3848,
-      "levelSeparatedCrossingConnectionCount": 22
+      "crossingConnectionCount": 525,
+      "levelSeparatedCrossingConnectionCount": 0,
+      "intersectionCornerConnectionCount": 3361,
+      "levelSeparatedIntersectionCornerCandidateCount": 48
     },
     "lengthMeters": {
-      "total": 2197941.5766874915,
-      "explicit": 646466.8784457598,
-      "derived": 111061.09439805023,
-      "explicitOrDerived": 757527.97284381,
+      "total": 2205553.6474461285,
+      "explicit": 646732.5982097038,
+      "derived": 118407.44539273901,
+      "explicitOrDerived": 765140.0436024428,
       "fallback": 1440413.603843686,
-      "explicitOrDerivedRatio": 0.34465337062574575,
-      "fallbackRatio": 0.6553466293742563
+      "explicitOrDerivedRatio": 0.346915181359755,
+      "fallbackRatio": 0.6530848186402451
     },
     "segmentRationales": {
       "explicit-crossing": {
-        "physicalEdgeCount": 440,
-        "lengthMeters": 1092.0318409972886
+        "physicalEdgeCount": 525,
+        "lengthMeters": 1357.751604941169
+      },
+      "derived-intersection-corner": {
+        "physicalEdgeCount": 3361,
+        "lengthMeters": 7345.697670770501
+      },
+      "shared-raw-node-topology": {
+        "physicalEdgeCount": 9,
+        "lengthMeters": 0.6125066693800877
       },
       "shared-space-representative-line": {
         "physicalEdgeCount": 55895,
@@ -80,7 +97,7 @@
       },
       "derived-sidewalk": {
         "physicalEdgeCount": 2893,
-        "lengthMeters": 111061.09439805023
+        "lengthMeters": 111061.13521529917
       }
     },
     "topology": {
@@ -88,18 +105,62 @@
       "rejected": []
     },
     "representativeOds": {
-      "status": "blocked",
-      "reason": "representative-od-not-configured",
-      "routes": []
+      "status": "passed",
+      "reason": null,
+      "routes": [
+        {
+          "id": "core-walkable-corridor",
+          "startNodeId": "ped:osm-node:5196506189:none:l0",
+          "endNodeId": "ped:osm-node:12505597292:none:l0",
+          "startSnapDistanceMeters": 0,
+          "endSnapDistanceMeters": 0,
+          "directDistanceMeters": 329.234725197756,
+          "routeDistanceMeters": 370.0258164972595,
+          "detourRatio": 1.1238966857915798,
+          "maxDetourRatio": 1.5,
+          "walkingSeconds": 264.30415464089964,
+          "directedEdgeIds": [
+            "ped:way:536429007:none:6:backward",
+            "ped:way:536429007:none:5:backward",
+            "ped:way:536429007:none:4:backward",
+            "ped:way:536429007:none:3:backward",
+            "ped:way:536429007:none:2:backward",
+            "ped:way:536429007:none:1:backward",
+            "ped:way:536429007:none:0:backward",
+            "ped:way:536429016:none:3:backward",
+            "ped:way:536429016:none:2:backward",
+            "ped:way:536429016:none:1:backward",
+            "ped:way:536429016:none:0:backward",
+            "ped:way:536429017:none:0:backward",
+            "ped:way:798538982:none:3:backward",
+            "ped:way:798538982:none:2:backward",
+            "ped:way:536519461:none:1:backward",
+            "ped:way:536519461:none:0:backward",
+            "ped:way:536519463:none:9:backward",
+            "ped:way:536519463:none:8:backward",
+            "ped:way:536519463:none:7:backward",
+            "ped:way:536519463:none:6:backward",
+            "ped:way:536519463:none:5:backward",
+            "ped:way:536519463:none:4:backward",
+            "ped:way:536519463:none:3:backward",
+            "ped:way:536519463:none:2:backward",
+            "ped:way:536519463:none:1:backward",
+            "ped:way:536519463:none:0:backward",
+            "ped:way:798538977:none:3:backward",
+            "ped:way:798538977:none:2:backward",
+            "ped:way:798538977:none:1:backward",
+            "ped:way:798538977:none:0:backward"
+          ],
+          "status": "passed"
+        }
+      ]
     },
     "validation": {
       "status": "accepted",
       "isValid": true,
       "rejectedReasons": [],
       "unverifiedReasons": [],
-      "warnings": [
-        "representative-od-not-configured"
-      ]
+      "warnings": []
     }
   }
 }

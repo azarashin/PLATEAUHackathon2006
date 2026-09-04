@@ -13,7 +13,7 @@ async function main() {
     await mkdir(dirname(resolve(o.report)), { recursive: true }); await writeFile(resolve(o.report), `${JSON.stringify(report, null, 2)}\n`); console.log(`SIDEWALK_REGIONAL_VERIFICATION_BLOCKED area=${config.areaId} reason=capture-contract-0.2-missing`); return
   }
   if (!o.osm) throw new Error('--osm is required for capture contract 0.2')
-  const graph = buildGraph(config, JSON.parse(await readFile(resolve(o.osm), 'utf8'))), quality = qualityReport(graph, { areaId: config.areaId, captureContractVersion: '0.2' }, config.representativeOds)
+  const graph = buildGraph(config, JSON.parse(await readFile(resolve(o.osm), 'utf8'))), quality = qualityReport(graph, { areaId: config.areaId, captureContractVersion: '0.2', requireRepresentativeOds: true }, config.representativeOds)
   const report = { ...base, status: quality.validation.status, graphFingerprintSha256: graphFingerprint(graph), quality }
   await mkdir(dirname(resolve(o.report)), { recursive: true }); await writeFile(resolve(o.report), `${JSON.stringify(report, null, 2)}\n`); if (quality.validation.status === 'rejected') throw new Error(quality.validation.rejectedReasons.join(', ')); console.log(`SIDEWALK_REGIONAL_VERIFIED area=${config.areaId} status=${quality.validation.status}`)
 }

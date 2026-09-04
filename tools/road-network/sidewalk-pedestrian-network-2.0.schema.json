@@ -9,7 +9,7 @@
     "areaId": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
     "graphFingerprintSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "quality": { "type": "object", "required": ["qualityContractVersion", "status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion", "validationFailures", "validationWarnings"], "properties": { "qualityContractVersion": { "const": "pedestrian-network-safety-1.0" }, "status": { "enum": ["accepted", "rejected", "unverified"] }, "explicitOrDerivedRatio": { "type": "number", "minimum": 0, "maximum": 1 }, "fallbackRatio": { "type": "number", "minimum": 0, "maximum": 1 }, "sourceSchemaVersion": { "type": "string" }, "validationFailures": { "type": "array", "items": { "type": "string" } }, "validationWarnings": { "type": "array", "items": { "type": "string" } } } },
+    "quality": { "type": "object", "required": ["qualityContractVersion", "status", "explicitOrDerivedRatio", "fallbackRatio", "sourceSchemaVersion", "validationFailures", "validationWarnings"], "properties": { "qualityContractVersion": { "const": "pedestrian-network-safety-1.1" }, "status": { "enum": ["accepted", "rejected", "unverified"] }, "explicitOrDerivedRatio": { "type": "number", "minimum": 0, "maximum": 1 }, "fallbackRatio": { "type": "number", "minimum": 0, "maximum": 1 }, "sourceSchemaVersion": { "type": "string" }, "validationFailures": { "type": "array", "items": { "type": "string" } }, "validationWarnings": { "type": "array", "items": { "type": "string" } } } },
     "extent": { "type": "object", "required": ["center", "radiusMeters"] },
     "coordinateReferenceSystem": { "type": "object", "required": ["geographic", "projected"] },
     "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
@@ -17,7 +17,7 @@
     "edges": { "type": "array", "items": { "$ref": "#/$defs/directedEdge" } }
   },
   "$defs": {
-    "source": { "type": "object", "required": ["confidence", "rationale"], "properties": { "confidence": { "enum": ["explicit", "derived", "fallback"] }, "rationale": { "enum": ["explicit-pedestrian-facility", "explicit-crossing", "derived-sidewalk", "shared-space-representative-line"] } } },
+    "source": { "type": "object", "required": ["confidence", "rationale"], "properties": { "confidence": { "enum": ["explicit", "derived", "fallback"] }, "rationale": { "enum": ["explicit-pedestrian-facility", "explicit-crossing", "derived-sidewalk", "derived-intersection-corner", "shared-raw-node-topology", "shared-space-representative-line"] } } },
     "node": { "type": "object", "required": ["id", "coordinate", "zLevel", "kind", "source"], "properties": { "source": { "$ref": "#/$defs/source" } } },
     "physicalEdge": { "type": "object", "required": ["id", "fromNodeId", "toNodeId", "geometry", "lengthMeters", "walkingSeconds", "walkability", "facility", "side", "level", "source", "fallback"], "properties": { "source": { "$ref": "#/$defs/source" } } },
     "directedEdge": { "type": "object", "required": ["id", "physicalEdgeId", "fromNodeId", "toNodeId", "walkingSeconds", "walkability", "facility", "side", "level", "source", "fallback"], "properties": { "source": { "$ref": "#/$defs/source" } } }

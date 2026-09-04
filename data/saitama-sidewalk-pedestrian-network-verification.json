@@ -1,6 +1,6 @@
 {
   "schemaVersion": "regional-sidewalk-pedestrian-network-verification-0.2",
-  "verifiedAt": "2026-09-01T14:09:39.787Z",
+  "verifiedAt": "2026-09-04T00:34:09.952Z",
   "areaId": "saitama",
   "captureManifest": {
     "schemaVersion": "osm-snapshot-manifest-0.2",
@@ -8,37 +8,44 @@
     "sha256": "d9e3a543843cb0e620e4585ef20b9cb0c7e03720458050bbe5f6f2b0a8c9ab92"
   },
   "status": "accepted",
-  "graphFingerprintSha256": "ebcc87b0099f762167c5add4547b25e83a63e7b760509fcfb875e65421dc4a8f",
+  "graphFingerprintSha256": "51519f7d78c902c16de8821e69c58488a7eaf2f1ab0bc93edaa6410272003baf",
   "quality": {
     "schemaVersion": "sidewalk-pedestrian-network-quality-report-2.0",
-    "qualityContractVersion": "pedestrian-network-safety-1.0",
-    "generatedAt": "2026-09-01T14:09:41.132Z",
-    "graphFingerprintSha256": "ebcc87b0099f762167c5add4547b25e83a63e7b760509fcfb875e65421dc4a8f",
+    "qualityContractVersion": "pedestrian-network-safety-1.1",
+    "generatedAt": "2026-09-04T00:34:11.420Z",
+    "graphFingerprintSha256": "51519f7d78c902c16de8821e69c58488a7eaf2f1ab0bc93edaa6410272003baf",
     "input": {
       "areaId": "saitama",
-      "captureContractVersion": "0.2"
+      "captureContractVersion": "0.2",
+      "requireRepresentativeOds": true
     },
     "counts": {
-      "nodeCount": 66999,
-      "physicalEdgeCount": 74566,
-      "directedEdgeCount": 149132,
+      "nodeCount": 63267,
+      "physicalEdgeCount": 75250,
+      "directedEdgeCount": 150500,
       "fallbackPhysicalEdgeCount": 55998,
       "fallbackDirectedEdgeCount": 111996,
       "sourceWayCount": 17808,
       "includedWayCount": 17645,
-      "excludedWayCount": 116,
       "excludedWayCountByReason": {
         "non-pedestrian-highway": 69,
         "foot-prohibited": 4,
         "area-without-linear-walkway": 27,
         "access-restricted-without-foot-override": 16
       },
+      "excludedWayCount": 116,
       "explicitWayCount": 4373,
       "derivedSidewalkWayCount": 44,
       "separateSidewalkSkippedCount": 47,
       "fallbackWayCount": 13228,
-      "crossingConnectionCount": 1281,
-      "levelSeparatedCrossingConnectionCount": 2,
+      "crossingConnectionCount": 114,
+      "levelSeparatedCrossingConnectionCount": 0,
+      "intersectionCornerConnectionCount": 663,
+      "levelSeparatedIntersectionCornerCandidateCount": 12,
+      "canonicalSharedRawNodeMergeCount": 85673,
+      "sharedRawNodeCoordinateVariantCount": 1221,
+      "sharedRawNodeLayerTransitionConnectionCount": 6,
+      "layerIncompatibleIntersectionCornerCandidateCount": 24,
       "malformedWayCount": 0
     },
     "processing": {
@@ -53,22 +60,32 @@
       },
       "separateSidewalkSkippedCount": 47,
       "malformedWayCount": 0,
-      "crossingConnectionCount": 1281,
-      "levelSeparatedCrossingConnectionCount": 2
+      "crossingConnectionCount": 114,
+      "levelSeparatedCrossingConnectionCount": 0,
+      "intersectionCornerConnectionCount": 663,
+      "levelSeparatedIntersectionCornerCandidateCount": 12
     },
     "lengthMeters": {
-      "total": 2048886.7032997159,
-      "explicit": 295078.6770759892,
-      "derived": 29799.050886961228,
-      "explicitOrDerived": 324877.7279629504,
+      "total": 2050281.5300250154,
+      "explicit": 295134.58542129386,
+      "derived": 31137.969266956727,
+      "explicitOrDerived": 326272.5546882506,
       "fallback": 1724008.9753367726,
-      "explicitOrDerivedRatio": 0.1585630515536742,
-      "fallbackRatio": 0.8414369484463293
+      "explicitOrDerivedRatio": 0.15913548939997024,
+      "fallbackRatio": 0.8408645106000336
     },
     "segmentRationales": {
       "explicit-crossing": {
-        "physicalEdgeCount": 99,
-        "lengthMeters": 307.5188522908731
+        "physicalEdgeCount": 114,
+        "lengthMeters": 363.4271975955411
+      },
+      "derived-intersection-corner": {
+        "physicalEdgeCount": 663,
+        "lengthMeters": 1338.8367370648707
+      },
+      "shared-raw-node-topology": {
+        "physicalEdgeCount": 6,
+        "lengthMeters": 0.10833954137193424
       },
       "shared-space-representative-line": {
         "physicalEdgeCount": 55998,
@@ -80,7 +97,7 @@
       },
       "derived-sidewalk": {
         "physicalEdgeCount": 895,
-        "lengthMeters": 29799.050886961228
+        "lengthMeters": 29799.024190350483
       }
     },
     "topology": {
@@ -88,18 +105,42 @@
       "rejected": []
     },
     "representativeOds": {
-      "status": "blocked",
-      "reason": "representative-od-not-configured",
-      "routes": []
+      "status": "passed",
+      "reason": null,
+      "routes": [
+        {
+          "id": "core-walkable-corridor",
+          "startNodeId": "ped:osm-node:1147135908:center:l0",
+          "endNodeId": "ped:osm-node:1147135824:center:l0",
+          "startSnapDistanceMeters": 0,
+          "endSnapDistanceMeters": 0,
+          "directDistanceMeters": 487.98735202082906,
+          "routeDistanceMeters": 539.3368650246501,
+          "detourRatio": 1.1052271391690276,
+          "maxDetourRatio": 1.5,
+          "walkingSeconds": 385.2406178747501,
+          "directedEdgeIds": [
+            "ped:way:99170907:center:2:forward",
+            "ped:way:99170907:center:3:forward",
+            "ped:way:99170907:center:4:forward",
+            "ped:way:1481439887:center:9:forward",
+            "ped:way:99170589:center:0:forward",
+            "ped:way:99170589:center:1:forward",
+            "ped:way:99170589:center:2:forward",
+            "ped:way:99170589:center:3:forward",
+            "ped:way:99170589:center:4:forward",
+            "ped:way:99170589:center:5:forward"
+          ],
+          "status": "passed"
+        }
+      ]
     },
     "validation": {
       "status": "accepted",
       "isValid": true,
       "rejectedReasons": [],
       "unverifiedReasons": [],
-      "warnings": [
-        "representative-od-not-configured"
-      ]
+      "warnings": []
     }
   }
 }

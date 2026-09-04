@@ -10,6 +10,13 @@
   "sampleSpacingMeters": 25,
   "pedestrianHeightMeters": 1.5,
   "walkingSpeedMetersPerSecond": 1.4,
+  "representativeOds": [{
+    "id": "core-walkable-corridor",
+    "start": [139.6400325, 35.900685],
+    "end": [139.6346157, 35.9006027],
+    "maxSnapDistanceMeters": 75,
+    "maxDetourRatio": 1.5
+  }],
   "candidateDatasetIds": ["11100", "11219", "11203"],
   "datasetRoots": {
     "11100": "data/raw/plateau/11100-saitama-2025",
