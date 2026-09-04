@@ -10,6 +10,8 @@ public static class EnvironmentCostRuntimeUiInputGate
     private static VisualElement trackedUiSurface;
     private static Focusable focusedElement;
     private static bool editableFieldWasPointerSelected;
+    private static bool additionalPointerOverUi;
+    private static bool trackedSurfacePointerOverUi;
 
     /// <summary>Tracks the full UIDocument input boundary and its visible UI surface.</summary>
     public static void TrackDocument(VisualElement documentRoot, VisualElement uiSurface)
@@ -18,6 +20,8 @@ public static class EnvironmentCostRuntimeUiInputGate
         trackedDocumentRoot = documentRoot;
         trackedUiSurface = uiSurface;
         editableFieldWasPointerSelected = false;
+        additionalPointerOverUi = false;
+        trackedSurfacePointerOverUi = false;
         IsPointerOverUi = false;
         IsTextInputFocused = false;
 
@@ -59,6 +63,8 @@ public static class EnvironmentCostRuntimeUiInputGate
         ClearTextInputFocus();
         trackedDocumentRoot = null;
         trackedUiSurface = null;
+        additionalPointerOverUi = false;
+        trackedSurfacePointerOverUi = false;
         IsPointerOverUi = false;
     }
 
@@ -89,6 +95,13 @@ public static class EnvironmentCostRuntimeUiInputGate
         IsTextInputFocused = false;
     }
 
+    /// <summary>Allows a Runtime overlay outside the main panel surface to reserve pointer input.</summary>
+    public static void SetAdditionalPointerOverUi(bool value)
+    {
+        additionalPointerOverUi = value;
+        IsPointerOverUi = additionalPointerOverUi || trackedSurfacePointerOverUi;
+    }
+
     private static bool IsCameraKey(KeyCode keyCode) => keyCode == KeyCode.W || keyCode == KeyCode.A || keyCode == KeyCode.S ||
         keyCode == KeyCode.D || keyCode == KeyCode.Q || keyCode == KeyCode.E;
 
@@ -107,8 +120,17 @@ public static class EnvironmentCostRuntimeUiInputGate
         IsTextInputFocused = true;
     }
 
-    private static void OnUiPointerEnter(PointerEnterEvent evt) => IsPointerOverUi = true;
-    private static void OnUiPointerLeave(PointerLeaveEvent evt) => IsPointerOverUi = false;
+    private static void OnUiPointerEnter(PointerEnterEvent evt)
+    {
+        trackedSurfacePointerOverUi = true;
+        IsPointerOverUi = true;
+    }
+
+    private static void OnUiPointerLeave(PointerLeaveEvent evt)
+    {
+        trackedSurfacePointerOverUi = false;
+        IsPointerOverUi = additionalPointerOverUi;
+    }
     private static void StopUiPointerPropagation(PointerDownEvent evt) => evt.StopPropagation();
     private static void OnDocumentPointerDown(PointerDownEvent evt)
     {

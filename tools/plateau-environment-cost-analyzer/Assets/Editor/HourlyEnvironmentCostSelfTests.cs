@@ -198,6 +198,8 @@ public static class HourlyEnvironmentCostSelfTests
             AssertRuntimeRouteComparisonWithLocalCityPackage();
             AssertRuntimeUiKeyboardFocusPolicy();
             AssertRuntimeUiDocumentInputGate();
+            AssertRuntimeOverviewMapCullingMask();
+            AssertRuntimeOverviewMapSourceCameraSelection();
             Debug.Log("HOURLY_ENVIRONMENT_COST_SELF_TEST_PASSED");
             EditorApplication.Exit(0);
         }
@@ -589,6 +591,50 @@ public static class HourlyEnvironmentCostSelfTests
             var document = uiObject.GetComponent<UIDocument>();
             if (document != null) EnvironmentCostRuntimeUiInputGate.StopTracking(document.rootVisualElement);
             UnityEngine.Object.DestroyImmediate(uiObject);
+        }
+    }
+
+    private static void AssertRuntimeOverviewMapCullingMask()
+    {
+        var sourceMask = (1 << 0) | (1 << 2) | (1 << 5) | (1 << 8) | (1 << 9) | (1 << 10);
+        var mask = EnvironmentCostRuntimeOverviewMapController.CreateOverviewCullingMask(sourceMask);
+        AssertEqual(false, (mask & (1 << 0)) != 0);
+        AssertEqual(false, (mask & (1 << 2)) != 0);
+        AssertEqual(false, (mask & (1 << 5)) != 0);
+        AssertEqual(true, (mask & (1 << 8)) != 0);
+        AssertEqual(true, (mask & (1 << 9)) != 0);
+        AssertEqual(true, (mask & (1 << 10)) != 0);
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds >= 0.1f);
+        AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IdleRefreshIntervalSeconds >= EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds);
+
+        // A detached Runtime overlay (the overview map) can reserve pointer input without
+        // making the full-screen UI root block scene interaction.
+        EnvironmentCostRuntimeUiInputGate.SetAdditionalPointerOverUi(true);
+        AssertEqual(true, EnvironmentCostRuntimeUiInputGate.IsPointerOverUi);
+        EnvironmentCostRuntimeUiInputGate.SetAdditionalPointerOverUi(false);
+        AssertEqual(false, EnvironmentCostRuntimeUiInputGate.IsPointerOverUi);
+    }
+
+    private static void AssertRuntimeOverviewMapSourceCameraSelection()
+    {
+        var sourceObject = new GameObject("Overview map source camera self-test");
+        var overviewObject = new GameObject("Overview map camera self-test");
+        try
+        {
+            var source = sourceObject.AddComponent<Camera>();
+            var overview = overviewObject.AddComponent<Camera>();
+            AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IsUsableSourceCamera(source, overview));
+            AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.IsUsableSourceCamera(overview, overview));
+            source.enabled = false;
+            AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.IsUsableSourceCamera(source, overview));
+            source.enabled = true;
+            UnityEngine.Object.DestroyImmediate(sourceObject);
+            AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.IsUsableSourceCamera(source, overview));
+        }
+        finally
+        {
+            if (sourceObject != null) UnityEngine.Object.DestroyImmediate(sourceObject);
+            if (overviewObject != null) UnityEngine.Object.DestroyImmediate(overviewObject);
         }
     }
 }
