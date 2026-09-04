@@ -39,6 +39,7 @@
 | [時間別環境コストの解析・検証・可視化](hourly-environment-cost-analysis.md) | 日陰率・日射曝露、キャッシュ、欠測、Unityヒートマップ、検証方法 | 解析ロジックやUnityでの確認を行うとき |
 | [環境コスト Inspection Scene のDEM・影・実行時確認](environment-cost-inspection-runtime.md) | DEM、遮蔽物、自由カメラ、Windows Playerの確認手順 | CityGML読込結果を3D表示・ビルドで確認するとき |
 | [Runtime UI の入力フォーカス境界](runtime-ui-input-focus.md) | UI Toolkit とカメラ操作で競合するキーボード入力の原因、対策、回帰試験 | Runtime UI の入力・フォーカス挙動を変更するとき |
+| [Runtime俯瞰地図](runtime-overview-map.md) | 北上固定の俯瞰地図、メインカメラ追従、描画更新と入力境界 | Runtimeの俯瞰表示や描画負荷を確認・変更するとき |
 | [Runtimeの施策前後経路・KPI比較](runtime-route-comparison.md) | 現状・案A・案BのRuntime経路計算、表示、比較証跡、操作手順 | Runtime内で施策効果を比較・検証するとき |
 | [Runtime 道路別ヒートマップ比較](runtime-road-heatmap-comparison.md) | 同一条件の道路辺ごとの改善・悪化・品質状態を可視化し、JSON証跡を出力する | Runtimeで道路別の施策影響を確認するとき |
 | [太陽位置計算と3D影表示](solar-position-and-3d-shadows.md) | 日時・地域からの太陽方位／高度、Inspection SceneのDirectional Light・影、夜間の扱い | 太陽位置の計算根拠や影表示を確認・変更するとき |

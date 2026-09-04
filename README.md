@@ -170,6 +170,7 @@ npm --prefix viewer run build
 | [Runtime道路別ヒートマップ](docs/runtime-road-heatmap-comparison.md) | 道路別の現状・施策後差分表示。 |
 | [Runtime UI設計](docs/runtime-ui-design.md) | UI Toolkitの構造、配色、レイアウト方針。 |
 | [Runtime UI入力フォーカス](docs/runtime-ui-input-focus.md) | カメラ操作とUI入力の競合対策。 |
+| [Runtime俯瞰地図](docs/runtime-overview-map.md) | 北上固定の俯瞰地図、カメラ追従、描画負荷と入力境界。 |
 | [施策シナリオ](docs/policy-scenarios.md) | 施策データ、樹冠・日よけ・障害物の定義。 |
 | [施策A/B比較](docs/policy-scenario-ab-comparison.md) | A/B用bundle、比較条件、指紋一致の要件。 |
 | [地域・経路操作](docs/viewer-location-and-route-controls.md) | Viewerの地域、GPS、起終点、時刻、5地域v2起動。 |

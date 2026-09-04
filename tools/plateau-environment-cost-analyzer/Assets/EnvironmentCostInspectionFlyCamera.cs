@@ -29,7 +29,9 @@ public sealed class EnvironmentCostInspectionFlyCamera : MonoBehaviour
         if (Input.GetKey(KeyCode.Q)) movement.y -= 1f;
         transform.position += transform.TransformDirection(movement.normalized) * speed;
 
-        if (!Input.GetMouseButton(1)) return;
+        // A right-click over Runtime UI must not rotate the scene behind it. Keyboard movement
+        // remains available unless an editable field owns text input.
+        if (!Input.GetMouseButton(1) || EnvironmentCostRuntimeUiInputGate.IsPointerOverUi) return;
         yaw += Input.GetAxis("Mouse X") * lookDegreesPerPixel * 100f;
         pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * lookDegreesPerPixel * 100f, -85f, 85f);
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);

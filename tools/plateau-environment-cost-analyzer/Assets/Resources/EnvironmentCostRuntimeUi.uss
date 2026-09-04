@@ -1,10 +1,57 @@
 .runtime-ui-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.runtime-ui-surface {
     flex-direction: column;
     align-items: flex-start;
     padding-left: 16px;
     padding-top: 16px;
     width: 500px;
 }
+
+.runtime-overview-map-launcher {
+    position: absolute;
+    right: 16px;
+    top: 16px;
+}
+
+.runtime-overview-map-toggle {
+    background-color: rgb(219, 234, 254);
+    color: rgb(30, 64, 175);
+    border-left-color: rgb(147, 197, 253);
+    border-right-color: rgb(147, 197, 253);
+    border-top-color: rgb(147, 197, 253);
+    border-bottom-color: rgb(147, 197, 253);
+}
+
+.runtime-overview-map {
+    position: absolute;
+    right: 16px;
+    top: 52px;
+    width: 276px;
+    padding: 8px;
+    background-color: rgba(248, 250, 252, 0.96);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(37, 99, 235);
+    border-right-color: rgb(37, 99, 235);
+    border-top-color: rgb(37, 99, 235);
+    border-bottom-color: rgb(37, 99, 235);
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.runtime-overview-map-title { color: rgb(15, 71, 125); font-size: 11px; unity-font-style: bold; margin-bottom: 4px; }
+.runtime-overview-map-image { width: 260px; height: 260px; background-color: rgb(226, 232, 240); }
 
 .runtime-tabs { flex-direction: row; margin-bottom: 8px; gap: 4px; }
 .runtime-tab { background-color: rgb(219, 234, 254); color: rgb(30, 64, 175); border-left-color: rgb(147, 197, 253); border-right-color: rgb(147, 197, 253); border-top-color: rgb(147, 197, 253); border-bottom-color: rgb(147, 197, 253); }
