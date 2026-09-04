@@ -14,6 +14,7 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     private const int TerrainLayer = 10;
     private const float DefaultMapExtentMeters = 500f;
     private const float MarkerRotationUpdateThresholdDegrees = 0.1f;
+    private static readonly Color PositionMarkerColor = new Color(13f / 255f, 148f / 255f, 136f / 255f, 1f);
     public const float MovingRefreshIntervalSeconds = 0.2f;
     public const float IdleRefreshIntervalSeconds = 1.0f;
     private static readonly ProfilerMarker OverviewMapRenderMarker = new ProfilerMarker("EnvironmentCost.OverviewMap.Render");
@@ -83,8 +84,9 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
         image.AddToClassList("runtime-overview-map-image");
         mapContainer.Add(image);
 
-        positionMarker = new Label("▲");
+        positionMarker = new VisualElement { pickingMode = PickingMode.Ignore };
         positionMarker.AddToClassList("runtime-overview-map-position-marker");
+        positionMarker.generateVisualContent += GeneratePositionMarkerVisualContent;
         positionMarker.tooltip = "現在地とメインカメラの向き";
         image.Add(positionMarker);
 
@@ -288,6 +290,29 @@ public sealed class EnvironmentCostRuntimeOverviewMapController : MonoBehaviour
     /// <summary>Skips a retained-mode style update until the north-up marker rotation visibly changes.</summary>
     public static bool ShouldUpdatePositionMarkerRotation(bool hasPreviousRotation, float previousDegrees, float nextDegrees)
         => !hasPreviousRotation || Mathf.Abs(Mathf.DeltaAngle(previousDegrees, nextDegrees)) >= MarkerRotationUpdateThresholdDegrees;
+
+    /// <summary>Returns an upward-pointing isosceles triangle for the north-up camera marker.</summary>
+    public static void GetPositionMarkerTriangleVertices(float width, float height, out Vector2 tip, out Vector2 leftBase, out Vector2 rightBase)
+    {
+        tip = new Vector2(width * 0.5f, 0f);
+        leftBase = new Vector2(0f, height);
+        rightBase = new Vector2(width, height);
+    }
+
+    private static void GeneratePositionMarkerVisualContent(MeshGenerationContext context)
+    {
+        var rect = context.visualElement.contentRect;
+        if (rect.width <= 0f || rect.height <= 0f) return;
+
+        GetPositionMarkerTriangleVertices(rect.width, rect.height, out var tip, out var leftBase, out var rightBase);
+        var mesh = context.Allocate(3, 3);
+        mesh.SetNextVertex(new Vertex { position = new Vector3(tip.x, tip.y, Vertex.nearZ), tint = PositionMarkerColor });
+        mesh.SetNextVertex(new Vertex { position = new Vector3(leftBase.x, leftBase.y, Vertex.nearZ), tint = PositionMarkerColor });
+        mesh.SetNextVertex(new Vertex { position = new Vector3(rightBase.x, rightBase.y, Vertex.nearZ), tint = PositionMarkerColor });
+        mesh.SetNextIndex(0);
+        mesh.SetNextIndex(1);
+        mesh.SetNextIndex(2);
+    }
 
     private void ToggleVisibility()
     {

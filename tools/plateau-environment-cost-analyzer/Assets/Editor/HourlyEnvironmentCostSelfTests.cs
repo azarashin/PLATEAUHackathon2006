@@ -624,6 +624,14 @@ public static class HourlyEnvironmentCostSelfTests
         AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(1100f, 100.3f, 1100f, 1000f));
         AssertNear(1000.0, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(2000f, 100.3f, 1100f, 1000f));
         AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)));
+        EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerTriangleVertices(22f, 28f, out var markerTip, out var markerLeftBase, out var markerRightBase);
+        AssertNear(11.0, markerTip.x);
+        AssertNear(0.0, markerTip.y);
+        AssertNear(0.0, markerLeftBase.x);
+        AssertNear(28.0, markerLeftBase.y);
+        AssertNear(22.0, markerRightBase.x);
+        AssertNear(28.0, markerRightBase.y);
+        AssertNear(Vector2.Distance(markerTip, markerLeftBase), Vector2.Distance(markerTip, markerRightBase));
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(false, 0f, 0f));
         AssertEqual(false, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 90f, 90.05f));
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.ShouldUpdatePositionMarkerRotation(true, 359.95f, 0.1f));
