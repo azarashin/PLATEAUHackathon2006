@@ -5,6 +5,7 @@
   "version": "2026.09.02-sidewalk-v2",
   "analysisConfigPath": "data/analysis-configs/kyoto.json",
   "sidewalkNetworkPath": "data/generated/kyoto-sidewalk-pedestrian-network-v2.json",
+  "roadNetworkBundlePath": "data/generated/kyoto-environment-cost-server-bundle-v2/manifest.json",
   "packageRelativePath": "EnvironmentCostCities/kyoto-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/kyoto.unity",
   "runtimeShadeResultOutputPath": "data/generated/kyoto-sidewalk-v2-runtime-shade-result.json",

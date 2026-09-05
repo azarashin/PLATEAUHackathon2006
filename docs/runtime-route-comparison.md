@@ -146,4 +146,8 @@ JSON Schemaは [`schemas/environment-cost-runtime-route-comparison-0.1.schema.js
 
 Runtimeは都市パッケージに同梱済みのtopologyとcost sliceを読み、pure C#のDijkstraで計算する。外部サーバーへ施策bundleを送信しない。Runtime出力を経路サーバーへ安全に配備する機能は#65の対象である。
 
+都市パッケージに`road-network`が収録されていない場合、経路・KPI比較は「道路ネットワークが未収録」の利用不可状態を日本語で表示し、例外を画面へ出さない。v2歩行ネットワークを使うパッケージは、対応する`*-environment-cost-server-bundle-v2/manifest.json`を`roadNetworkBundlePath`へ明示して再作成する。
+
+Runtime coreは、従来のserver bundle/topology/cost slice 1.0を維持しつつ、2.0も受理する。v2では文字列node ID、歩行ネットワークのphysical edge geometry、`sourceEdgeIds=[physicalEdgeId]`を扱い、経路と道路別比較出力に曲線・折れ点を含む全geometryを残す。反対方向のedgeは同じphysical geometryを逆順にして描画・出力する。v2 bundleは、`pedestrian-network-safety-1.1`、`accepted`、source schema `0.2`、安全検証失敗0件のnetwork quality契約を満たす場合だけ受理する。
+
 経路サーバーとの一致は `data/fixtures/route-server-bundle-v1` を使う `HourlyEnvironmentCostSelfTests.Run` で検証する。

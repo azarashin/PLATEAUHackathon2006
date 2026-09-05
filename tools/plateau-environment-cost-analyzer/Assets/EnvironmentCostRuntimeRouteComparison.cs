@@ -15,7 +15,9 @@ using Newtonsoft.Json.Linq;
 public sealed class EnvironmentCostRuntimeRouteComparison
 {
     public const string TopologySchema = "environment-cost-server-topology-1.0";
+    public const string TopologySchemaV2 = "environment-cost-server-topology-2.0";
     public const string BundleSchema = "environment-cost-server-bundle-1.0";
+    public const string BundleSchemaV2 = "environment-cost-server-bundle-2.0";
     public const string ResultSchema = "environment-cost-runtime-route-comparison-0.1";
     private const double Tolerance = 1e-9;
     private const double FormulaToleranceSeconds = 1e-6;
@@ -56,24 +58,36 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         var cityManifest = ReadObject(cityManifestPath);
         var roadRoot = Path.Combine(cityPackageRoot, "road-network");
         var manifest = ReadObject(Path.Combine(roadRoot, "manifest.json"));
-        if (!string.Equals((string)manifest["schemaVersion"], BundleSchema, StringComparison.Ordinal) ||
-            !string.Equals((string)manifest["status"], "completed", StringComparison.Ordinal))
-            throw new InvalidOperationException("Runtime route package has an unsupported or incomplete road-network manifest.");
+        var bundleIsV2 = ValidateBundleManifest(manifest);
         var topologyReference = manifest["topology"] as JObject ?? throw new InvalidOperationException("Road-network topology reference is missing.");
-        var topologyFile = RequiredString(topologyReference, "file");
-        var topology = ReadObject(SafePath(roadRoot, topologyFile));
+        var topology = ReadVerifiedReference(roadRoot, topologyReference);
         var parsed = ParseTopology(topology);
+        if (bundleIsV2 != parsed.isV2)
+            throw new InvalidOperationException("Road-network bundle and topology schema versions do not match.");
+        if (bundleIsV2)
+        {
+            ValidateV2NetworkQuality(topology["networkQuality"] as JObject);
+            if (!JToken.DeepEquals(manifest["networkQuality"], topology["networkQuality"]))
+                throw new InvalidOperationException("V2 server bundle and topology network quality contracts do not match.");
+        }
         var area = manifest["area"] as JObject ?? throw new InvalidOperationException("Road-network area is missing.");
         var cityArea = (string)cityManifest["areaId"];
         if (!string.Equals(parsed.areaId, RequiredString(area, "areaId"), StringComparison.Ordinal) ||
             (!string.IsNullOrWhiteSpace(cityArea) && !string.Equals(cityArea, parsed.areaId, StringComparison.Ordinal)))
             throw new InvalidOperationException("City package and road-network area IDs do not match.");
+        if (!string.Equals(parsed.contentFingerprintSha256, RequiredString(topologyReference, "contentFingerprintSha256"), StringComparison.Ordinal) ||
+            !string.Equals(parsed.graphFingerprintSha256, RequiredString(manifest["inputs"] as JObject ?? throw new InvalidOperationException("Road-network inputs are missing."), "roadGraphFingerprintSha256"), StringComparison.Ordinal))
+            throw new InvalidOperationException("Road-network topology fingerprints do not match the manifest.");
+        var counts = manifest["counts"] as JObject ?? throw new InvalidOperationException("Road-network counts are missing.");
+        if ((int?)counts["nodeCount"] != parsed.nodes.Length || (int?)counts["physicalEdgeCount"] != parsed.physicalEdges.Length || (int?)counts["directedEdgeCount"] != parsed.directedEdges.Length)
+            throw new InvalidOperationException("Road-network topology counts do not match the manifest.");
         var costFiles = new Dictionary<string, string>();
         var references = manifest["costSlices"] as JArray ?? throw new InvalidOperationException("Road-network cost slices are missing.");
         foreach (var token in references.OfType<JObject>())
         {
             var timestamp = RequiredString(token, "timestamp");
-            costFiles.Add(timestamp, SafePath(roadRoot, RequiredString(token, "file")));
+            if (costFiles.ContainsKey(timestamp)) throw new InvalidOperationException("Road-network cost timestamps are duplicated.");
+            costFiles.Add(timestamp, ReadVerifiedReferencePath(roadRoot, token));
         }
         if (costFiles.Count == 0) throw new InvalidOperationException("Road-network contains no cost slice.");
         return new EnvironmentCostRuntimeRouteComparison(new Package
@@ -84,7 +98,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
             bundleFingerprintSha256 = (string)manifest["bundleFingerprintSha256"],
             center = ReadCoordinate(area["center"] as JArray, "area.center"), radiusMeters = RequiredNumber(area, "radiusMeters"),
             referenceDate = (string)((manifest["scenario"] as JObject)?["referenceDate"]), timezone = (string)((manifest["scenario"] as JObject)?["timezone"]),
-            nodes = parsed.nodes, physicalEdges = parsed.physicalEdges, directedEdges = parsed.directedEdges,
+            isV2 = parsed.isV2, nodes = parsed.nodes, physicalEdges = parsed.physicalEdges, directedEdges = parsed.directedEdges,
             physicalWalkingSeconds = parsed.physicalWalkingSeconds,
             baselineCostFiles = costFiles, baselineCosts = new Dictionary<string, Cost[]>(StringComparer.Ordinal)
         });
@@ -168,6 +182,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
                 id = package.physicalEdges[index].id,
                 sourceEdgeIds = package.physicalEdges[index].sourceEdgeIds,
                 from = CoordinateForNode(directed.fromNodeIndex), to = CoordinateForNode(directed.toNodeIndex),
+                coordinates = DirectedGeometry(directed),
                 walkingSeconds = package.physicalWalkingSeconds[index],
                 baselineStatus = before.status, policyStatus = after.status,
                 baselineValue = MetricValue(before, request.metric, package.physicalWalkingSeconds[index], request.solarAvoidanceFactor),
@@ -326,7 +341,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
 
     private EnvironmentCostRuntimeRouteSnap SnapAt(int index, EnvironmentCostRuntimeRouteCoordinate input, double distance) => new EnvironmentCostRuntimeRouteSnap
     {
-        nodeIndex = index, nodeId = "osm-node-" + package.nodes[index].sourceNodeId.ToString(CultureInfo.InvariantCulture),
+        nodeIndex = index, nodeId = package.isV2 ? package.nodes[index].sourceNodeId : "osm-node-" + package.nodes[index].sourceNodeId,
         input = input, snapped = new EnvironmentCostRuntimeRouteCoordinate { longitude = package.nodes[index].longitude, latitude = package.nodes[index].latitude, nodeIndex = index }, distanceMeters = distance
     };
 
@@ -356,13 +371,48 @@ public sealed class EnvironmentCostRuntimeRouteComparison
             var edge = package.directedEdges[edgeIndex]; var physical = package.physicalEdges[edge.physicalEdgeIndex]; var cost = Effective(source.costs[edge.physicalEdgeIndex], edge.walkingSeconds, profile.solarAvoidanceFactor);
             route.edgeIds.Add(physical.id + (edge.directionCode == 0 ? ":forward" : ":backward")); route.distanceMeters += edge.lengthMeters; route.walkingSeconds += edge.walkingSeconds; route.solarExposureSeconds += cost.solarExposureSeconds; route.observedSolarExposureSeconds += cost.observedSolarExposureSeconds; route.unknownWalkingSeconds += cost.unknownWalkingSeconds;
             if (cost.missing) route.missingEdgeCount++; if (cost.partial) route.partialEdgeCount++;
-            if (route.coordinates.Count == 0) route.coordinates.Add(new EnvironmentCostRuntimeRouteCoordinate { longitude = package.nodes[edge.fromNodeIndex].longitude, latitude = package.nodes[edge.fromNodeIndex].latitude, nodeIndex = edge.fromNodeIndex });
-            route.coordinates.Add(new EnvironmentCostRuntimeRouteCoordinate { longitude = package.nodes[edge.toNodeIndex].longitude, latitude = package.nodes[edge.toNodeIndex].latitude, nodeIndex = edge.toNodeIndex });
+            AppendDirectedGeometry(route.coordinates, edge);
         }
         route.shadeRatio = route.walkingSeconds == 0 ? 0 : 1.0 - route.solarExposureSeconds / route.walkingSeconds;
         var known = route.walkingSeconds - route.unknownWalkingSeconds; route.observedShadeRatio = known <= 0 ? -1.0 : 1.0 - route.observedSolarExposureSeconds / known;
         route.coverageStatus = route.missingEdgeCount > 0 ? "missing" : route.partialEdgeCount > 0 ? "partial" : "available";
         return route;
+    }
+
+    private void AppendDirectedGeometry(List<EnvironmentCostRuntimeRouteCoordinate> coordinates, DirectedEdge edge)
+    {
+        var physical = package.physicalEdges[edge.physicalEdgeIndex];
+        var geometry = physical.geometry;
+        if (geometry == null || geometry.Length < 2)
+        {
+            AppendCoordinate(coordinates, CoordinateForNode(edge.fromNodeIndex));
+            AppendCoordinate(coordinates, CoordinateForNode(edge.toNodeIndex));
+            return;
+        }
+        var forward = edge.directionCode == 0;
+        for (var offset = 0; offset < geometry.Length; offset++)
+        {
+            var index = forward ? offset : geometry.Length - 1 - offset;
+            var point = geometry[index];
+            AppendCoordinate(coordinates, new EnvironmentCostRuntimeRouteCoordinate { longitude = point.longitude, latitude = point.latitude, nodeIndex = offset == 0 ? edge.fromNodeIndex : offset == geometry.Length - 1 ? edge.toNodeIndex : -1 });
+        }
+    }
+
+    private List<EnvironmentCostRuntimeRouteCoordinate> DirectedGeometry(DirectedEdge edge)
+    {
+        var coordinates = new List<EnvironmentCostRuntimeRouteCoordinate>();
+        AppendDirectedGeometry(coordinates, edge);
+        return coordinates;
+    }
+
+    private static void AppendCoordinate(List<EnvironmentCostRuntimeRouteCoordinate> coordinates, EnvironmentCostRuntimeRouteCoordinate coordinate)
+    {
+        if (coordinates.Count > 0)
+        {
+            var previous = coordinates[coordinates.Count - 1];
+            if (Math.Abs(previous.longitude - coordinate.longitude) <= Tolerance && Math.Abs(previous.latitude - coordinate.latitude) <= Tolerance) return;
+        }
+        coordinates.Add(coordinate);
     }
 
     private static EffectiveCost Effective(Cost cost, double walking, double factor)
@@ -389,6 +439,8 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         if (!string.Equals(result.provenance.cityPackageVersion, package.cityPackageVersion, StringComparison.Ordinal) ||
             !string.Equals(result.provenance.cityPackageManifestSha256, package.cityPackageManifestSha256, StringComparison.Ordinal))
             throw new InvalidOperationException("Runtime shade result city package version or fingerprint does not match.");
+        if (package.isV2 && !string.Equals(result.provenance.graphFingerprintSha256, package.graphFingerprintSha256, StringComparison.Ordinal))
+            throw new InvalidOperationException("Runtime shade result graph fingerprint does not match the v2 city package.");
         if (result.provenance.hours == null || !result.provenance.hours.Contains(hour))
             throw new InvalidOperationException("Runtime shade result does not contain the requested hour.");
         if (string.IsNullOrWhiteSpace(result.provenance.scenarioId) || !IsSha256(result.provenance.policyFingerprintSha256) ||
@@ -403,7 +455,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
         {
             if (package.baselineCosts.TryGetValue(timestamp, out var cached)) return cached;
             if (!package.baselineCostFiles.TryGetValue(timestamp, out var path)) throw new InvalidOperationException("The requested timestamp is not in the city package.");
-            var parsed = new ParsedTopology { areaId = package.areaId, contentFingerprintSha256 = package.topologyFingerprintSha256,
+            var parsed = new ParsedTopology { areaId = package.areaId, contentFingerprintSha256 = package.topologyFingerprintSha256, isV2 = package.isV2,
                 nodes = package.nodes, physicalEdges = package.physicalEdges, directedEdges = package.directedEdges,
                 physicalWalkingSeconds = package.physicalWalkingSeconds };
             var loaded = ParseCostSlice(ReadObject(path), parsed, timestamp);
@@ -418,12 +470,66 @@ public sealed class EnvironmentCostRuntimeRouteComparison
     private static bool IsSha256(string value) => value != null && value.Length == 64 && value.All(character =>
         (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'));
     private static bool IsCoordinate(double longitude, double latitude) => Finite(longitude) && Finite(latitude) && longitude >= -180 && longitude <= 180 && latitude >= -90 && latitude <= 90;
+    private static bool CoordinatesMatch(EnvironmentCostRuntimeRouteCoordinate coordinate, Node node) =>
+        Math.Abs(coordinate.longitude - node.longitude) <= Tolerance && Math.Abs(coordinate.latitude - node.latitude) <= Tolerance;
     private static double Haversine(double lon1, double lat1, double lon2, double lat2) { var p = Math.PI / 180.0; var dlat = (lat2 - lat1) * p; var dlon = (lon2 - lon1) * p; var h = Math.Sin(dlat / 2) * Math.Sin(dlat / 2) + Math.Cos(lat1 * p) * Math.Cos(lat2 * p) * Math.Sin(dlon / 2) * Math.Sin(dlon / 2); return 2 * EarthRadiusMeters * Math.Asin(Math.Min(1, Math.Sqrt(h))); }
     private static JObject ReadObject(string path)
     {
         using var stream = File.OpenText(path);
         using var reader = new JsonTextReader(stream) { DateParseHandling = DateParseHandling.None };
         return JObject.Load(reader);
+    }
+    private static JObject ReadVerifiedReference(string root, JObject reference) => ReadObject(ReadVerifiedReferencePath(root, reference));
+    private static string ReadVerifiedReferencePath(string root, JObject reference)
+    {
+        var path = SafePath(root, RequiredString(reference, "file"));
+        var expectedBytes = (long?)reference["bytes"] ?? -1;
+        var expectedSha256 = RequiredString(reference, "fileSha256");
+        if (expectedBytes < 0 || new FileInfo(path).Length != expectedBytes || !string.Equals(EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(path), expectedSha256, StringComparison.Ordinal))
+            throw new InvalidOperationException("Road-network referenced file integrity check failed: " + Path.GetFileName(path));
+        return path;
+    }
+    private static bool ValidateBundleManifest(JObject manifest)
+    {
+        var schema = (string)manifest["schemaVersion"];
+        var v2 = string.Equals(schema, BundleSchemaV2, StringComparison.Ordinal);
+        if ((!v2 && !string.Equals(schema, BundleSchema, StringComparison.Ordinal)) || !string.Equals((string)manifest["status"], "completed", StringComparison.Ordinal) ||
+            !IsSha256((string)manifest["bundleFingerprintSha256"]))
+            throw new InvalidOperationException("Runtime route package has an unsupported or incomplete road-network manifest.");
+        var scenario = manifest["scenario"] as JObject;
+        var timestamps = scenario?["availableTimestamps"] as JArray;
+        var manifestCounts = manifest["counts"] as JObject;
+        if (timestamps == null || timestamps.Count == 0 || timestamps.Values<string>().Any(string.IsNullOrWhiteSpace) || timestamps.Count != timestamps.Values<string>().Distinct(StringComparer.Ordinal).Count() ||
+            !timestamps.Values<string>().Contains((string)scenario["defaultTimestamp"], StringComparer.Ordinal) || (int?)(manifestCounts?["hourCount"]) != timestamps.Count)
+            throw new InvalidOperationException("Road-network timestamps are invalid.");
+        var topology = manifest["topology"] as JObject;
+        var costSlices = manifest["costSlices"] as JArray;
+        if (topology == null || costSlices == null || costSlices.Count != timestamps.Count)
+            throw new InvalidOperationException("Road-network cost references do not match the scenario timestamps.");
+        var referencedFiles = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace((string)topology["file"]) || !referencedFiles.Add((string)topology["file"]))
+            throw new InvalidOperationException("Road-network contains an invalid or duplicate file reference.");
+        for (var index = 0; index < costSlices.Count; index++)
+        {
+            var reference = costSlices[index] as JObject;
+            if (reference == null || !string.Equals((string)reference["timestamp"], (string)timestamps[index], StringComparison.Ordinal))
+                throw new InvalidOperationException("Road-network cost references do not match the scenario timestamps.");
+            var file = (string)reference["file"];
+            if (string.IsNullOrWhiteSpace(file) || !referencedFiles.Add(file))
+                throw new InvalidOperationException("Road-network contains an invalid or duplicate file reference.");
+        }
+        if (v2) ValidateV2NetworkQuality(manifest["networkQuality"] as JObject);
+        return v2;
+    }
+    private static void ValidateV2NetworkQuality(JObject quality)
+    {
+        var explicitOrDerived = (double?)quality?["explicitOrDerivedRatio"] ?? double.NaN;
+        var fallback = (double?)quality?["fallbackRatio"] ?? double.NaN;
+        if (quality == null || !string.Equals((string)quality["qualityContractVersion"], "pedestrian-network-safety-1.1", StringComparison.Ordinal) ||
+            !string.Equals((string)quality["status"], "accepted", StringComparison.Ordinal) || !string.Equals((string)quality["sourceSchemaVersion"], "0.2", StringComparison.Ordinal) ||
+            !Finite(explicitOrDerived) || explicitOrDerived < 0 || explicitOrDerived > 1 || !Finite(fallback) || fallback < 0 || fallback > 1 || Math.Abs(explicitOrDerived + fallback - 1) > 0.000001 ||
+            !(quality["validationFailures"] is JArray failures) || failures.Count != 0 || !(quality["validationWarnings"] is JArray))
+            throw new InvalidOperationException("v2 server bundle network quality contract is missing or not accepted.");
     }
     private static string SafePath(string root, string relative) { var full = Path.GetFullPath(Path.Combine(root, relative)); var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar; if (!full.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Road-network path escapes its package."); return full; }
     private static string RequiredString(JObject value, string name) => (string)value[name] ?? throw new InvalidOperationException("Missing required field: " + name);
@@ -432,11 +538,12 @@ public sealed class EnvironmentCostRuntimeRouteComparison
 
     private static ParsedTopology ParseTopology(JObject topology)
     {
-        if (!string.Equals((string)topology["schemaVersion"], TopologySchema, StringComparison.Ordinal)) throw new InvalidOperationException("Unsupported topology schema.");
+        var v2 = string.Equals((string)topology["schemaVersion"], TopologySchemaV2, StringComparison.Ordinal);
+        if (!v2 && !string.Equals((string)topology["schemaVersion"], TopologySchema, StringComparison.Ordinal)) throw new InvalidOperationException("Unsupported topology schema.");
         var nodesArray = topology["nodes"] as JArray; var physicalArray = topology["physicalEdges"] as JArray; var directedArray = topology["directedEdges"] as JArray; var counts = topology["counts"] as JObject;
         if (nodesArray == null || physicalArray == null || directedArray == null || counts == null || nodesArray.Count != (int?)counts["nodeCount"] || physicalArray.Count != (int?)counts["physicalEdgeCount"] || directedArray.Count != (int?)counts["directedEdgeCount"]) throw new InvalidOperationException("Topology counts do not match packed arrays.");
-        var nodes = new Node[nodesArray.Count]; var nodeIds = new HashSet<long>(); for (var i = 0; i < nodes.Length; i++) { var item = nodesArray[i] as JArray; if (item == null || item.Count != 3) throw new InvalidOperationException("Invalid packed node."); var id = (long?)item[0] ?? long.MinValue; var coordinate = ReadCoordinate(new JArray(item[1], item[2]), "node"); if (!nodeIds.Add(id)) throw new InvalidOperationException("Duplicate source node."); nodes[i] = new Node { sourceNodeId = id, longitude = coordinate.longitude, latitude = coordinate.latitude }; }
-        var physical = new PhysicalEdge[physicalArray.Count]; var physicalIds = new HashSet<string>(); for (var i = 0; i < physical.Length; i++) { var item = physicalArray[i] as JArray; var sources = item?[1] as JArray; var id = item?.Count == 2 ? (string)item[0] : null; if (string.IsNullOrWhiteSpace(id) || sources == null || sources.Count == 0 || !physicalIds.Add(id)) throw new InvalidOperationException("Invalid packed physical edge."); physical[i] = new PhysicalEdge { id = id, sourceEdgeIds = sources.Values<string>().ToArray() }; }
+        var nodes = new Node[nodesArray.Count]; var nodeIds = new HashSet<string>(StringComparer.Ordinal); for (var i = 0; i < nodes.Length; i++) { var item = nodesArray[i] as JArray; if (item == null || item.Count != 3) throw new InvalidOperationException("Invalid packed node."); var id = v2 ? (string)item[0] : ((long?)item[0])?.ToString(CultureInfo.InvariantCulture); var coordinate = ReadCoordinate(new JArray(item[1], item[2]), "node"); if (string.IsNullOrWhiteSpace(id) || !nodeIds.Add(id)) throw new InvalidOperationException("Duplicate source node."); nodes[i] = new Node { sourceNodeId = id, longitude = coordinate.longitude, latitude = coordinate.latitude }; }
+        var physical = new PhysicalEdge[physicalArray.Count]; var physicalIds = new HashSet<string>(); for (var i = 0; i < physical.Length; i++) { var item = physicalArray[i] as JArray; var id = item?.Count >= 2 ? (string)item[0] : null; if (string.IsNullOrWhiteSpace(id) || !physicalIds.Add(id)) throw new InvalidOperationException("Invalid packed physical edge."); if (!v2) { var sources = item?[1] as JArray; if (item.Count != 2 || sources == null || sources.Count == 0 || sources.Values<string>().Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException("Invalid packed physical edge."); physical[i] = new PhysicalEdge { id = id, sourceEdgeIds = sources.Values<string>().ToArray() }; } else { var from = (int?)item[1] ?? -1; var to = (int?)item[2] ?? -1; var geometry = item[3] as JArray; if (item.Count != 9 || from < 0 || from >= nodes.Length || to < 0 || to >= nodes.Length || from == to || geometry == null || geometry.Count < 2) throw new InvalidOperationException("Invalid v2 packed physical edge."); var coordinates = geometry.Select(point => ReadCoordinate(point as JArray, "physical geometry")).ToArray(); if (!CoordinatesMatch(coordinates[0], nodes[from]) || !CoordinatesMatch(coordinates[coordinates.Length - 1], nodes[to])) throw new InvalidOperationException("V2 physical geometry endpoint does not match node."); physical[i] = new PhysicalEdge { id = id, sourceEdgeIds = new[] { id }, fromNodeIndex = from, toNodeIndex = to, geometry = coordinates }; } }
         var directed = new DirectedEdge[directedArray.Count]; for (var i = 0; i < directed.Length; i++) { var item = directedArray[i] as JArray; if (item == null || item.Count != 6) throw new InvalidOperationException("Invalid packed directed edge."); var edge = new DirectedEdge { physicalEdgeIndex = (int?)item[0] ?? -1, fromNodeIndex = (int?)item[1] ?? -1, toNodeIndex = (int?)item[2] ?? -1, directionCode = (int?)item[3] ?? -1, lengthMeters = (double?)item[4] ?? -1, walkingSeconds = (double?)item[5] ?? -1 }; if (edge.physicalEdgeIndex < 0 || edge.physicalEdgeIndex >= physical.Length || edge.fromNodeIndex < 0 || edge.fromNodeIndex >= nodes.Length || edge.toNodeIndex < 0 || edge.toNodeIndex >= nodes.Length || edge.fromNodeIndex == edge.toNodeIndex || (edge.directionCode != 0 && edge.directionCode != 1) || edge.lengthMeters <= 0 || edge.walkingSeconds <= 0) throw new InvalidOperationException("Invalid packed directed edge values."); directed[i] = edge; }
         var walkingByPhysical = new double[physical.Length];
         for (var index = 0; index < walkingByPhysical.Length; index++) walkingByPhysical[index] = -1;
@@ -447,21 +554,24 @@ public sealed class EnvironmentCostRuntimeRouteComparison
             else if (Math.Abs(walking - edge.walkingSeconds) > Tolerance) throw new InvalidOperationException("Walking time differs by direction for a physical edge.");
         }
         foreach (var walking in walkingByPhysical) if (walking <= 0) throw new InvalidOperationException("A physical edge has no directed edge.");
-        return new ParsedTopology { areaId = RequiredString(topology, "areaId"), contentFingerprintSha256 = RequiredString(topology, "contentFingerprintSha256"), nodes = nodes, physicalEdges = physical, directedEdges = directed, physicalWalkingSeconds = walkingByPhysical };
+        if (v2)
+            foreach (var edge in directed) { var physicalEdge = physical[edge.physicalEdgeIndex]; var forward = edge.fromNodeIndex == physicalEdge.fromNodeIndex && edge.toNodeIndex == physicalEdge.toNodeIndex; var backward = edge.fromNodeIndex == physicalEdge.toNodeIndex && edge.toNodeIndex == physicalEdge.fromNodeIndex; if ((!forward && !backward) || edge.directionCode != (forward ? 0 : 1)) throw new InvalidOperationException("V2 directed edge does not follow physical geometry."); }
+        return new ParsedTopology { areaId = RequiredString(topology, "areaId"), contentFingerprintSha256 = RequiredString(topology, "contentFingerprintSha256"), graphFingerprintSha256 = RequiredString(topology, "graphFingerprintSha256"), isV2 = v2, nodes = nodes, physicalEdges = physical, directedEdges = directed, physicalWalkingSeconds = walkingByPhysical };
     }
 
     private static Cost[] ParseCostSlice(JObject slice, ParsedTopology topology, string expectedTimestamp)
     {
         var costs = slice["costs"] as JArray;
-        if (!string.Equals((string)slice["schemaVersion"], "environment-cost-server-cost-slice-1.0", StringComparison.Ordinal) || !string.Equals((string)slice["areaId"], topology.areaId, StringComparison.Ordinal) || !string.Equals((string)slice["timestamp"], expectedTimestamp, StringComparison.Ordinal) || !string.Equals((string)slice["topologyContentFingerprintSha256"], topology.contentFingerprintSha256, StringComparison.Ordinal) || (int?)slice["physicalEdgeCount"] != topology.physicalEdges.Length || costs == null || costs.Count != topology.physicalEdges.Length) throw new InvalidOperationException("Invalid cost slice.");
+        var expectedSchema = topology.isV2 ? "environment-cost-server-cost-slice-2.0" : "environment-cost-server-cost-slice-1.0";
+        if (!string.Equals((string)slice["schemaVersion"], expectedSchema, StringComparison.Ordinal) || !string.Equals((string)slice["areaId"], topology.areaId, StringComparison.Ordinal) || !string.Equals((string)slice["timestamp"], expectedTimestamp, StringComparison.Ordinal) || !string.Equals((string)slice["topologyContentFingerprintSha256"], topology.contentFingerprintSha256, StringComparison.Ordinal) || (int?)slice["physicalEdgeCount"] != topology.physicalEdges.Length || costs == null || costs.Count != topology.physicalEdges.Length) throw new InvalidOperationException("Invalid cost slice.");
         var values = new Cost[costs.Count]; for (var i = 0; i < values.Length; i++) { var item = costs[i] as JArray; if (item == null || item.Count != 6) throw new InvalidOperationException("Invalid packed cost."); var code = (int?)item[0] ?? -1; var sample = (int?)item[1] ?? -1; var valid = (int?)item[2] ?? -1; var noGround = (int?)item[3] ?? -1; if (code < 0 || code > 2 || sample < 0 || valid < 0 || noGround < 0 || valid + noGround != sample) throw new InvalidOperationException("Invalid packed cost coverage."); if (code == 0) { if (item[4]?.Type != JTokenType.Null || item[5]?.Type != JTokenType.Null || valid != 0) throw new InvalidOperationException("Invalid missing packed cost."); values[i] = Cost.Missing(); } else { var shade = (double?)item[4] ?? double.NaN; var exposure = (double?)item[5] ?? double.NaN; if (!Finite(shade) || shade < 0 || shade > 1 || !Finite(exposure) || exposure < 0 || Math.Abs(exposure - topology.physicalWalkingSeconds[i] * (1.0 - shade)) > FormulaToleranceSeconds) throw new InvalidOperationException("Invalid calculated packed cost."); values[i] = new Cost { status = code == 1 ? "partial" : "available", shadeRatio = shade, solarExposureSeconds = exposure }; } }
         return values;
     }
 
-    private sealed class Package { public string areaId, cityPackageVersion, cityPackageManifestSha256, topologyFingerprintSha256, graphFingerprintSha256, bundleFingerprintSha256, referenceDate, timezone; public EnvironmentCostRuntimeRouteCoordinate center; public double radiusMeters; public Node[] nodes; public PhysicalEdge[] physicalEdges; public DirectedEdge[] directedEdges; public double[] physicalWalkingSeconds; public Dictionary<string, string> baselineCostFiles; public Dictionary<string, Cost[]> baselineCosts; }
-    private sealed class ParsedTopology { public string areaId, contentFingerprintSha256; public Node[] nodes; public PhysicalEdge[] physicalEdges; public DirectedEdge[] directedEdges; public double[] physicalWalkingSeconds; }
-    private sealed class Node { public long sourceNodeId; public double longitude, latitude; }
-    private sealed class PhysicalEdge { public string id; public string[] sourceEdgeIds; }
+    private sealed class Package { public string areaId, cityPackageVersion, cityPackageManifestSha256, topologyFingerprintSha256, graphFingerprintSha256, bundleFingerprintSha256, referenceDate, timezone; public bool isV2; public EnvironmentCostRuntimeRouteCoordinate center; public double radiusMeters; public Node[] nodes; public PhysicalEdge[] physicalEdges; public DirectedEdge[] directedEdges; public double[] physicalWalkingSeconds; public Dictionary<string, string> baselineCostFiles; public Dictionary<string, Cost[]> baselineCosts; }
+    private sealed class ParsedTopology { public string areaId, contentFingerprintSha256, graphFingerprintSha256; public bool isV2; public Node[] nodes; public PhysicalEdge[] physicalEdges; public DirectedEdge[] directedEdges; public double[] physicalWalkingSeconds; }
+    private sealed class Node { public string sourceNodeId; public double longitude, latitude; }
+    private sealed class PhysicalEdge { public string id; public string[] sourceEdgeIds; public int fromNodeIndex, toNodeIndex; public EnvironmentCostRuntimeRouteCoordinate[] geometry; }
     private sealed class DirectedEdge { public int physicalEdgeIndex, fromNodeIndex, toNodeIndex, directionCode; public double lengthMeters, walkingSeconds; }
     private sealed class Cost { public string status; public double shadeRatio, solarExposureSeconds; public static Cost Missing() => new Cost { status = "missing", shadeRatio = -1, solarExposureSeconds = -1 }; public Cost Copy() => new Cost { status = status, shadeRatio = shadeRatio, solarExposureSeconds = solarExposureSeconds }; }
     private sealed class CostSource { public Cost[] costs; public EnvironmentCostRuntimeRouteScenarioProvenance provenance; }
@@ -503,6 +613,7 @@ public sealed class EnvironmentCostRuntimeRouteComparison
     public string id;
     public string[] sourceEdgeIds;
     public EnvironmentCostRuntimeRouteCoordinate from, to;
+    public List<EnvironmentCostRuntimeRouteCoordinate> coordinates = new List<EnvironmentCostRuntimeRouteCoordinate>();
     public double walkingSeconds, baselineValue, policyValue, delta;
     public string baselineStatus, policyStatus, status;
 }

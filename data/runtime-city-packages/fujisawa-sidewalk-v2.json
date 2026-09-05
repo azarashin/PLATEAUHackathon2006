@@ -5,6 +5,7 @@
   "version": "2026.09.02-sidewalk-v2",
   "analysisConfigPath": "data/analysis-configs/fujisawa.json",
   "sidewalkNetworkPath": "data/generated/fujisawa-sidewalk-pedestrian-network-v2.json",
+  "roadNetworkBundlePath": "data/generated/fujisawa-environment-cost-server-bundle-v2/manifest.json",
   "packageRelativePath": "EnvironmentCostCities/fujisawa-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/fujisawa.unity",
   "runtimeShadeResultOutputPath": "data/generated/fujisawa-sidewalk-v2-runtime-shade-result.json",

@@ -126,15 +126,12 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         var triangles = new List<int>();
         foreach (var road in roads)
         {
-            var from = ToLocal(reference, road.from) + Vector3.up * HeatmapSurfaceOffset;
-            var to = ToLocal(reference, road.to) + Vector3.up * HeatmapSurfaceOffset;
-            var direction = to - from;
-            if (direction.sqrMagnitude < 0.0001f) continue;
-            var side = Vector3.Cross(Vector3.up, direction.normalized) * 0.8f;
-            var index = vertices.Count;
-            vertices.Add(from - side); vertices.Add(from + side); vertices.Add(to + side); vertices.Add(to - side);
-            triangles.Add(index); triangles.Add(index + 1); triangles.Add(index + 2);
-            triangles.Add(index); triangles.Add(index + 2); triangles.Add(index + 3);
+            var geometry = road.coordinates != null && road.coordinates.Count >= 2
+                ? road.coordinates
+                : new List<EnvironmentCostRuntimeRouteCoordinate> { road.from, road.to };
+            for (var index = 1; index < geometry.Count; index++)
+                AddRoadSegment(vertices, triangles, ToLocal(reference, geometry[index - 1]) + Vector3.up * HeatmapSurfaceOffset,
+                    ToLocal(reference, geometry[index]) + Vector3.up * HeatmapSurfaceOffset);
         }
         if (vertices.Count == 0) return;
         var item = new GameObject("RoadHeatmap-" + edgeStatus);
@@ -148,6 +145,17 @@ public sealed class EnvironmentCostRuntimeRoadHeatmapController : MonoBehaviour
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
         item.layer = 2; // Ignore Raycast: the comparison overlay must not obstruct editing or endpoint selection.
+    }
+
+    private static void AddRoadSegment(List<Vector3> vertices, List<int> triangles, Vector3 from, Vector3 to)
+    {
+        var direction = to - from;
+        if (direction.sqrMagnitude < 0.0001f) return;
+        var side = Vector3.Cross(Vector3.up, direction.normalized) * 0.8f;
+        var index = vertices.Count;
+        vertices.Add(from - side); vertices.Add(from + side); vertices.Add(to + side); vertices.Add(to - side);
+        triangles.Add(index); triangles.Add(index + 1); triangles.Add(index + 2);
+        triangles.Add(index); triangles.Add(index + 2); triangles.Add(index + 3);
     }
 
     private GeoReference CreateLocalReference()

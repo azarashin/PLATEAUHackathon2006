@@ -87,11 +87,18 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
     {
         metadata = GetComponent<EnvironmentCostInspectionMetadata>();
         packageLoader = GetComponent<EnvironmentCostRuntimeCityPackageLoader>();
+        packageLoader?.EnsureLoadStarted();
         while (packageLoader != null && (packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.NotStarted ||
                                          packageLoader.State == EnvironmentCostRuntimeCityPackageLoader.PackageState.Loading)) yield return null;
         if (metadata == null || packageLoader == null || packageLoader.State != EnvironmentCostRuntimeCityPackageLoader.PackageState.Ready)
         {
             status = "経路比較には検証済みの都市データパッケージが必要です。";
+            yield break;
+        }
+
+        if (!HasRoadNetwork(packageLoader.PackageRootPath))
+        {
+            status = "この都市データパッケージには経路比較用の道路ネットワークが収録されていません。道路ネットワークを含む都市データパッケージを作成してください。";
             yield break;
         }
 
@@ -145,6 +152,10 @@ public sealed class EnvironmentCostRuntimeRouteComparisonController : MonoBehavi
         ClearRoutes();
         status = $"{label}を設定しました（緯度 {coordinate.latitude:F6}、経度 {coordinate.longitude:F6}）。";
     }
+
+    /// <summary>Checks the optional route-comparison payload before starting a background package load.</summary>
+    public static bool HasRoadNetwork(string cityPackageRoot)
+        => !string.IsNullOrWhiteSpace(cityPackageRoot) && File.Exists(Path.Combine(cityPackageRoot, "road-network", "manifest.json"));
 
     private Camera ResolveCamera()
     {

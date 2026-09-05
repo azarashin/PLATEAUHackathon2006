@@ -5,6 +5,7 @@
   "version": "2026.09.02-sidewalk-v2",
   "analysisConfigPath": "data/analysis-configs/maizuru.json",
   "sidewalkNetworkPath": "data/generated/maizuru-sidewalk-pedestrian-network-v2.json",
+  "roadNetworkBundlePath": "data/generated/maizuru-environment-cost-server-bundle-v2/manifest.json",
   "packageRelativePath": "EnvironmentCostCities/maizuru-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/maizuru.unity",
   "runtimeShadeResultOutputPath": "data/generated/maizuru-sidewalk-v2-runtime-shade-result.json",

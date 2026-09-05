@@ -5,6 +5,7 @@
   "version": "2026.09.02-sidewalk-v2",
   "analysisConfigPath": "data/analysis-configs/saitama.json",
   "sidewalkNetworkPath": "data/generated/saitama-sidewalk-pedestrian-network-v2.json",
+  "roadNetworkBundlePath": "data/generated/saitama-environment-cost-server-bundle-v2/manifest.json",
   "packageRelativePath": "EnvironmentCostCities/saitama-sidewalk-v2",
   "inspectionSceneAssetPath": "Assets/Scenes/EnvironmentCostInspection/saitama.unity",
   "runtimeShadeResultOutputPath": "data/generated/saitama-sidewalk-v2-runtime-shade-result.json",
