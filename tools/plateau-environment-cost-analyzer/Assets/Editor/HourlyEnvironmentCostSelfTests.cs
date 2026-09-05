@@ -228,6 +228,8 @@ public static class HourlyEnvironmentCostSelfTests
             AssertEqual(2, runtimeShadeResult.edges[0].hourly[0].noGroundSampleCount);
             AssertRuntimeShadeRaycasts();
             AssertRuntimeRouteComparison();
+            AssertRuntimeRouteComparisonV2();
+            AssertEqual(false, EnvironmentCostRuntimeRouteComparisonController.HasRoadNetwork(Path.Combine(Path.GetTempPath(), "environment-cost-route-missing-self-test")));
             AssertRuntimeRouteComparisonWithLocalCityPackage();
             AssertRuntimeUiKeyboardFocusPolicy();
             AssertRuntimeUiDocumentInputGate();
@@ -440,6 +442,91 @@ public static class HourlyEnvironmentCostSelfTests
         {
             if (Directory.Exists(packageRoot)) Directory.Delete(packageRoot, true);
         }
+    }
+
+    private static void AssertRuntimeRouteComparisonV2()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "environment-cost-runtime-route-v2-self-test-" + Guid.NewGuid().ToString("N"));
+        var road = Path.Combine(root, "road-network");
+        Directory.CreateDirectory(road);
+        try
+        {
+            AssertEqual(false, EnvironmentCostRuntimeRouteComparisonController.HasRoadNetwork(root));
+            File.WriteAllText(Path.Combine(root, "manifest.json"), "{\"areaId\":\"route-v2\",\"version\":\"self-test\"}");
+            var topology = new JObject
+            {
+                ["schemaVersion"] = "environment-cost-server-topology-2.0", ["areaId"] = "route-v2", ["graphFingerprintSha256"] = new string('a', 64), ["contentFingerprintSha256"] = new string('b', 64),
+                ["networkQuality"] = new JObject { ["qualityContractVersion"] = "pedestrian-network-safety-1.1", ["status"] = "accepted", ["explicitOrDerivedRatio"] = 1.0, ["fallbackRatio"] = 0.0, ["sourceSchemaVersion"] = "0.2", ["validationFailures"] = new JArray(), ["validationWarnings"] = new JArray() },
+                ["counts"] = new JObject { ["nodeCount"] = 2, ["physicalEdgeCount"] = 1, ["directedEdgeCount"] = 2 },
+                ["nodes"] = new JArray { new JArray("sidewalk:a", 139.0, 35.0), new JArray("sidewalk:b", 139.001, 35.0) },
+                ["physicalEdges"] = new JArray { new JArray("walk-1", 0, 1, new JArray { new JArray(139.0, 35.0), new JArray(139.0005, 35.0002), new JArray(139.001, 35.0) }, new JObject(), "sidewalk", "left", 0, false) },
+                // The representative physical edge is intentionally backward.  This verifies
+                // that heatmap rendering reverses the v2 physical geometry as well.
+                ["directedEdges"] = new JArray { new JArray(0, 1, 0, 1, 100.0, 70.0), new JArray(0, 0, 1, 0, 100.0, 70.0) }
+            };
+            var topologyPath = Path.Combine(road, "topology.json"); File.WriteAllText(topologyPath, topology.ToString(Formatting.None));
+            var cost = new JObject { ["schemaVersion"] = "environment-cost-server-cost-slice-2.0", ["areaId"] = "route-v2", ["timestamp"] = "2025-08-01T12:00:00+09:00", ["topologyContentFingerprintSha256"] = new string('b', 64), ["physicalEdgeCount"] = 1, ["costs"] = new JArray { new JArray(2, 1, 1, 0, 0.5, 35.0) } };
+            var costPath = Path.Combine(road, "cost.json"); File.WriteAllText(costPath, cost.ToString(Formatting.None));
+            var manifest = new JObject
+            {
+                ["schemaVersion"] = "environment-cost-server-bundle-2.0", ["status"] = "completed", ["bundleFingerprintSha256"] = new string('c', 64),
+                ["inputs"] = new JObject { ["roadGraphFingerprintSha256"] = new string('a', 64) }, ["area"] = new JObject { ["areaId"] = "route-v2", ["center"] = new JArray(139.0, 35.0), ["radiusMeters"] = 500.0 },
+                ["scenario"] = new JObject { ["availableTimestamps"] = new JArray("2025-08-01T12:00:00+09:00"), ["defaultTimestamp"] = "2025-08-01T12:00:00+09:00" }, ["counts"] = new JObject { ["nodeCount"] = 2, ["physicalEdgeCount"] = 1, ["directedEdgeCount"] = 2, ["hourCount"] = 1 },
+                ["networkQuality"] = new JObject { ["qualityContractVersion"] = "pedestrian-network-safety-1.1", ["status"] = "accepted", ["explicitOrDerivedRatio"] = 1.0, ["fallbackRatio"] = 0.0, ["sourceSchemaVersion"] = "0.2", ["validationFailures"] = new JArray(), ["validationWarnings"] = new JArray() },
+                ["topology"] = FileReference(topologyPath, "topology.json", new string('b', 64)), ["costSlices"] = new JArray { FileReference(costPath, "cost.json", new string('d', 64)) }
+            };
+            File.WriteAllText(Path.Combine(road, "manifest.json"), manifest.ToString(Formatting.None));
+            AssertEqual(true, EnvironmentCostRuntimeRouteComparisonController.HasRoadNetwork(root));
+            ((JObject)((JArray)manifest["costSlices"])[0])["timestamp"] = "2025-08-01T13:00:00+09:00";
+            File.WriteAllText(Path.Combine(road, "manifest.json"), manifest.ToString(Formatting.None));
+            AssertThrows<InvalidOperationException>(() => EnvironmentCostRuntimeRouteComparison.Load(root));
+            ((JObject)((JArray)manifest["costSlices"])[0])["timestamp"] = "2025-08-01T12:00:00+09:00";
+            File.WriteAllText(Path.Combine(road, "manifest.json"), manifest.ToString(Formatting.None));
+            var core = EnvironmentCostRuntimeRouteComparison.Load(root);
+            var request = new EnvironmentCostRuntimeRouteComparisonRequest { areaId = "route-v2", timestamp = "2025-08-01T12:00:00+09:00", start = new EnvironmentCostRuntimeRouteCoordinate { nodeIndex = 0 }, end = new EnvironmentCostRuntimeRouteCoordinate { nodeIndex = 1 } };
+            var result = core.Compare(request, null);
+            AssertEqual("sidewalk:a", result.baseline.start.nodeId);
+            AssertEqual(3, result.baseline.routes[0].coordinates.Count);
+            AssertNear(35.0002, result.baseline.routes[0].coordinates[1].latitude, 0.0000001);
+            var reverseResult = core.Compare(new EnvironmentCostRuntimeRouteComparisonRequest { areaId = "route-v2", timestamp = request.timestamp, start = new EnvironmentCostRuntimeRouteCoordinate { nodeIndex = 1 }, end = new EnvironmentCostRuntimeRouteCoordinate { nodeIndex = 0 } }, null);
+            AssertEqual(3, reverseResult.baseline.routes[0].coordinates.Count);
+            AssertNear(139.001, reverseResult.baseline.routes[0].coordinates[0].longitude, 0.0000001);
+            AssertNear(35.0002, reverseResult.baseline.routes[0].coordinates[1].latitude, 0.0000001);
+            AssertNear(139.0, reverseResult.baseline.routes[0].coordinates[2].longitude, 0.0000001);
+            var policyResult = new EnvironmentCostRuntimeShadeAnalysisResult
+            {
+                status = "completed", areaId = "route-v2", generatedAtUtc = "2025-08-01T03:00:00.0000000Z",
+                provenance = new EnvironmentCostRuntimeShadeAnalysisProvenance
+                {
+                    areaId = "route-v2", analysisDate = "2025-08-01", hours = new[] { 12 }, scenarioId = "v2-test",
+                    policyFingerprintSha256 = new string('e', 64), resultFingerprintSha256 = new string('f', 64),
+                    cityPackageVersion = "self-test", cityPackageManifestSha256 = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(Path.Combine(root, "manifest.json")),
+                    graphFingerprintSha256 = new string('a', 64)
+                },
+                edges = new List<EnvironmentCostRuntimeShadeEdgeResult>
+                {
+                    new EnvironmentCostRuntimeShadeEdgeResult
+                    {
+                        id = "walk-1",
+                        hourly = new[] { new EnvironmentCostRuntimeShadeHourlyResult { hour = 12, timestamp = "2025-08-01T12:00:00+09:00", status = "available", shadeRatio = 0.5, sampleCount = 1, validSampleCount = 1, noGroundSampleCount = 0 } }
+                    }
+                }
+            };
+            var comparison = core.Compare(request, policyResult);
+            var heatmap = core.CompareRoadHeatmap(new EnvironmentCostRuntimeRoadHeatmapComparisonRequest { areaId = "route-v2", timestamp = request.timestamp }, comparison, policyResult);
+            AssertEqual(3, heatmap.edges[0].coordinates.Count);
+            AssertNear(139.001, heatmap.edges[0].coordinates[0].longitude, 0.0000001);
+            AssertNear(35.0002, heatmap.edges[0].coordinates[1].latitude, 0.0000001);
+            AssertNear(139.0, heatmap.edges[0].coordinates[2].longitude, 0.0000001);
+            policyResult.provenance.graphFingerprintSha256 = new string('0', 64);
+            AssertThrows<InvalidOperationException>(() => core.Compare(request, policyResult));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static JObject FileReference(string path, string file, string contentFingerprint)
+    {
+        return new JObject { ["file"] = file, ["bytes"] = new FileInfo(path).Length, ["fileSha256"] = EnvironmentCostRuntimeCityPackageManifest.CalculateSha256(path), ["contentFingerprintSha256"] = contentFingerprint };
     }
 
     private static void AssertRuntimeRouteComparisonWithLocalCityPackage()
