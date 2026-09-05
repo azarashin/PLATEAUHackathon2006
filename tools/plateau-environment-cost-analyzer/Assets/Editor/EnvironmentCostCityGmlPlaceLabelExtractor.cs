@@ -27,8 +27,19 @@ public static class EnvironmentCostCityGmlPlaceLabelExtractor
             try
             {
                 var gml = GmlFile.Create(input.path);
-                epsgCodes.Add(gml.Epsg);
-                ExtractFile(XDocument.Load(input.path), input, analysis, config.placeLabelCoordinateAxis, gml.Epsg, reference, labels);
+                int sourceEpsg;
+                try
+                {
+                    sourceEpsg = gml.Epsg;
+                }
+                finally
+                {
+                    // GmlFile exposes Dispose(), but does not implement IDisposable in the
+                    // current PLATEAU SDK. Release its native handle explicitly for every file.
+                    gml.Dispose();
+                }
+                epsgCodes.Add(sourceEpsg);
+                ExtractFile(XDocument.Load(input.path), input, analysis, config.placeLabelCoordinateAxis, sourceEpsg, reference, labels);
                 parsed++;
             }
             catch (Exception exception) { errors.Add($"{Path.GetFileName(input.path)}: {exception.Message}"); }
