@@ -6,6 +6,8 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System.Xml.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PLATEAU.Geometries;
 using PLATEAU.Native;
 
@@ -231,6 +233,7 @@ public static class HourlyEnvironmentCostSelfTests
             AssertRuntimeRouteComparisonV2();
             AssertEqual(false, EnvironmentCostRuntimeRouteComparisonController.HasRoadNetwork(Path.Combine(Path.GetTempPath(), "environment-cost-route-missing-self-test")));
             AssertRuntimeRouteComparisonWithLocalCityPackage();
+            AssertRuntimeRouteComparisonWithLocalV2CityPackage();
             AssertRuntimeUiKeyboardFocusPolicy();
             AssertRuntimeUiDocumentInputGate();
             AssertRuntimeOverviewMapCullingMask();
@@ -512,7 +515,7 @@ public static class HourlyEnvironmentCostSelfTests
                     }
                 }
             };
-            var comparison = core.Compare(request, policyResult);
+            var comparison = core.Compare(request, null, policyResult);
             var heatmap = core.CompareRoadHeatmap(new EnvironmentCostRuntimeRoadHeatmapComparisonRequest { areaId = "route-v2", timestamp = request.timestamp }, comparison, policyResult);
             AssertEqual(3, heatmap.edges[0].coordinates.Count);
             AssertNear(139.001, heatmap.edges[0].coordinates[0].longitude, 0.0000001);
@@ -562,6 +565,38 @@ public static class HourlyEnvironmentCostSelfTests
         AssertNear(0.7210275379560118, result.baseline.routes[1].observedShadeRatio, 0.000001);
         AssertNear(0.7247973927581977, result.baseline.routes[2].observedShadeRatio, 0.000001);
         Debug.Log($"ENVIRONMENT_COST_RUNTIME_ROUTE_CITY_PACKAGE_PASSED elapsedMilliseconds={stopwatch.Elapsed.TotalMilliseconds:F1}");
+    }
+
+    private static void AssertRuntimeRouteComparisonWithLocalV2CityPackage()
+    {
+        var packageRoot = Path.Combine(Application.streamingAssetsPath, "EnvironmentCostCities", "ichigaya-venue-sidewalk-v2");
+        if (!Directory.Exists(packageRoot))
+        {
+            Debug.Log("ENVIRONMENT_COST_RUNTIME_ROUTE_V2_CITY_PACKAGE_SKIPPED reason=package-not-found");
+            return;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var core = EnvironmentCostRuntimeRouteComparison.Load(packageRoot);
+        AssertEqual(24, core.AvailableTimestamps.Length);
+        var result = core.Compare(new EnvironmentCostRuntimeRouteComparisonRequest
+        {
+            areaId = "ichigaya-venue",
+            timestamp = "2025-08-01T12:00:00+09:00",
+            start = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.736043, latitude = 35.69047, nodeIndex = -1 },
+            end = new EnvironmentCostRuntimeRouteCoordinate { longitude = 139.700556, latitude = 35.689606, nodeIndex = -1 }
+        }, null);
+        stopwatch.Stop();
+
+        AssertEqual(true, result.baseline.start.nodeId.StartsWith("ped:", StringComparison.Ordinal));
+        AssertEqual(true, result.baseline.end.nodeId.StartsWith("ped:", StringComparison.Ordinal));
+        AssertEqual(3, result.baseline.routes.Count);
+        foreach (var route in result.baseline.routes)
+        {
+            AssertEqual(true, route.edgeIds.Count > 0);
+            AssertEqual(true, route.coordinates.Count >= route.edgeIds.Count + 1);
+        }
+        Debug.Log($"ENVIRONMENT_COST_RUNTIME_ROUTE_V2_CITY_PACKAGE_PASSED elapsedMilliseconds={stopwatch.Elapsed.TotalMilliseconds:F1}");
     }
 
     private static EnvironmentCostRuntimeShadeAnalysisResult CreateFixtureRuntimeRouteResult(string packageRoot, string scenarioId, double shadeRatio)
@@ -727,32 +762,33 @@ public static class HourlyEnvironmentCostSelfTests
         AssertEqual(true, (mask & (1 << 10)) != 0);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds >= 0.1f);
         AssertEqual(true, EnvironmentCostRuntimeOverviewMapController.IdleRefreshIntervalSeconds >= EnvironmentCostRuntimeOverviewMapController.MovingRefreshIntervalSeconds);
-        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(1000f));
-        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(1000f));
-        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(10f, 1000f));
-        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(2000f, 1000f));
-        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(100f));
-        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(100f));
-        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(10f));
-        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10f));
-        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10000f));
-        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(20000f, 10000f));
-        AssertNear(100.3, EnvironmentCostRuntimeOverviewMapController.GetMinimumSourceCameraHeightMeters(100f, 0.3f));
-        AssertNear(1100.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumSourceCameraHeightMeters(100f, 1000f));
-        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100f, 100.3f, 1100f, 1000f));
-        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100.3f, 100.3f, 1100f, 1000f));
-        AssertNear(600.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(600.15f, 100.3f, 1100f, 1000f));
-        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(1100f, 100.3f, 1100f, 1000f));
-        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(2000f, 100.3f, 1100f, 1000f));
-        AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)));
+        const double floatTolerance = 0.001;
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(1000f), floatTolerance);
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(1000f), floatTolerance);
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(10f, 1000f), floatTolerance);
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(2000f, 1000f), floatTolerance);
+        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(100f), floatTolerance);
+        AssertNear(100.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(100f), floatTolerance);
+        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMinimumMapExtentMeters(10f), floatTolerance);
+        AssertNear(10.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10f), floatTolerance);
+        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMaximumMapExtentMeters(10000f), floatTolerance);
+        AssertNear(10000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.ClampMapExtentMeters(20000f, 10000f), floatTolerance);
+        AssertNear(100.3, EnvironmentCostRuntimeOverviewMapController.GetMinimumSourceCameraHeightMeters(100f, 0.3f), floatTolerance);
+        AssertNear(1100.0, EnvironmentCostRuntimeOverviewMapController.GetMaximumSourceCameraHeightMeters(100f, 1000f), floatTolerance);
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100f, 100.3f, 1100f, 1000f), floatTolerance);
+        AssertNear(200.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(100.3f, 100.3f, 1100f, 1000f), floatTolerance);
+        AssertNear(600.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(600.15f, 100.3f, 1100f, 1000f), floatTolerance);
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(1100f, 100.3f, 1100f, 1000f), floatTolerance);
+        AssertNear(1000.0 / 1.5, EnvironmentCostRuntimeOverviewMapController.GetMapExtentMetersForSourceCameraHeight(2000f, 100.3f, 1100f, 1000f), floatTolerance);
+        AssertNear(90.0, EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerRotationDegrees(Quaternion.Euler(0f, 90f, 0f)), floatTolerance);
         EnvironmentCostRuntimeOverviewMapController.GetPositionMarkerTriangleVertices(22f, 28f, out var markerTip, out var markerLeftBase, out var markerRightBase);
-        AssertNear(11.0, markerTip.x);
-        AssertNear(0.0, markerTip.y);
-        AssertNear(0.0, markerLeftBase.x);
-        AssertNear(28.0, markerLeftBase.y);
-        AssertNear(22.0, markerRightBase.x);
-        AssertNear(28.0, markerRightBase.y);
-        AssertNear(Vector2.Distance(markerTip, markerLeftBase), Vector2.Distance(markerTip, markerRightBase));
+        AssertNear(11.0, markerTip.x, floatTolerance);
+        AssertNear(0.0, markerTip.y, floatTolerance);
+        AssertNear(0.0, markerLeftBase.x, floatTolerance);
+        AssertNear(28.0, markerLeftBase.y, floatTolerance);
+        AssertNear(22.0, markerRightBase.x, floatTolerance);
+        AssertNear(28.0, markerRightBase.y, floatTolerance);
+        AssertNear(Vector2.Distance(markerTip, markerLeftBase), Vector2.Distance(markerTip, markerRightBase), floatTolerance);
         AssertEqual(60, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(150f));
         AssertEqual(70, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(250f));
         AssertEqual(80, EnvironmentCostRuntimeOverviewMapController.GetMinimumPlaceLabelPriority(500f));
